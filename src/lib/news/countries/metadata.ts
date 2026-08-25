@@ -34,6 +34,12 @@ export function getCountryName(code: string): string {
   return (Array.isArray(names) ? names[0] : names) ?? normalized;
 }
 
+export function listCountries(): Array<{ code: string; name: string }> {
+  return codeRows
+    .map(([code]) => ({ code, name: getCountryName(code) }))
+    .sort((first, second) => first.name.localeCompare(second.name, "en"));
+}
+
 export function numericCountryIdToCode(id: string | number): string | null {
   const numeric = String(id).padStart(3, "0");
   return numericCodes.get(numeric) ?? null;

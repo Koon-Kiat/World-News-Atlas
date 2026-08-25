@@ -40,7 +40,14 @@ export function StoryCard({ story, featured = false }: { story: StoryView; featu
     <article className={featured ? "story-card is-featured" : "story-card"}>
       {safeImage && (
         <div className="story-image-wrap">
-          <img src={safeImage} alt="" className="story-image" loading="lazy" referrerPolicy="no-referrer" />
+          <img
+            src={safeImage}
+            alt=""
+            className="story-image"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={(event) => { event.currentTarget.style.visibility = "hidden"; }}
+          />
           <span className="image-shade" />
           <span className="story-rank">{featured ? "Lead story" : "Developing"}</span>
         </div>

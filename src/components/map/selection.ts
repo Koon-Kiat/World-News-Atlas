@@ -1,7 +1,12 @@
-export function updateCountrySelection(current: string[], countryCode: string): string[] {
+export function updateCountrySelection(
+  current: string[],
+  countryCode: string,
+  limit: 1 | 2 = 2,
+): string[] {
   if (current.includes(countryCode)) {
     return current.filter((code) => code !== countryCode);
   }
-  if (current.length < 2) return [...current, countryCode];
+  if (limit === 1) return [countryCode];
+  if (current.length < limit) return [...current, countryCode];
   return [current[1], countryCode];
 }

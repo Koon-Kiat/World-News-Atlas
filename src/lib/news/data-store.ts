@@ -4,9 +4,7 @@ import { clusterArticles } from "./cluster";
 import { deduplicateArticles } from "./deduplicate";
 import { logNews } from "./logger";
 import { normalizeProviderArticles } from "./normalize";
-import { providerTimeoutFromEnvironment } from "./providers";
-import { NewsApiProvider } from "./providers/newsapi";
-import { ProviderError } from "./providers/provider";
+import { createConfiguredProviders, fetchProviderArticlesGracefully } from "./providers";
 import type { StoryView } from "./types";
 
 const LIVE_CACHE_TTL_MS = 60 * 60_000;
@@ -87,15 +85,14 @@ async function loadDatabaseStories(): Promise<StoryView[]> {
 }
 
 async function loadLiveStories(): Promise<StoryView[]> {
-  const apiKey = process.env.NEWSAPI_KEY?.trim();
-  if (!apiKey) return [];
   if (liveCache && liveCache.expiresAt > Date.now()) return liveCache.stories;
 
   try {
-    const provider = new NewsApiProvider(apiKey, providerTimeoutFromEnvironment());
-    const result = await provider.fetchLatest({
+    const providers = createConfiguredProviders();
+    if (providers.length === 0) return [];
+    const result = await fetchProviderArticlesGracefully(providers, {
       from: new Date(Date.now() - 3 * 24 * 3_600_000),
-      limit: 100,
+      limit: 150,
     });
     const normalized = normalizeProviderArticles(result.articles);
     const deduplicated = deduplicateArticles(normalized);
@@ -116,8 +113,7 @@ async function loadLiveStories(): Promise<StoryView[]> {
     return stories;
   } catch (error) {
     logNews("warn", "live_news_fetch_failed", {
-      provider: "NEWSAPI",
-      code: error instanceof ProviderError ? error.code : "UNEXPECTED_FAILURE",
+      code: error instanceof Error ? error.name : "UNEXPECTED_FAILURE",
     });
     return [];
   }
@@ -140,7 +136,7 @@ export async function loadNewsDataset(): Promise<{
 }> {
   if (!process.env.DATABASE_URL) {
     return liveDatasetOrFixtures(
-      "Sample coverage is shown until NewsAPI or stored ingestion is available.",
+      "No live provider returned usable coverage, so the sample briefing is shown temporarily.",
     );
   }
   try {

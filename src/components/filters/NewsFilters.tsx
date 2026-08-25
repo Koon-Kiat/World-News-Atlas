@@ -1,6 +1,18 @@
 import type { NewsPeriod } from "@/lib/news/types";
+import { FilterSelect } from "./FilterSelect";
 
 const TOPICS = ["all", "politics", "business", "technology", "society", "climate", "transport"];
+const LANGUAGE_OPTIONS = [
+  { value: "all", label: "All languages" },
+  { value: "en", label: "English" },
+  { value: "ja", label: "Japanese" },
+  { value: "zh", label: "Chinese" },
+];
+const PERIOD_OPTIONS: Array<{ value: NewsPeriod; label: string }> = [
+  { value: "latest", label: "Latest" },
+  { value: "24h", label: "Past 24 hours" },
+  { value: "7d", label: "Past 7 days" },
+];
 
 interface NewsFiltersProps {
   topic: string;
@@ -21,40 +33,35 @@ export function NewsFilters({
 }: NewsFiltersProps) {
   return (
     <div className="filter-bar">
-      <div className="topic-scroller" aria-label="Topic filter">
-        {TOPICS.map((item) => (
-          <button
-            type="button"
-            key={item}
-            className={topic === item ? "topic-chip active" : "topic-chip"}
-            aria-pressed={topic === item}
-            onClick={() => onTopicChange(item)}
-          >
-            {item.charAt(0).toUpperCase() + item.slice(1)}
-          </button>
-        ))}
+      <div className="topic-filter-group">
+        <span className="filter-label">Browse by topic</span>
+        <div className="topic-scroller" aria-label="Topic filter">
+          {TOPICS.map((item) => (
+            <button
+              type="button"
+              key={item}
+              className={topic === item ? "topic-chip active" : "topic-chip"}
+              aria-pressed={topic === item}
+              onClick={() => onTopicChange(item)}
+            >
+              {item.charAt(0).toUpperCase() + item.slice(1)}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="compact-filters">
-        <label>
-          <span className="sr-only">Language</span>
-          <select value={language} onChange={(event) => onLanguageChange(event.target.value)}>
-            <option value="all">All languages</option>
-            <option value="en">English</option>
-            <option value="ja">Japanese</option>
-            <option value="zh">Chinese</option>
-          </select>
-        </label>
-        <label>
-          <span className="sr-only">Time period</span>
-          <select
-            value={period}
-            onChange={(event) => onPeriodChange(event.target.value as NewsPeriod)}
-          >
-            <option value="latest">Latest</option>
-            <option value="24h">Past 24 hours</option>
-            <option value="7d">Past 7 days</option>
-          </select>
-        </label>
+        <FilterSelect
+          label="Language"
+          value={language}
+          options={LANGUAGE_OPTIONS}
+          onChange={onLanguageChange}
+        />
+        <FilterSelect
+          label="Published"
+          value={period}
+          options={PERIOD_OPTIONS}
+          onChange={onPeriodChange}
+        />
       </div>
     </div>
   );

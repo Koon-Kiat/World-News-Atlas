@@ -17,4 +17,12 @@ describe("country selection", () => {
   it("never exceeds two countries and replaces the oldest selection", () => {
     expect(updateCountrySelection(["JP", "SG"], "US")).toEqual(["SG", "US"]);
   });
+
+  it("replaces the current country in one-country mode", () => {
+    expect(updateCountrySelection(["JP"], "SG", 1)).toEqual(["SG"]);
+  });
+
+  it("allows clearing the selected country in one-country mode", () => {
+    expect(updateCountrySelection(["JP"], "JP", 1)).toEqual([]);
+  });
 });

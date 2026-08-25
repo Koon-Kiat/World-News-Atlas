@@ -34,6 +34,20 @@ describe("provider normalization", () => {
     });
     expect(result.topics).toEqual(expect.arrayContaining(["technology", "business"]));
   });
+
+  it("removes feed markup from provider text", () => {
+    const result = normalizeProviderArticle({
+      provider: "NEWSAPI",
+      providerArticleId: "clean-text",
+      title: "<![CDATA[World &amp; regional update]]>",
+      description: "<![CDATA[The <strong>latest</strong> report.]]>",
+      url: "https://example.com/clean-text",
+      publishedAt: new Date().toISOString(),
+      sourceName: "Example News",
+    });
+    expect(result.title).toBe("World & regional update");
+    expect(result.description).toBe("The latest report.");
+  });
 });
 
 describe("article deduplication", () => {

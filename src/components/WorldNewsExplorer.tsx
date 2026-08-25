@@ -3,6 +3,7 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { NewsFilters } from "@/components/filters/NewsFilters";
 import { PerspectiveFilter } from "@/components/filters/PerspectiveFilter";
+import { CountryPicker } from "@/components/map/CountryPicker";
 import { WorldMap } from "@/components/map/WorldMap";
 import { updateCountrySelection } from "@/components/map/selection";
 import { StoryList } from "@/components/news/StoryList";
@@ -17,6 +18,7 @@ function flag(code: string): string {
 
 export function WorldNewsExplorer({ initialData }: { initialData: NewsResponse }) {
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
+  const [selectionLimit, setSelectionLimit] = useState<1 | 2>(1);
   const [perspective, setPerspective] = useState<SourcePerspective>("all");
   const [topic, setTopic] = useState("all");
   const [language, setLanguage] = useState("all");
@@ -56,7 +58,7 @@ export function WorldNewsExplorer({ initialData }: { initialData: NewsResponse }
     const parameters = new URLSearchParams({
       sourcePerspective: perspective,
       period,
-      pageSize: "20",
+      pageSize: "30",
     });
     if (selectedCountries.length > 0) parameters.set("countries", selectedCountries.join(","));
     if (topic !== "all") parameters.set("topic", topic);
@@ -91,8 +93,18 @@ export function WorldNewsExplorer({ initialData }: { initialData: NewsResponse }
   }, [requestUrl]);
 
   function changeCountries(countries: string[]) {
-    setSelectedCountries(countries);
+    setSelectedCountries(countries.slice(0, selectionLimit));
     setPerspective("all");
+  }
+
+  function changeSelectionLimit(limit: 1 | 2) {
+    setSelectionLimit(limit);
+    if (limit === 1) setSelectedCountries((countries) => countries.slice(0, 1));
+    setPerspective("all");
+  }
+
+  function selectCountry(code: string) {
+    changeCountries(updateCountrySelection(selectedCountries, code, selectionLimit));
   }
 
   return (
@@ -120,21 +132,38 @@ export function WorldNewsExplorer({ initialData }: { initialData: NewsResponse }
           </div>
 
           <div className="map-layout">
-            <WorldMap selectedCountries={selectedCountries} onSelectionChange={changeCountries} />
+            <WorldMap
+              selectedCountries={selectedCountries}
+              selectionLimit={selectionLimit}
+              onSelectionChange={changeCountries}
+            />
             <aside className="map-guide">
               <div>
                 <p className="eyebrow">Your lens</p>
-                <h2>{selectedCountries.length === 0 ? "Start anywhere." : selectedCountries.length === 1 ? "Now add a connection." : "Connection found."}</h2>
+                <h2>{selectedCountries.length === 0 ? "Start anywhere." : selectionLimit === 1 ? "Country selected." : selectedCountries.length === 1 ? "Now add a connection." : "Connection found."}</h2>
                 <p>
                   {selectedCountries.length === 0
-                    ? "Choose a country on the map to move from world headlines to the stories that involve it."
-                    : selectedCountries.length === 1
+                    ? `Choose ${selectionLimit === 1 ? "one country" : "up to two countries"} on the map or search by name below.`
+                    : selectionLimit === 1
+                      ? "Your briefing now focuses on stories involving this country. Choose another country to switch the lens."
+                      : selectedCountries.length === 1
                       ? "Choose one more country to surface diplomacy, trade, technology, travel and other shared stories."
                       : "Results now require both countries to be central to the same event—not just incidental mentions."}
                 </p>
               </div>
+              <div className="selection-mode" aria-label="Country selection mode">
+                <span>Explore mode</span>
+                <div>
+                  <button type="button" className={selectionLimit === 1 ? "active" : ""} aria-pressed={selectionLimit === 1} onClick={() => changeSelectionLimit(1)}>
+                    One country
+                  </button>
+                  <button type="button" className={selectionLimit === 2 ? "active" : ""} aria-pressed={selectionLimit === 2} onClick={() => changeSelectionLimit(2)}>
+                    Compare two
+                  </button>
+                </div>
+              </div>
               <div className="selection-slots" aria-label="Selected countries">
-                {[0, 1].map((index) => {
+                {Array.from({ length: selectionLimit }, (_, index) => {
                   const code = selectedCountries[index];
                   return (
                     <div key={index} className={code ? "selection-slot filled" : "selection-slot"}>
@@ -148,11 +177,12 @@ export function WorldNewsExplorer({ initialData }: { initialData: NewsResponse }
                   );
                 })}
               </div>
+              <CountryPicker selectedCountries={selectedCountries} onSelect={selectCountry} />
               <div>
                 <p className="quick-label">Quick jump</p>
                 <div className="quick-countries">
                   {QUICK_COUNTRIES.map((code) => (
-                    <button type="button" key={code} aria-pressed={selectedCountries.includes(code)} onClick={() => changeCountries(updateCountrySelection(selectedCountries, code))}>
+                    <button type="button" key={code} aria-pressed={selectedCountries.includes(code)} onClick={() => selectCountry(code)}>
                       <span aria-hidden="true">{flag(code)}</span> {code}
                     </button>
                   ))}
@@ -165,7 +195,7 @@ export function WorldNewsExplorer({ initialData }: { initialData: NewsResponse }
             <div className="selection-title">
               <span className="pulse-dot" />
               <strong>{selectedCountries.length === 0 ? "Global view" : selectedCountries.map(getCountryName).join(" ↔ ")}</strong>
-              <span>{selectedCountries.length}/2 selected</span>
+              <span>{selectedCountries.length}/{selectionLimit} selected</span>
             </div>
             <PerspectiveFilter countries={selectedCountries} value={perspective} onChange={setPerspective} />
             {selectedCountries.length > 0 && <button type="button" className="clear-button" onClick={() => changeCountries([])}>Clear selection</button>}
