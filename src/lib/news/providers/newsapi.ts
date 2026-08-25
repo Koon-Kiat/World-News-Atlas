@@ -86,6 +86,15 @@ export class NewsApiProvider implements NewsProvider {
         { headers: { "X-Api-Key": this.apiKey, Accept: "application/json" } },
         this.timeoutMs,
       );
+      if (response.status === 400 && (url.searchParams.has("from") || url.searchParams.has("to"))) {
+        url.searchParams.delete("from");
+        url.searchParams.delete("to");
+        response = await fetchWithTimeout(
+          url,
+          { headers: { "X-Api-Key": this.apiKey, Accept: "application/json" } },
+          this.timeoutMs,
+        );
+      }
     } catch {
       throw new ProviderError(this.name, "REQUEST_FAILED", "NewsAPI request failed");
     }

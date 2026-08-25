@@ -10,8 +10,18 @@ function normalizeLanguage(value: string | null | undefined): string {
   return /^[a-z]{2,3}(?:-[a-z0-9]{2,8})?$/.test(language) ? language : "und";
 }
 
+function cleanProviderText(value: string): string {
+  return value
+    .replace(/<!\[CDATA\[|\]\]>/g, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function normalizeProviderArticle(article: ProviderArticle): NormalizedArticle {
-  const title = article.title.replace(/\s+/g, " ").trim();
+  const title = cleanProviderText(article.title);
   if (!title) throw new Error("Provider article has no title");
   const publishedAt = new Date(article.publishedAt);
   if (Number.isNaN(publishedAt.getTime())) throw new Error("Provider article has an invalid date");
@@ -28,15 +38,16 @@ export function normalizeProviderArticle(article: ProviderArticle): NormalizedAr
     sourceRegion: article.sourceRegion,
     language,
   });
-  const countries = detectCountries(title, article.description);
-  const topics = detectTopics(title, article.description);
+  const description = article.description ? cleanProviderText(article.description) || null : null;
+  const countries = detectCountries(title, description);
+  const topics = detectTopics(title, description);
 
   return {
     id: createHash("sha256").update(canonicalUrl).digest("hex").slice(0, 24),
     provider: article.provider,
     providerArticleId: article.providerArticleId,
     title,
-    description: article.description?.replace(/\s+/g, " ").trim() || null,
+    description,
     url: article.url,
     canonicalUrl,
     imageUrl: isSafeHttpUrl(article.imageUrl) ? article.imageUrl : null,

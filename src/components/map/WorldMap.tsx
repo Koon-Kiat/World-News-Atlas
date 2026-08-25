@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
 import { geoNaturalEarth1, geoPath } from "d3-geo";
 import type { Feature, Geometry, GeoJsonProperties } from "geojson";
 import { feature } from "topojson-client";
@@ -13,6 +14,7 @@ import { updateCountrySelection } from "./selection";
 
 interface WorldMapProps {
   selectedCountries: string[];
+  selectionLimit: 1 | 2;
   onSelectionChange: (countries: string[]) => void;
 }
 
@@ -22,11 +24,42 @@ interface MapCountry {
   feature: Feature<Geometry, GeoJsonProperties>;
 }
 
+interface MapView {
+  scale: number;
+  x: number;
+  y: number;
+}
+
 const WIDTH = 960;
 const HEIGHT = 500;
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 4;
 
-export function WorldMap({ selectedCountries, onSelectionChange }: WorldMapProps) {
+function clampView(scale: number, x: number, y: number): MapView {
+  const nextScale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale));
+  return {
+    scale: nextScale,
+    x: Math.min(0, Math.max(WIDTH * (1 - nextScale), x)),
+    y: Math.min(0, Math.max(HEIGHT * (1 - nextScale), y)),
+  };
+}
+
+export function WorldMap({
+  selectedCountries,
+  selectionLimit,
+  onSelectionChange,
+}: WorldMapProps) {
   const [hoveredCountry, setHoveredCountry] = useState<MapCountry | null>(null);
+  const [view, setView] = useState<MapView>({ scale: 1, x: 0, y: 0 });
+  const dragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    originX: number;
+    originY: number;
+    moved: boolean;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
   const countries = useMemo(() => {
     const collection = feature(countriesTopology, countriesTopology.objects.countries);
     return collection.features.flatMap<MapCountry>((country) => {
@@ -44,7 +77,68 @@ export function WorldMap({ selectedCountries, onSelectionChange }: WorldMapProps
   }, [countries]);
 
   function select(code: string) {
-    onSelectionChange(updateCountrySelection(selectedCountries, code));
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    onSelectionChange(updateCountrySelection(selectedCountries, code, selectionLimit));
+  }
+
+  function zoomAt(clientX: number, clientY: number, nextScale: number, element: SVGSVGElement) {
+    const bounds = element.getBoundingClientRect();
+    const pointX = ((clientX - bounds.left) / bounds.width) * WIDTH;
+    const pointY = ((clientY - bounds.top) / bounds.height) * HEIGHT;
+    setView((current) => {
+      const scale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextScale));
+      const x = pointX - ((pointX - current.x) / current.scale) * scale;
+      const y = pointY - ((pointY - current.y) / current.scale) * scale;
+      return clampView(scale, x, y);
+    });
+  }
+
+  function zoomFromCenter(direction: 1 | -1) {
+    setView((current) => {
+      const scale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, current.scale + direction * 0.5));
+      const x = WIDTH / 2 - ((WIDTH / 2 - current.x) / current.scale) * scale;
+      const y = HEIGHT / 2 - ((HEIGHT / 2 - current.y) / current.scale) * scale;
+      return clampView(scale, x, y);
+    });
+  }
+
+  function startDrag(event: ReactPointerEvent<SVGSVGElement>) {
+    if (event.button !== 0 || view.scale === 1) return;
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: view.x,
+      originY: view.y,
+      moved: false,
+    };
+  }
+
+  function dragMap(event: ReactPointerEvent<SVGSVGElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || view.scale === 1) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const dx = ((event.clientX - drag.startX) / bounds.width) * WIDTH;
+    const dy = ((event.clientY - drag.startY) / bounds.height) * HEIGHT;
+    if (Math.abs(dx) + Math.abs(dy) > 4 && !drag.moved) {
+      drag.moved = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+    setView((current) => clampView(current.scale, drag.originX + dx, drag.originY + dy));
+  }
+
+  function finishDrag(event: ReactPointerEvent<SVGSVGElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    suppressClickRef.current = drag.moved;
+    if (drag.moved) window.setTimeout(() => { suppressClickRef.current = false; }, 0);
+    dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
   }
 
   return (
@@ -57,58 +151,70 @@ export function WorldMap({ selectedCountries, onSelectionChange }: WorldMapProps
             ? "Choose a country"
             : selectedCountries.map(getCountryName).join(" + ")}
       </div>
+      <div className="map-zoom-controls" aria-label="Map zoom controls">
+        <button type="button" onClick={() => zoomFromCenter(1)} disabled={view.scale >= MAX_ZOOM} aria-label="Zoom in">+</button>
+        <button type="button" onClick={() => zoomFromCenter(-1)} disabled={view.scale <= MIN_ZOOM} aria-label="Zoom out">−</button>
+        <button type="button" className="map-reset" onClick={() => setView({ scale: 1, x: 0, y: 0 })} disabled={view.scale === 1} aria-label="Reset map zoom">Reset</button>
+      </div>
       <svg
         className="world-map"
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         role="group"
-        aria-label="Interactive world map. Select up to two countries."
+        aria-label={`Interactive world map. Select up to ${selectionLimit === 1 ? "one country" : "two countries"}.`}
+        onWheel={(event: ReactWheelEvent<SVGSVGElement>) => {
+          event.preventDefault();
+          zoomAt(event.clientX, event.clientY, view.scale + (event.deltaY < 0 ? 0.35 : -0.35), event.currentTarget);
+        }}
+        onPointerDown={startDrag}
+        onPointerMove={dragMap}
+        onPointerUp={finishDrag}
+        onPointerCancel={finishDrag}
       >
         <defs>
           <radialGradient id="ocean-glow" cx="48%" cy="43%" r="66%">
             <stop offset="0%" stopColor="#173d43" />
             <stop offset="100%" stopColor="#0b242a" />
           </radialGradient>
-          <filter id="selected-glow" x="-30%" y="-30%" width="160%" height="160%">
-            <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#ff7d5b" floodOpacity="0.7" />
-          </filter>
           <pattern id="map-grid" width="34" height="34" patternUnits="userSpaceOnUse">
             <path d="M 34 0 L 0 0 0 34" fill="none" stroke="#d8eee8" strokeOpacity="0.045" strokeWidth="1" />
           </pattern>
         </defs>
         <rect width={WIDTH} height={HEIGHT} rx="26" fill="url(#ocean-glow)" />
         <rect width={WIDTH} height={HEIGHT} rx="26" fill="url(#map-grid)" />
-        {countries.map((country) => {
-          const selectedIndex = selectedCountries.indexOf(country.code);
-          const isSelected = selectedIndex >= 0;
-          return (
-            <path
-              key={country.code}
-              d={path(country.feature) ?? undefined}
-              className={`map-country${isSelected ? " is-selected" : ""}`}
-              data-selection-order={isSelected ? selectedIndex + 1 : undefined}
-              role="button"
-              tabIndex={0}
-              aria-label={`${country.name}${isSelected ? ", selected" : ""}`}
-              aria-pressed={isSelected}
-              onClick={() => select(country.code)}
-              onMouseEnter={() => setHoveredCountry(country)}
-              onMouseLeave={() => setHoveredCountry(null)}
-              onFocus={() => setHoveredCountry(country)}
-              onBlur={() => setHoveredCountry(null)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  select(country.code);
-                }
-              }}
-            >
-              <title>{country.name}</title>
-            </path>
-          );
-        })}
+        <g transform={`translate(${view.x} ${view.y}) scale(${view.scale})`}>
+          {countries.map((country) => {
+            const selectedIndex = selectedCountries.indexOf(country.code);
+            const isSelected = selectedIndex >= 0;
+            return (
+              <path
+                key={country.code}
+                d={path(country.feature) ?? undefined}
+                className={`map-country${isSelected ? " is-selected" : ""}`}
+                data-selection-order={isSelected ? selectedIndex + 1 : undefined}
+                role="button"
+                tabIndex={0}
+                aria-label={`${country.name}${isSelected ? ", selected" : ""}`}
+                aria-pressed={isSelected}
+                onClick={() => select(country.code)}
+                onMouseEnter={() => setHoveredCountry(country)}
+                onMouseLeave={() => setHoveredCountry(null)}
+                onFocus={() => setHoveredCountry(country)}
+                onBlur={() => setHoveredCountry(null)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    select(country.code);
+                  }
+                }}
+              >
+                <title>{country.name}</title>
+              </path>
+            );
+          })}
+        </g>
       </svg>
       <p className="map-help">
-        Click again to remove · A third choice replaces the oldest selection
+        Scroll or use + to zoom · Drag to move · Click a selected country to remove it
       </p>
     </div>
   );
