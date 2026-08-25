@@ -110,8 +110,8 @@ The command has no hosting-provider dependency. A later deployment can invoke it
 
 | Provider | Credentials | Default behavior |
 | --- | --- | --- |
-| GDELT | None | Enabled unless `GDELT_ENABLED=false`. Availability and metadata quality can vary. |
-| RSS/Atom | None | Adapter is implemented, but no unreviewed feed is enabled. Add only feeds the operator is permitted to consume. |
+| GDELT | None | Opt in with `GDELT_ENABLED=true`. Availability and metadata quality can vary. |
+| RSS/Atom | None | Publisher-operated world feeds from BBC News, The Guardian, Al Jazeera, and CNA are enabled by default. |
 | NewsAPI | `NEWSAPI_KEY` | Disabled gracefully when the key is absent. |
 | Fixtures | None | Used for the initial UI and when a live ingestion batch is empty. Clearly labelled as sample content. |
 
@@ -119,7 +119,7 @@ Publisher availability is never assumed. Entries such as BBC, Reuters, AP, NHK, 
 
 ### Configuring approved RSS feeds
 
-`RSS_FEEDS_JSON` accepts an array like this:
+`RSS_FEEDS_JSON` replaces the default feed list with an operator-reviewed array like this:
 
 ```json
 [

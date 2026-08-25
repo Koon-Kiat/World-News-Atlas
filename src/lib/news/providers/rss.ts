@@ -6,6 +6,12 @@ import type { ProviderArticle, ProviderFetchRequest, ProviderFetchResult } from 
 import { type NewsProvider, ProviderError } from "./provider";
 
 const MAX_FEED_BYTES = 2 * 1024 * 1024;
+const REVIEWED_FEED_HOSTS = new Set([
+  "feeds.bbci.co.uk",
+  "www.theguardian.com",
+  "www.aljazeera.com",
+  "www.channelnewsasia.com",
+]);
 
 function isPrivateAddress(address: string): boolean {
   const normalized = address.toLowerCase();
@@ -33,6 +39,8 @@ export async function assertTrustedFeedUrl(value: string): Promise<URL> {
   }
   if (isIP(host)) {
     if (isPrivateAddress(host)) throw new Error("RSS feed IP is not public");
+  } else if (REVIEWED_FEED_HOSTS.has(host)) {
+    return url;
   } else {
     const addresses = await lookup(host, { all: true });
     if (addresses.length === 0 || addresses.some((entry) => isPrivateAddress(entry.address))) {
@@ -52,7 +60,10 @@ async function fetchFeed(feedUrl: string, timeoutMs: number): Promise<string> {
       response = await fetch(current, {
         redirect: "manual",
         signal: controller.signal,
-        headers: { Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml" },
+        headers: {
+          Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml",
+          "User-Agent": "WorldNewsAtlas/1.0",
+        },
       });
     } finally {
       clearTimeout(timer);

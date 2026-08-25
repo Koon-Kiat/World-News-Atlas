@@ -96,6 +96,43 @@ export interface RssFeedConfig {
   scope: SourceScope;
 }
 
-// RSS feeds are supplied through RSS_FEEDS_JSON after an operator has reviewed
-// usage rights. There are deliberately no unreviewed feeds enabled by default.
-export const DEFAULT_RSS_FEEDS: RssFeedConfig[] = [];
+// These publisher-operated feeds expose headlines, excerpts, links, and images
+// for feed readers. Full article text is never stored or reproduced.
+export const DEFAULT_RSS_FEEDS: RssFeedConfig[] = [
+  {
+    name: "BBC News",
+    feedUrl: "https://feeds.bbci.co.uk/news/world/rss.xml",
+    websiteUrl: "https://www.bbc.com/news/world",
+    countryCode: "GB",
+    region: null,
+    language: "en",
+    scope: "INTERNATIONAL",
+  },
+  {
+    name: "The Guardian",
+    feedUrl: "https://www.theguardian.com/world/rss",
+    websiteUrl: "https://www.theguardian.com/world",
+    countryCode: "GB",
+    region: null,
+    language: "en",
+    scope: "INTERNATIONAL",
+  },
+  {
+    name: "Al Jazeera",
+    feedUrl: "https://www.aljazeera.com/xml/rss/all.xml",
+    websiteUrl: "https://www.aljazeera.com/",
+    countryCode: "QA",
+    region: "Middle East",
+    language: "en",
+    scope: "INTERNATIONAL",
+  },
+  {
+    name: "CNA",
+    feedUrl: "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml",
+    websiteUrl: "https://www.channelnewsasia.com/",
+    countryCode: "SG",
+    region: "Asia",
+    language: "en",
+    scope: "INTERNATIONAL",
+  },
+];

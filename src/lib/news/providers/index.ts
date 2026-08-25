@@ -42,7 +42,7 @@ export function createConfiguredProviders(): NewsProvider[] {
   if (newsApiKey) providers.push(new NewsApiProvider(newsApiKey, timeout));
   else logNews("info", "provider_disabled", { provider: "NEWSAPI", reason: "missing_credential" });
 
-  if (process.env.GDELT_ENABLED?.toLowerCase() !== "false") {
+  if (process.env.GDELT_ENABLED?.toLowerCase() === "true") {
     providers.push(new GdeltProvider(timeout));
   } else {
     logNews("info", "provider_disabled", { provider: "GDELT", reason: "configuration" });
