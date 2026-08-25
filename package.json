@@ -6,9 +6,11 @@
     "node": ">=24.15.0"
   },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "vinext dev",
+    "build": "vinext build",
+    "start": "vinext start",
+    "dev:next": "next dev",
+    "build:next": "next build",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
@@ -34,6 +36,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.37.1",
+    "@cloudflare/workers-types": "^4.20260515.1",
+    "@openai/sites-vite-plugin": "^0.2.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.1",
@@ -45,16 +50,22 @@
     "@types/react-dom": "^19",
     "@types/topojson-client": "^3.1.5",
     "@vitejs/plugin-react": "^6.1.0",
+    "@vitejs/plugin-rsc": "^0.5.26",
     "eslint": "^9",
     "eslint-config-next": "16.3.2",
     "jsdom": "^30.0.1",
     "prisma": "^6.12.0",
+    "react-server-dom-webpack": "^19.2.8",
     "tailwindcss": "^4",
     "tsx": "^4.23.12",
     "typescript": "^5",
-    "vitest": "^4.1.11"
+    "vinext": "^1.0.0-beta.3",
+    "vite": "^8.0.13",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.92.0"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
-  }
+  },
+  "type": "module"
 }

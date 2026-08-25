@@ -82,7 +82,7 @@ export interface NewsResponse {
     total: number;
     page: number;
     pageSize: number;
-    dataSource: "database" | "fixtures";
+    dataSource: "database" | "live" | "fixtures";
     generatedAt: string;
     notice?: string;
   };
