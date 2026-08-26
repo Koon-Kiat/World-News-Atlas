@@ -13,7 +13,7 @@ export type SourcePerspective =
   | "first-country"
   | "second-country";
 
-export type NewsPeriod = "latest" | "24h" | "7d";
+export type NewsPeriod = "latest" | "24h" | "7d" | "30d";
 
 export interface CountryReference {
   code: string;

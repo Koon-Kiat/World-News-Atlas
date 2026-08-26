@@ -5,19 +5,20 @@ import { deduplicateArticles } from "./deduplicate";
 import { logNews } from "./logger";
 import { normalizeProviderArticles } from "./normalize";
 import { createConfiguredProviders, fetchProviderArticlesGracefully } from "./providers";
-import type { StoryView } from "./types";
+import { newsPeriodHours } from "./periods";
+import type { NewsPeriod, StoryView } from "./types";
 
 const LIVE_CACHE_TTL_MS = 60 * 60_000;
-let liveCache: { expiresAt: number; stories: StoryView[] } | null = null;
+const liveCaches = new Map<NewsPeriod, { expiresAt: number; stories: StoryView[] }>();
 
 function enumValue<T extends string>(value: T): T {
   return value;
 }
 
-async function loadDatabaseStories(): Promise<StoryView[]> {
+async function loadDatabaseStories(period: NewsPeriod): Promise<StoryView[]> {
   const { prisma } = await import("@/lib/db/prisma");
   const records = await prisma.story.findMany({
-    where: { lastUpdatedAt: { gte: new Date(Date.now() - 7 * 24 * 3_600_000) } },
+    where: { lastUpdatedAt: { gte: new Date(Date.now() - newsPeriodHours(period) * 3_600_000) } },
     orderBy: [{ importanceScore: "desc" }, { lastUpdatedAt: "desc" }],
     take: 250,
     include: {
@@ -84,15 +85,16 @@ async function loadDatabaseStories(): Promise<StoryView[]> {
   })) as StoryView[];
 }
 
-async function loadLiveStories(): Promise<StoryView[]> {
+async function loadLiveStories(period: NewsPeriod): Promise<StoryView[]> {
+  const liveCache = liveCaches.get(period);
   if (liveCache && liveCache.expiresAt > Date.now()) return liveCache.stories;
 
   try {
     const providers = createConfiguredProviders();
     if (providers.length === 0) return [];
     const result = await fetchProviderArticlesGracefully(providers, {
-      from: new Date(Date.now() - 3 * 24 * 3_600_000),
-      limit: 150,
+      from: new Date(Date.now() - newsPeriodHours(period) * 3_600_000),
+      limit: 250,
     });
     const normalized = normalizeProviderArticles(result.articles);
     const deduplicated = deduplicateArticles(normalized);
@@ -108,7 +110,7 @@ async function loadLiveStories(): Promise<StoryView[]> {
       articles: story.articles,
     }));
     if (stories.length > 0) {
-      liveCache = { stories, expiresAt: Date.now() + LIVE_CACHE_TTL_MS };
+      liveCaches.set(period, { stories, expiresAt: Date.now() + LIVE_CACHE_TTL_MS });
     }
     return stories;
   } catch (error) {
@@ -119,33 +121,35 @@ async function loadLiveStories(): Promise<StoryView[]> {
   }
 }
 
-async function liveDatasetOrFixtures(notice: string): Promise<{
+async function liveDatasetOrFixtures(period: NewsPeriod, notice: string): Promise<{
   stories: StoryView[];
   dataSource: "live" | "fixtures";
   notice?: string;
 }> {
-  const stories = await loadLiveStories();
+  const stories = await loadLiveStories(period);
   if (stories.length > 0) return { stories, dataSource: "live" };
   return { stories: getFixtureStories(), dataSource: "fixtures", notice };
 }
 
-export async function loadNewsDataset(): Promise<{
+export async function loadNewsDataset(period: NewsPeriod = "latest"): Promise<{
   stories: StoryView[];
   dataSource: "database" | "live" | "fixtures";
   notice?: string;
 }> {
   if (!process.env.DATABASE_URL) {
     return liveDatasetOrFixtures(
+      period,
       "No live provider returned usable coverage, so the sample briefing is shown temporarily.",
     );
   }
   try {
-    const stories = await loadDatabaseStories();
+    const stories = await loadDatabaseStories(period);
     if (stories.length > 0) return { stories, dataSource: "database" };
-    return liveDatasetOrFixtures("The news database is empty, so sample coverage is shown.");
+    return liveDatasetOrFixtures(period, "The news database is empty, so sample coverage is shown.");
   } catch {
     logNews("error", "database_query_failed", { operation: "load_news_dataset" });
     return liveDatasetOrFixtures(
+      period,
       "Live stored coverage is temporarily unavailable; sample coverage is shown.",
     );
   }

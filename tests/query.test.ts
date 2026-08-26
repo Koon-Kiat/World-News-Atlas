@@ -111,6 +111,11 @@ describe("API query validation", () => {
     });
   });
 
+  it("supports a 30-day range and a progressively rendered response size", () => {
+    const query = parseNewsQuery(new URLSearchParams("period=30d&pageSize=250"));
+    expect(query).toMatchObject({ period: "30d", pageSize: 250 });
+  });
+
   it.each([
     "countries=JP,SG,US",
     "countries=ZZ",

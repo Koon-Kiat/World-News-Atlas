@@ -1,7 +1,8 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { ExploreNavigation } from "@/components/ExploreNavigation";
 import { NewsFilters } from "@/components/filters/NewsFilters";
 import { PerspectiveFilter } from "@/components/filters/PerspectiveFilter";
 import { CountryPicker } from "@/components/map/CountryPicker";
@@ -9,15 +10,88 @@ import { WorldMap } from "@/components/map/WorldMap";
 import { updateCountrySelection } from "@/components/map/selection";
 import { StoryList } from "@/components/news/StoryList";
 import { getCountryName } from "@/lib/news/countries/metadata";
-import type { NewsPeriod, NewsResponse, SourcePerspective } from "@/lib/news/types";
+import { newsPeriodLabel } from "@/lib/news/periods";
+import { useNewsPeriodPreference } from "@/hooks/useNewsPeriodPreference";
+import type { NewsPeriod, NewsResponse, SourcePerspective, StoryView } from "@/lib/news/types";
 
 const QUICK_COUNTRIES = ["JP", "SG", "US", "CN", "IN", "GB"];
+const INITIAL_STORY_COUNT = 12;
+const STORY_BATCH_SIZE = 12;
 
 function flag(code: string): string {
   return String.fromCodePoint(...code.split("").map((character) => 127397 + character.charCodeAt(0)));
 }
 
 export type ExplorerMode = "country" | "compare";
+
+function ProgressiveStoryList({
+  stories,
+  total,
+  isFetchingMore,
+  onRequestMore,
+}: {
+  stories: StoryView[];
+  total: number;
+  isFetchingMore: boolean;
+  onRequestMore: () => void;
+}) {
+  const [visibleStoryCount, setVisibleStoryCount] = useState(INITIAL_STORY_COUNT);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const visibleStories = stories.slice(0, visibleStoryCount);
+  const hasMoreRenderedStories = visibleStoryCount < stories.length;
+  const hasMoreServerStories = stories.length < total;
+  const hasMoreStories = hasMoreRenderedStories || hasMoreServerStories;
+
+  const revealOrRequestMore = useCallback(() => {
+    if (hasMoreRenderedStories) {
+      setVisibleStoryCount((current) => Math.min(current + STORY_BATCH_SIZE, stories.length));
+    } else if (hasMoreServerStories && !isFetchingMore) {
+      onRequestMore();
+    }
+  }, [hasMoreRenderedStories, hasMoreServerStories, isFetchingMore, onRequestMore, stories.length]);
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || !hasMoreStories) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        revealOrRequestMore();
+      },
+      { rootMargin: "500px 0px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMoreStories, revealOrRequestMore]);
+
+  return (
+    <>
+      <StoryList stories={visibleStories} />
+      {stories.length > 0 && (
+        <div className={hasMoreStories ? "load-more-sentinel" : "load-more-sentinel is-complete"} ref={loadMoreRef}>
+          {hasMoreStories ? (
+            <>
+              <span className="load-more-spinner" aria-hidden="true" />
+              <div>
+                <strong>{isFetchingMore ? "Fetching more live stories" : "More stories are ready"}</strong>
+                <small>
+                  {visibleStories.length} shown · {hasMoreRenderedStories
+                    ? `Continue scrolling or load the next ${Math.min(STORY_BATCH_SIZE, stories.length - visibleStoryCount)} now.`
+                    : "Continue scrolling to fetch the next page of current coverage."}
+                </small>
+              </div>
+              <button type="button" onClick={revealOrRequestMore} disabled={isFetchingMore}>
+                {isFetchingMore ? "Loading…" : "Load more"}
+              </button>
+            </>
+          ) : (
+            <p>All {total} matching stories are loaded.</p>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
 
 export function WorldNewsExplorer({
   initialData,
@@ -31,10 +105,13 @@ export function WorldNewsExplorer({
   const [perspective, setPerspective] = useState<SourcePerspective>("all");
   const [topic, setTopic] = useState("all");
   const [language, setLanguage] = useState("all");
-  const [period, setPeriod] = useState<NewsPeriod>("latest");
+  const [period, setPeriod] = useNewsPeriodPreference();
   const [search, setSearch] = useState("");
   const [data, setData] = useState(initialData);
   const [settledRequest, setSettledRequest] = useState<string | null>(null);
+  const [loadedPage, setLoadedPage] = useState(1);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const loadMoreControllerRef = useRef<AbortController | null>(null);
   const [error, setError] = useState<string | null>(null);
   const deferredSearch = useDeferredValue(search.trim());
 
@@ -67,7 +144,8 @@ export function WorldNewsExplorer({
     const parameters = new URLSearchParams({
       sourcePerspective: perspective,
       period,
-      pageSize: "30",
+      page: "1",
+      pageSize: "60",
     });
     if (selectedCountries.length > 0) parameters.set("countries", selectedCountries.join(","));
     if (topic !== "all") parameters.set("topic", topic);
@@ -79,6 +157,7 @@ export function WorldNewsExplorer({
   const isInitialLiveLoad = isLoading && data.meta.dataSource === "fixtures";
 
   useEffect(() => {
+    loadMoreControllerRef.current?.abort();
     const controller = new AbortController();
     fetch(requestUrl, {
       signal: controller.signal,
@@ -91,6 +170,7 @@ export function WorldNewsExplorer({
       })
       .then((responseData) => {
         setData(responseData);
+        setLoadedPage(responseData.meta.page);
         setError(null);
       })
       .catch((requestError: unknown) => {
@@ -103,6 +183,46 @@ export function WorldNewsExplorer({
     return () => controller.abort();
   }, [requestUrl]);
 
+  function loadNextPage() {
+    if (isLoading || isLoadingMore || data.stories.length >= data.meta.total || loadMoreControllerRef.current) return;
+    const controller = new AbortController();
+    loadMoreControllerRef.current = controller;
+    setIsLoadingMore(true);
+    const nextPage = loadedPage + 1;
+    const nextUrl = new URL(requestUrl, window.location.origin);
+    nextUrl.searchParams.set("page", String(nextPage));
+    fetch(`${nextUrl.pathname}?${nextUrl.searchParams.toString()}`, {
+      signal: controller.signal,
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("request failed");
+        return (await response.json()) as NewsResponse;
+      })
+      .then((responseData) => {
+        setData((current) => {
+          const knownIds = new Set(current.stories.map((story) => story.id));
+          return {
+            stories: [...current.stories, ...responseData.stories.filter((story) => !knownIds.has(story.id))],
+            meta: responseData.meta,
+          };
+        });
+        setLoadedPage(responseData.meta.page);
+        setError(null);
+      })
+      .catch((requestError: unknown) => {
+        if (requestError instanceof DOMException && requestError.name === "AbortError") return;
+        setError("Could not load the next page of coverage. You can try again.");
+      })
+      .finally(() => {
+        if (loadMoreControllerRef.current === controller) {
+          loadMoreControllerRef.current = null;
+          setIsLoadingMore(false);
+        }
+      });
+  }
+
   function changeCountries(countries: string[]) {
     setSelectedCountries(countries.slice(0, selectionLimit));
     setPerspective("all");
@@ -112,8 +232,12 @@ export function WorldNewsExplorer({
     changeCountries(updateCountrySelection(selectedCountries, code, selectionLimit));
   }
 
+  function changePeriod(value: NewsPeriod) {
+    setPeriod(value);
+  }
+
   return (
-    <div className="site-frame">
+    <div className="site-frame" id="top">
       <header className="site-header">
         <Link className="brand" href="/country#top" aria-label="Worldline home">
           <span className="brand-mark" aria-hidden="true"><span /></span>
@@ -128,7 +252,9 @@ export function WorldNewsExplorer({
         <a className="latest-link" href="#stories">Latest <span aria-hidden="true">↓</span></a>
       </header>
 
-      <main id="top">
+      <ExploreNavigation active={mode} />
+
+      <main>
         <section className="hero-section" aria-labelledby="hero-title">
           <div className="hero-copy">
             <p className="eyebrow">{mode === "country" ? "Single-country briefing" : "Two-country comparison"}</p>
@@ -156,17 +282,6 @@ export function WorldNewsExplorer({
                       : "Direct bilateral links appear first, followed by current reporting involving either selected country."}
                 </p>
               </div>
-              <nav className="selection-mode" aria-label="News explorer pages">
-                <span>Choose a page</span>
-                <div>
-                  <Link href="/country#top" className={mode === "country" ? "active" : ""} aria-current={mode === "country" ? "page" : undefined}>
-                    One country
-                  </Link>
-                  <Link href="/compare#top" className={mode === "compare" ? "active" : ""} aria-current={mode === "compare" ? "page" : undefined}>
-                    Compare two
-                  </Link>
-                </div>
-              </nav>
               <div className="selection-slots" aria-label="Selected countries">
                 {Array.from({ length: selectionLimit }, (_, index) => {
                   const code = selectedCountries[index];
@@ -218,12 +333,15 @@ export function WorldNewsExplorer({
               {isLoading ? (
                 <span className="refreshing"><i aria-hidden="true" /> Checking live sources…</span>
               ) : (
-                <span>{data.meta.total} {data.meta.total === 1 ? "story" : "stories"}</span>
+                <span>
+                  {data.meta.total} {data.meta.total === 1 ? "story" : "stories"}
+                  <small>{newsPeriodLabel(period)}</small>
+                </span>
               )}
             </div>
           </div>
 
-          <NewsFilters topic={topic} language={language} period={period} onTopicChange={setTopic} onLanguageChange={setLanguage} onPeriodChange={setPeriod} />
+          <NewsFilters topic={topic} language={language} period={period} onTopicChange={setTopic} onLanguageChange={setLanguage} onPeriodChange={changePeriod} />
           {isLoading && (
             <div className="refresh-banner" role="status" aria-live="polite">
               <span className="refresh-spinner" aria-hidden="true" />
@@ -245,7 +363,13 @@ export function WorldNewsExplorer({
               <span /><span /><span />
             </div>
           ) : (
-            <StoryList stories={data.stories} />
+            <ProgressiveStoryList
+              key={requestUrl}
+              stories={data.stories}
+              total={data.meta.total}
+              isFetchingMore={isLoadingMore}
+              onRequestMore={loadNextPage}
+            />
           )}
         </section>
       </main>

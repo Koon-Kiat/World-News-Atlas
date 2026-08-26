@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { getCountryName, normalizeCountryCode } from "./countries/metadata";
+import { newsPeriodHours } from "./periods";
 import { rankStories } from "./ranking";
 import type {
   ArticleView,
-  NewsPeriod,
   NewsQuery,
   NewsResponse,
   SourcePerspective,
@@ -17,7 +17,7 @@ const perspectiveSchema = z.enum([
   "first-country",
   "second-country",
 ]);
-const periodSchema = z.enum(["latest", "24h", "7d"]);
+const periodSchema = z.enum(["latest", "24h", "7d", "30d"]);
 
 export class NewsQueryValidationError extends Error {
   constructor(public readonly issues: string[]) {
@@ -111,14 +111,8 @@ export function parseNewsQuery(searchParams: URLSearchParams): NewsQuery {
     period: periodResult.data,
     search: rawSearch || undefined,
     page: positiveInteger(searchParams.get("page"), 1, 100),
-    pageSize: positiveInteger(searchParams.get("pageSize"), 12, 50),
+    pageSize: positiveInteger(searchParams.get("pageSize"), 12, 250),
   };
-}
-
-function periodHours(period: NewsPeriod): number {
-  if (period === "24h") return 24;
-  if (period === "7d") return 168;
-  return 72;
 }
 
 function perspectiveMatches(
@@ -166,7 +160,7 @@ export function queryStories(
   query: NewsQuery,
   now = new Date(),
 ): { stories: StoryView[]; total: number } {
-  const cutoff = now.getTime() - periodHours(query.period) * 3_600_000;
+  const cutoff = now.getTime() - newsPeriodHours(query.period) * 3_600_000;
   const matching = stories
     .filter((story) => new Date(story.lastUpdatedAt).getTime() >= cutoff)
     .filter((story) => {

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { detectCountries } from "./countries/detectCountries";
+import { getCountryName } from "./countries/metadata";
 import { resolveSource } from "./sources/registry";
 import { detectTopics } from "./topics";
 import type { NormalizedArticle, ProviderArticle } from "./types";
@@ -40,6 +41,17 @@ export function normalizeProviderArticle(article: ProviderArticle): NormalizedAr
   });
   const description = article.description ? cleanProviderText(article.description) || null : null;
   const countries = detectCountries(title, description);
+  if (
+    source.countryCode &&
+    source.scope !== "INTERNATIONAL" &&
+    !countries.some((country) => country.code === source.countryCode)
+  ) {
+    countries.push({
+      code: source.countryCode,
+      name: getCountryName(source.countryCode),
+      relevanceScore: 0.56,
+    });
+  }
   const topics = detectTopics(title, description);
 
   return {

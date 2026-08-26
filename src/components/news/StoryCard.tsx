@@ -7,6 +7,24 @@ function flag(code: string): string {
   return String.fromCodePoint(...code.split("").map((character) => 127397 + character.charCodeAt(0)));
 }
 
+function sourceMark(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase())
+    .join("") || "WN";
+}
+
+function displayImageUrl(value: string | null | undefined): string | null {
+  if (!isSafeHttpUrl(value)) return null;
+  const url = new URL(value);
+  if (url.hostname.toLowerCase() === "www.japantimes.co.jp") {
+    return `/api/image?url=${encodeURIComponent(value)}`;
+  }
+  return value;
+}
+
 function relativeTime(value: string): string {
   const hours = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 3_600_000));
   if (hours < 1) return "Just now";
@@ -33,25 +51,34 @@ function ArticleLink({ article }: { article: ArticleView }) {
 
 export function StoryCard({ story, featured = false }: { story: StoryView; featured?: boolean }) {
   const lead = story.articles[0];
-  const safeImage = isSafeHttpUrl(lead?.imageUrl) ? lead.imageUrl : null;
+  const imageArticle = story.articles.find((article) => isSafeHttpUrl(article.imageUrl));
+  const safeImage = displayImageUrl(imageArticle?.imageUrl);
+  const fallbackSource = imageArticle?.source.name ?? lead?.source.name ?? "World News Atlas";
   const sourceNames = [...new Set(story.articles.map((article) => article.source.name))];
 
   return (
-    <article className={featured ? "story-card is-featured" : "story-card"}>
-      {safeImage && (
-        <div className="story-image-wrap">
+    <article className={featured ? "story-card is-featured has-media" : "story-card has-media"}>
+      <div className={safeImage ? "story-image-wrap" : "story-image-wrap is-placeholder"}>
+        <div className="story-image-fallback" aria-hidden="true">
+          <span>{sourceMark(fallbackSource)}</span>
+          <small>Live coverage from {fallbackSource}</small>
+        </div>
+        {safeImage && (
           <img
             src={safeImage}
             alt=""
             className="story-image"
             loading="lazy"
             referrerPolicy="no-referrer"
-            onError={(event) => { event.currentTarget.style.visibility = "hidden"; }}
+            onError={(event) => {
+              event.currentTarget.style.display = "none";
+              event.currentTarget.parentElement?.classList.add("is-placeholder");
+            }}
           />
-          <span className="image-shade" />
-          <span className="story-rank">{featured ? "Lead story" : "Developing"}</span>
-        </div>
-      )}
+        )}
+        <span className="image-shade" />
+        <span className="story-rank">{featured ? "Lead story" : "Developing"}</span>
+      </div>
       <div className="story-body">
         <div className="story-kicker">
           <span>{story.topics[0] ?? "World"}</span>
