@@ -104,6 +104,7 @@ export interface ProviderArticle {
   sourceCountry?: string | null;
   sourceScope?: SourceScope | null;
   sourceRegion?: string | null;
+  coverageCountries?: string[];
 }
 
 export interface ProviderFetchRequest {

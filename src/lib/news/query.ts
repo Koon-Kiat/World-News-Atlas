@@ -162,10 +162,8 @@ function matchesSearch(story: StoryView, search: string): boolean {
 function storyMatchesCountry(
   story: StoryView,
   code: string,
-  includePublisherCountry: boolean,
 ): boolean {
-  if (story.countries.some((country) => country.code === code)) return true;
-  return includePublisherCountry && story.articles.some((article) => article.source.countryCode === code);
+  return story.countries.some((country) => country.code === code);
 }
 
 function hasFocusedBilateralSignal(story: StoryView, countries: string[]): boolean {
@@ -191,10 +189,10 @@ export function queryStories(
     .filter((story) => new Date(story.lastUpdatedAt).getTime() >= cutoff)
     .filter((story) => {
       if (query.countries.length !== 2) {
-        return query.countries.every((code) => storyMatchesCountry(story, code, false));
+        return query.countries.every((code) => storyMatchesCountry(story, code));
       }
       return (
-        query.countries.every((code) => storyMatchesCountry(story, code, true)) &&
+        query.countries.every((code) => storyMatchesCountry(story, code)) &&
         hasFocusedBilateralSignal(story, query.countries) &&
         scoreTwoCountryRelevance(story, query.countries[0], query.countries[1]) >= MIN_BILATERAL_RELEVANCE
       );

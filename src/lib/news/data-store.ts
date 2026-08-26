@@ -12,6 +12,12 @@ import type { NewsPeriod, NewsQuery, StoryView } from "./types";
 const LIVE_CACHE_TTL_MS = 60 * 60_000;
 const MAX_LIVE_CACHE_ENTRIES = 40;
 const liveCaches = new Map<string, { expiresAt: number; stories: StoryView[] }>();
+const PROVIDER_COUNTRY_NAMES: Record<string, string> = {
+  CN: "China",
+  GB: "United Kingdom",
+  RU: "Russia",
+  US: "US",
+};
 
 function enumValue<T extends string>(value: T): T {
   return value;
@@ -89,17 +95,15 @@ async function loadDatabaseStories(period: NewsPeriod): Promise<StoryView[]> {
 
 function providerSearchQuery(query: NewsQuery): string | undefined {
   const terms = [
-    ...query.countries.map(getCountryName),
+    ...query.countries.map((code) => PROVIDER_COUNTRY_NAMES[code] ?? getCountryName(code)),
     ...(query.search ? [query.search] : []),
   ]
     .map((term) => term.replace(/["\\]/g, " ").replace(/\s+/g, " ").trim())
     .filter(Boolean);
   if (terms.length === 0) return undefined;
-  // Fetch a broad candidate pool and let queryStories enforce the final
-  // country/search intersection. This also finds reporting from one selected
-  // country about the other when the publisher's own country is not repeated
-  // in the headline.
-  return terms.map((term) => `"${term}"`).join(" OR ");
+  // Fetch a focused candidate pool and let queryStories enforce the final
+  // country/search intersection against normalized article signals.
+  return terms.map((term) => `"${term}"`).join(" AND ");
 }
 
 async function loadLiveStories(query: NewsQuery): Promise<StoryView[]> {
@@ -122,8 +126,8 @@ async function loadLiveStories(query: NewsQuery): Promise<StoryView[]> {
             { ...request, query: searchQuery },
           ),
           // Publisher feeds are already a bounded, reviewed candidate set.
-          // Keep the complete feed pool so local/national publishers can
-          // establish one side of a country connection through source metadata.
+          // Keep the complete feed pool so direct mentions and reviewed
+          // country-category signals remain available to the final query.
           fetchProviderArticlesGracefully(
             providers.filter((provider) => provider.name === "RSS"),
             request,
@@ -166,7 +170,14 @@ async function liveDatasetOrFixtures(query: NewsQuery, notice: string): Promise<
 }> {
   const stories = await loadLiveStories(query);
   if (stories.length > 0) return { stories, dataSource: "live" };
-  return { stories: getFixtureStories(), dataSource: "fixtures", notice };
+  if (process.env.NEWS_FIXTURES_ENABLED?.toLowerCase() === "true") {
+    return { stories: getFixtureStories(), dataSource: "fixtures", notice };
+  }
+  return {
+    stories: [],
+    dataSource: "live",
+    notice: "Live providers did not return usable coverage for this request.",
+  };
 }
 
 export async function loadNewsDataset(query: NewsQuery): Promise<{
@@ -177,18 +188,18 @@ export async function loadNewsDataset(query: NewsQuery): Promise<{
   if (!process.env.DATABASE_URL) {
     return liveDatasetOrFixtures(
       query,
-      "No live provider returned usable coverage, so the sample briefing is shown temporarily.",
+      "No live provider returned usable coverage.",
     );
   }
   try {
     const stories = await loadDatabaseStories(query.period);
     if (stories.length > 0) return { stories, dataSource: "database" };
-    return liveDatasetOrFixtures(query, "The news database is empty, so sample coverage is shown.");
+    return liveDatasetOrFixtures(query, "The news database is empty.");
   } catch {
     logNews("error", "database_query_failed", { operation: "load_news_dataset" });
     return liveDatasetOrFixtures(
       query,
-      "Live stored coverage is temporarily unavailable; sample coverage is shown.",
+      "Live stored coverage is temporarily unavailable.",
     );
   }
 }

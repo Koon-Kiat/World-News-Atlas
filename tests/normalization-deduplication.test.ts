@@ -49,7 +49,7 @@ describe("provider normalization", () => {
     expect(result.description).toBe("The latest report.");
   });
 
-  it("uses a national publisher country as a country signal", () => {
+  it("keeps publisher origin separate from article country signals", () => {
     const result = normalizeProviderArticle({
       provider: "RSS",
       providerArticleId: "national-source",
@@ -62,8 +62,27 @@ describe("provider normalization", () => {
       sourceScope: "NATIONAL",
     });
 
-    expect(result.countries).toEqual(
+    expect(result.source.countryCode).toBe("JP");
+    expect(result.countries).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ code: "JP" })]),
+    );
+  });
+
+  it("uses an explicit country-category feed as an article country signal", () => {
+    const result = normalizeProviderArticle({
+      provider: "RSS",
+      providerArticleId: "country-category",
+      title: "Government announces a new transport programme",
+      description: "The policy begins next month.",
+      url: "https://www.channelnewsasia.com/singapore/example",
+      publishedAt: new Date().toISOString(),
+      sourceName: "CNA",
+      sourceCountry: "SG",
+      coverageCountries: ["SG"],
+    });
+
+    expect(result.countries).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "SG", relevanceScore: 0.9 })]),
     );
   });
 });

@@ -165,6 +165,7 @@ export class RssProvider implements NewsProvider {
           sourceCountry: feed.countryCode,
           sourceScope: feed.scope,
           sourceRegion: feed.region,
+          coverageCountries: feed.coverageCountries,
         }));
       }),
     );

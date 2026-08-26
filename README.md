@@ -2,7 +2,7 @@
 
 Worldline is a production-minded MVP for exploring world news through an interactive map. It works immediately for an anonymous visitor: global coverage appears with no setup, one selected country shows stories involving that country, and two selected countries surface stories meaningfully related to both.
 
-Fixture mode is deliberately labelled in the interface. It demonstrates the complete experience without presenting sample stories as live reporting.
+Fixture mode is an explicit development option only. Production returns live stories or an honest empty state and never substitutes sample stories for reporting.
 
 ## What is implemented
 
@@ -12,17 +12,17 @@ Fixture mode is deliberately labelled in the interface. It demonstrates the comp
 - Bilateral source filters for first-country, second-country, and outside sources.
 - Topic, language, time, and keyword filters.
 - Story-first results with grouped publisher coverage and links to original live articles.
-- Provider adapters for NewsAPI, GDELT, and administrator-approved RSS/Atom feeds.
+- Provider adapters for NewsAPI, GDELT, publisher RSS/Atom feeds, and Bing News RSS discovery with original-publisher URL extraction.
 - Provider-independent source registry and many-to-one provider identifier mapping.
 - Deterministic country detection, topic classification, URL canonicalization, deduplication, story clustering, and ranking.
 - PostgreSQL schema, Prisma migration, database seed, manual ingestion command, structured logs, caching, rate limiting, response validation, provider timeouts, and RSS SSRF controls.
-- Fixture fallback when the database has no stored stories or is unavailable.
+- Opt-in fixtures for local development and tests; disabled by default and never required by the production UI.
 
 ## Architecture
 
 ```text
-NewsAPI       GDELT       trusted RSS feeds
-   \            |             /
+NewsAPI       GDELT       Bing News RSS       trusted publisher feeds
+   \            |              |                       /
         provider adapters
                 |
           normalization
@@ -77,7 +77,7 @@ The normalized schema includes `Country`, `Source`, `SourceProviderIdentifier`, 
 | `DATABASE_URL` | For persistence | PostgreSQL connection string used only on the server. |
 | `NEWSAPI_KEY` | No | Enables NewsAPI ingestion. Missing credentials disable only this adapter. |
 | `GDELT_ENABLED` | No | Enables credential-free GDELT ingestion; defaults to `true`. |
-| `NEWS_FIXTURES_ENABLED` | No | Uses fixtures when every live ingestion provider returns no articles; defaults to `true`. |
+| `NEWS_FIXTURES_ENABLED` | No | Opts into fixture fallback for local development or ingestion tests; defaults to `false`. |
 | `NEWS_PROVIDER_TIMEOUT_MS` | No | External request timeout, clamped to 2–30 seconds; defaults to 8 seconds. |
 | `RSS_FEEDS_JSON` | No | JSON array of server-controlled, rights-reviewed RSS/Atom feed definitions. |
 
@@ -102,7 +102,7 @@ The command:
 7. Persists articles, provider references, country/topic relations, and stories when `DATABASE_URL` is set.
 8. Logs received, normalized, rejected, duplicate, stored, and story counts without logging secrets.
 
-Without `DATABASE_URL`, the command still fetches, normalizes, deduplicates, clusters, and prints a dry-run summary. If all configured live providers fail or return no articles, fixtures keep the pipeline testable unless `NEWS_FIXTURES_ENABLED=false`.
+Without `DATABASE_URL`, the command still fetches, normalizes, deduplicates, clusters, and prints a dry-run summary. Fixtures are used only when `NEWS_FIXTURES_ENABLED=true` is set explicitly.
 
 The command has no hosting-provider dependency. A later deployment can invoke it from cron, a scheduled function, or a worker. Run only one ingestion job at a time until a distributed lock is added.
 
@@ -111,9 +111,10 @@ The command has no hosting-provider dependency. A later deployment can invoke it
 | Provider | Credentials | Default behavior |
 | --- | --- | --- |
 | GDELT | None | Opt in with `GDELT_ENABLED=true`. Availability and metadata quality can vary. |
-| RSS/Atom | None | Publisher-operated world feeds from BBC News, The Guardian, Al Jazeera, and CNA are enabled by default. |
+| RSS/Atom | None | Reviewed feeds from BBC News, The Guardian, Al Jazeera, CNA, The Straits Times, The Japan Times, DW, Euronews, France 24, Sky News, and NPR are enabled by default. Country-category feeds carry an explicit coverage signal instead of treating every story from a national publisher as domestic news. |
+| Bing News RSS | None | Adds targeted country and bilateral discovery, then extracts the original publisher URL, source name, excerpt, date, and available thumbnail. |
 | NewsAPI | `NEWSAPI_KEY` | Disabled gracefully when the key is absent. |
-| Fixtures | None | Used for the initial UI and when a live ingestion batch is empty. Clearly labelled as sample content. |
+| Fixtures | None | Disabled by default. Available only as an explicit local development/testing fallback. |
 
 Publisher availability is never assumed. Entries such as BBC, Reuters, AP, NHK, and CNA in the source registry are identity mappings only; they do not claim that a current provider or subscription returns those publishers.
 
@@ -130,7 +131,8 @@ Publisher availability is never assumed. Entries such as BBC, Reuters, AP, NHK, 
     "countryCode": "SG",
     "region": null,
     "language": "en",
-    "scope": "NATIONAL"
+    "scope": "NATIONAL",
+    "coverageCountries": ["SG"]
   }
 ]
 ```
@@ -165,7 +167,7 @@ Invalid combinations return a sanitized `400` response. The API uses a short in-
 
 ## Ranking and two-country relevance
 
-Ranking is deterministic and politically neutral. The current score combines recency, geographic relevance, story importance, independent source count, and source-country diversity. Two-country results require both countries through direct article signals or a publisher from one selected country reporting on the other, reward balanced country relevance and bilateral headline focus, and penalize long incidental country lists.
+Ranking is deterministic and politically neutral. The current score combines recency, geographic relevance, story importance, independent source count, and source-country diversity. Two-country results require both countries through direct article or reviewed country-category signals, reward balanced country relevance and bilateral headline focus, and penalize long incidental country lists. A publisher's home country alone never creates a bilateral match.
 
 These modules are intentionally replaceable. Future entity extraction, embeddings, or human editorial signals can be added without changing provider adapters or UI contracts.
 
@@ -182,6 +184,7 @@ These modules are intentionally replaceable. Future entity extraction, embedding
 ## Licensing and provider limitations
 
 - NewsAPI plan restrictions and production rights depend on the operator's account and current terms. Verify them before deployment.
+- Bing News RSS discovery is used only for headline-level, private, non-commercial exploration and links directly to the discovered publisher URL. Review Microsoft's current terms before changing that usage model.
 - GDELT can supply broad discovery metadata but does not grant rights to republish publisher content. The original publisher's rights still apply.
 - RSS availability does not automatically grant permission to archive, reproduce, translate, or commercially reuse full content. Enable only reviewed feeds and retain only permitted metadata/excerpts.
 - Images and descriptions may have separate rights or hotlinking restrictions. A production operator should disable or proxy only expressly licensed media according to publisher/provider terms.

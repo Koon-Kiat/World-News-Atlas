@@ -24,7 +24,7 @@ function flag(code: string): string {
 
 export type ExplorerMode = "country" | "compare";
 
-function ProgressiveStoryList({
+export function ProgressiveStoryList({
   stories,
   total,
   isFetchingMore,
@@ -148,7 +148,7 @@ export function WorldNewsExplorer({
       sourcePerspective: perspective,
       period,
       page: "1",
-      pageSize: "60",
+      pageSize: String(STORY_BATCH_SIZE),
     });
     if (selectedCountries.length > 0) parameters.set("countries", selectedCountries.join(","));
     if (topic !== "all") parameters.set("topic", topic);
@@ -158,7 +158,7 @@ export function WorldNewsExplorer({
     return `/api/news?${parameters.toString()}`;
   }, [deferredSearch, language, period, perspective, selectedCountries, sources, topic]);
   const isLoading = settledRequest !== requestUrl;
-  const isInitialLiveLoad = isLoading && data.meta.dataSource === "fixtures";
+  const isInitialLiveLoad = isLoading && data.stories.length === 0;
 
   useEffect(() => {
     loadMoreControllerRef.current?.abort();
@@ -300,7 +300,7 @@ export function WorldNewsExplorer({
                       ? "Your briefing now focuses on stories involving this country. Choose another country to switch the lens."
                       : selectedCountries.length === 1
                       ? "Choose one more country to surface diplomacy, trade, technology, travel and other shared stories."
-                      : "Direct bilateral links appear first, followed by current reporting involving either selected country."}
+                      : "Every result contains a direct reporting signal for both selected countries."}
                 </p>
               </div>
               <div className="selection-slots" aria-label="Selected countries">
