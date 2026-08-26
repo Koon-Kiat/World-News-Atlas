@@ -46,4 +46,21 @@ describe("RSS provider", () => {
 
     expect(result.articles[0].imageUrl).toBe("https://i.guim.co.uk/example-700.jpg");
   });
+
+  it("matches every quoted country term for bilateral searches", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          `<?xml version="1.0"?><rss version="2.0"><channel><title>World</title><item><title>Japan and Singapore launch a new corridor</title><link>https://www.bbc.com/news/articles/bilateral</link><guid>bilateral</guid><pubDate>Tue, 25 Aug 2026 12:00:00 GMT</pubDate><description>Ministers from both countries announced the plan.</description></item><item><title>Japan announces a domestic policy</title><link>https://www.bbc.com/news/articles/domestic</link><guid>domestic</guid><pubDate>Tue, 25 Aug 2026 12:00:00 GMT</pubDate></item></channel></rss>`,
+          { status: 200, headers: { "Content-Type": "application/rss+xml" } },
+        ),
+      ),
+    );
+
+    const provider = new RssProvider([DEFAULT_RSS_FEEDS[0]]);
+    const result = await provider.search('"Japan" AND "Singapore"');
+
+    expect(result.articles.map((article) => article.providerArticleId)).toEqual(["bilateral"]);
+  });
 });

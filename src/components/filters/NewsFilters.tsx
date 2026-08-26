@@ -1,6 +1,7 @@
 import type { NewsPeriod } from "@/lib/news/types";
 import { NEWS_PERIOD_OPTIONS } from "@/lib/news/periods";
 import { FilterSelect } from "./FilterSelect";
+import { SourceFilter } from "./SourceFilter";
 
 const TOPICS = ["all", "politics", "business", "technology", "society", "climate", "transport"];
 const LANGUAGE_OPTIONS = [
@@ -13,18 +14,24 @@ interface NewsFiltersProps {
   topic: string;
   language: string;
   period: NewsPeriod;
+  sources: string[];
+  availableSources: Array<{ name: string; storyCount: number }>;
   onTopicChange: (value: string) => void;
   onLanguageChange: (value: string) => void;
   onPeriodChange: (value: NewsPeriod) => void;
+  onSourcesChange: (value: string[]) => void;
 }
 
 export function NewsFilters({
   topic,
   language,
   period,
+  sources,
+  availableSources,
   onTopicChange,
   onLanguageChange,
   onPeriodChange,
+  onSourcesChange,
 }: NewsFiltersProps) {
   return (
     <div className="filter-bar">
@@ -45,6 +52,7 @@ export function NewsFilters({
         </div>
       </div>
       <div className="compact-filters">
+        <SourceFilter availableSources={availableSources} value={sources} onChange={onSourcesChange} />
         <FilterSelect
           label="Language"
           value={language}

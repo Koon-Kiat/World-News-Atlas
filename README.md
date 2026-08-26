@@ -147,23 +147,25 @@ GET /api/news?countries=JP
 GET /api/news?countries=JP,SG
 GET /api/news?countries=JP&sourcePerspective=local&period=24h
 GET /api/news?countries=JP,SG&sourcePerspective=second-country&topic=technology
+GET /api/news?countries=JP&source=The+Japan+Times&source=Al+Jazeera
 ```
 
 Typed values:
 
 - `countries`: zero to two unique ISO 3166-1 alpha-2 codes.
 - `sourcePerspective`: `all`; `local` or `international` for one country; `first-country`, `second-country`, or `international` for two countries.
-- `period`: `latest`, `24h`, or `7d`.
+- `period`: `latest`, `24h`, `7d`, or `30d`.
+- `source`: repeatable exact news-outlet name; up to 20 outlets.
 - `topic`: lowercase topic slug.
 - `language`: BCP 47-style short language tag when metadata exists.
 - `search`: at most 120 characters.
-- `page`: 1–100; `pageSize`: 1–50.
+- `page`: 1–100; `pageSize`: 1–250.
 
 Invalid combinations return a sanitized `400` response. The API uses a short in-memory result cache and a best-effort per-instance rate limit. A multi-instance production deployment should replace both with shared infrastructure such as Redis.
 
 ## Ranking and two-country relevance
 
-Ranking is deterministic and politically neutral. The current score combines recency, geographic relevance, story importance, independent source count, and source-country diversity. Two-country relevance requires both countries in the story relationship table, rewards balanced country relevance and bilateral headline focus, and penalizes long incidental country lists.
+Ranking is deterministic and politically neutral. The current score combines recency, geographic relevance, story importance, independent source count, and source-country diversity. Two-country results require both countries through direct article signals or a publisher from one selected country reporting on the other, reward balanced country relevance and bilateral headline focus, and penalize long incidental country lists.
 
 These modules are intentionally replaceable. Future entity extraction, embeddings, or human editorial signals can be added without changing provider adapters or UI contracts.
 

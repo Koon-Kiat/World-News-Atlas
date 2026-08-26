@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { getCountryName, normalizeCountryCode } from "./countries/metadata";
 import { newsPeriodHours } from "./periods";
-import { rankStories } from "./ranking";
+import { rankStories, scoreTwoCountryRelevance } from "./ranking";
 import type {
   ArticleView,
   NewsQuery,
@@ -18,6 +18,7 @@ const perspectiveSchema = z.enum([
   "second-country",
 ]);
 const periodSchema = z.enum(["latest", "24h", "7d", "30d"]);
+const MIN_BILATERAL_RELEVANCE = 0.56;
 
 export class NewsQueryValidationError extends Error {
   constructor(public readonly issues: string[]) {
@@ -49,6 +50,17 @@ function parseCountries(value: string | null): string[] {
     throw new NewsQueryValidationError(["Country selections must be unique"]);
   }
   return normalized;
+}
+
+function parseSources(searchParams: URLSearchParams): string[] {
+  const sources = [...new Set(searchParams.getAll("source").map((value) => value.trim()).filter(Boolean))];
+  if (
+    sources.length > 20 ||
+    sources.some((source) => source.length > 80 || /[\u0000-\u001f\u007f]/.test(source))
+  ) {
+    throw new NewsQueryValidationError(["Select no more than 20 valid news outlets"]);
+  }
+  return sources;
 }
 
 function parseOptionalToken(
@@ -101,6 +113,7 @@ export function parseNewsQuery(searchParams: URLSearchParams): NewsQuery {
   return {
     countries,
     sourcePerspective: validatePerspective(perspectiveResult.data, countries.length),
+    sources: parseSources(searchParams),
     topic: parseOptionalToken(searchParams.get("topic"), "topic", /^[a-z0-9-]+$/, 40),
     language: parseOptionalToken(
       searchParams.get("language"),
@@ -155,40 +168,72 @@ function storyMatchesCountry(
   return includePublisherCountry && story.articles.some((article) => article.source.countryCode === code);
 }
 
+function hasFocusedBilateralSignal(story: StoryView, countries: string[]): boolean {
+  if (story.countries.length <= 4) return true;
+  return countries.every((code) =>
+    story.countries.some(
+      (country) => country.code === code && country.relevanceScore >= 0.85,
+    ),
+  );
+}
+
 export function queryStories(
   stories: StoryView[],
   query: NewsQuery,
   now = new Date(),
-): { stories: StoryView[]; total: number } {
+): {
+  stories: StoryView[];
+  total: number;
+  sourceFacets: Array<{ name: string; storyCount: number }>;
+} {
   const cutoff = now.getTime() - newsPeriodHours(query.period) * 3_600_000;
-  const matching = stories
+  const candidates = stories
     .filter((story) => new Date(story.lastUpdatedAt).getTime() >= cutoff)
     .filter((story) => {
       if (query.countries.length !== 2) {
         return query.countries.every((code) => storyMatchesCountry(story, code, false));
       }
-      const hasDirectMention = query.countries.some((code) =>
-        story.countries.some((country) => country.code === code),
+      return (
+        query.countries.every((code) => storyMatchesCountry(story, code, true)) &&
+        hasFocusedBilateralSignal(story, query.countries) &&
+        scoreTwoCountryRelevance(story, query.countries[0], query.countries[1]) >= MIN_BILATERAL_RELEVANCE
       );
-      return hasDirectMention;
     })
     .filter((story) => !query.topic || story.topics.includes(query.topic))
     .filter(
       (story) =>
         !query.language || story.articles.some((article) => article.language === query.language),
     )
-    .filter((story) => !query.search || matchesSearch(story, query.search))
+    .filter((story) => !query.search || matchesSearch(story, query.search));
+
+  const sourceCounts = new Map<string, number>();
+  for (const story of candidates) {
+    const storySources = new Set(story.articles.map((article) => article.source.name));
+    for (const source of storySources) sourceCounts.set(source, (sourceCounts.get(source) ?? 0) + 1);
+  }
+  const sourceFacets = [...sourceCounts.entries()]
+    .map(([name, storyCount]) => ({ name, storyCount }))
+    .sort((left, right) => right.storyCount - left.storyCount || left.name.localeCompare(right.name));
+
+  const selectedSources = new Set(query.sources);
+  const matching = candidates
     .map((story) => ({
       ...story,
-      articles: story.articles.filter((article) =>
-        perspectiveMatches(article, query.sourcePerspective, query.countries),
+      articles: story.articles.filter(
+        (article) =>
+          perspectiveMatches(article, query.sourcePerspective, query.countries) &&
+          (selectedSources.size === 0 || selectedSources.has(article.source.name)),
       ),
     }))
     .filter((story) => story.articles.length > 0);
 
   const ranked = rankStories(matching, query, now);
   const start = (query.page - 1) * query.pageSize;
-  return { stories: ranked.slice(start, start + query.pageSize), total: ranked.length };
+  return {
+    stories: ranked.slice(start, start + query.pageSize),
+    total: ranked.length,
+    sourceFacets,
+  };
 }
 
 export function buildNewsResponse(
@@ -206,6 +251,7 @@ export function buildNewsResponse(
       page: query.page,
       pageSize: query.pageSize,
       dataSource,
+      sourceFacets: result.sourceFacets,
       generatedAt: new Date().toISOString(),
       notice,
     },
@@ -215,6 +261,7 @@ export function buildNewsResponse(
 export const DEFAULT_NEWS_QUERY: NewsQuery = {
   countries: [],
   sourcePerspective: "all",
+  sources: [],
   period: "latest",
   page: 1,
   pageSize: 12,

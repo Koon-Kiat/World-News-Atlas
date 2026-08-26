@@ -205,7 +205,11 @@ export function WorldMap({
                 tabIndex={0}
                 aria-label={`${country.name}${isSelected ? ", selected" : ""}`}
                 aria-pressed={isSelected}
-                onClick={() => select(country.code)}
+                onClick={(event) => {
+                  select(country.code);
+                  event.currentTarget.blur();
+                }}
+                onMouseDown={(event) => event.preventDefault()}
                 onMouseEnter={() => setHoveredCountry(country)}
                 onMouseLeave={() => setHoveredCountry(null)}
                 onFocus={() => setHoveredCountry(country)}

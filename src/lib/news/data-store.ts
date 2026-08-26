@@ -6,10 +6,12 @@ import { logNews } from "./logger";
 import { normalizeProviderArticles } from "./normalize";
 import { createConfiguredProviders, fetchProviderArticlesGracefully } from "./providers";
 import { newsPeriodHours } from "./periods";
-import type { NewsPeriod, StoryView } from "./types";
+import { getCountryName } from "./countries/metadata";
+import type { NewsPeriod, NewsQuery, StoryView } from "./types";
 
 const LIVE_CACHE_TTL_MS = 60 * 60_000;
-const liveCaches = new Map<NewsPeriod, { expiresAt: number; stories: StoryView[] }>();
+const MAX_LIVE_CACHE_ENTRIES = 40;
+const liveCaches = new Map<string, { expiresAt: number; stories: StoryView[] }>();
 
 function enumValue<T extends string>(value: T): T {
   return value;
@@ -85,16 +87,30 @@ async function loadDatabaseStories(period: NewsPeriod): Promise<StoryView[]> {
   })) as StoryView[];
 }
 
-async function loadLiveStories(period: NewsPeriod): Promise<StoryView[]> {
-  const liveCache = liveCaches.get(period);
+function providerSearchQuery(query: NewsQuery): string | undefined {
+  const terms = [
+    ...query.countries.map(getCountryName),
+    ...(query.search ? [query.search] : []),
+  ]
+    .map((term) => term.replace(/["\\]/g, " ").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  if (terms.length === 0) return undefined;
+  return terms.map((term) => `"${term}"`).join(" AND ");
+}
+
+async function loadLiveStories(query: NewsQuery): Promise<StoryView[]> {
+  const searchQuery = providerSearchQuery(query);
+  const cacheKey = `${query.period}|${searchQuery ?? "latest"}`;
+  const liveCache = liveCaches.get(cacheKey);
   if (liveCache && liveCache.expiresAt > Date.now()) return liveCache.stories;
 
   try {
     const providers = createConfiguredProviders();
     if (providers.length === 0) return [];
     const result = await fetchProviderArticlesGracefully(providers, {
-      from: new Date(Date.now() - newsPeriodHours(period) * 3_600_000),
+      from: new Date(Date.now() - newsPeriodHours(query.period) * 3_600_000),
       limit: 250,
+      query: searchQuery,
     });
     const normalized = normalizeProviderArticles(result.articles);
     const deduplicated = deduplicateArticles(normalized);
@@ -110,7 +126,11 @@ async function loadLiveStories(period: NewsPeriod): Promise<StoryView[]> {
       articles: story.articles,
     }));
     if (stories.length > 0) {
-      liveCaches.set(period, { stories, expiresAt: Date.now() + LIVE_CACHE_TTL_MS });
+      if (liveCaches.size >= MAX_LIVE_CACHE_ENTRIES) {
+        const oldestKey = liveCaches.keys().next().value;
+        if (oldestKey) liveCaches.delete(oldestKey);
+      }
+      liveCaches.set(cacheKey, { stories, expiresAt: Date.now() + LIVE_CACHE_TTL_MS });
     }
     return stories;
   } catch (error) {
@@ -121,35 +141,35 @@ async function loadLiveStories(period: NewsPeriod): Promise<StoryView[]> {
   }
 }
 
-async function liveDatasetOrFixtures(period: NewsPeriod, notice: string): Promise<{
+async function liveDatasetOrFixtures(query: NewsQuery, notice: string): Promise<{
   stories: StoryView[];
   dataSource: "live" | "fixtures";
   notice?: string;
 }> {
-  const stories = await loadLiveStories(period);
+  const stories = await loadLiveStories(query);
   if (stories.length > 0) return { stories, dataSource: "live" };
   return { stories: getFixtureStories(), dataSource: "fixtures", notice };
 }
 
-export async function loadNewsDataset(period: NewsPeriod = "latest"): Promise<{
+export async function loadNewsDataset(query: NewsQuery): Promise<{
   stories: StoryView[];
   dataSource: "database" | "live" | "fixtures";
   notice?: string;
 }> {
   if (!process.env.DATABASE_URL) {
     return liveDatasetOrFixtures(
-      period,
+      query,
       "No live provider returned usable coverage, so the sample briefing is shown temporarily.",
     );
   }
   try {
-    const stories = await loadDatabaseStories(period);
+    const stories = await loadDatabaseStories(query.period);
     if (stories.length > 0) return { stories, dataSource: "database" };
-    return liveDatasetOrFixtures(period, "The news database is empty, so sample coverage is shown.");
+    return liveDatasetOrFixtures(query, "The news database is empty, so sample coverage is shown.");
   } catch {
     logNews("error", "database_query_failed", { operation: "load_news_dataset" });
     return liveDatasetOrFixtures(
-      period,
+      query,
       "Live stored coverage is temporarily unavailable; sample coverage is shown.",
     );
   }

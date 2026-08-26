@@ -55,9 +55,20 @@ export function StoryCard({ story, featured = false }: { story: StoryView; featu
   const safeImage = displayImageUrl(imageArticle?.imageUrl);
   const fallbackSource = imageArticle?.source.name ?? lead?.source.name ?? "World News Atlas";
   const sourceNames = [...new Set(story.articles.map((article) => article.source.name))];
+  const cardUrl = lead && !lead.isFixture && isSafeHttpUrl(lead.url) ? lead.url : null;
 
   return (
     <article className={featured ? "story-card is-featured has-media" : "story-card has-media"}>
+      {cardUrl && (
+        <a
+          className="story-card-link"
+          href={cardUrl}
+          target="_blank"
+          rel="noopener noreferrer nofollow"
+          referrerPolicy="strict-origin-when-cross-origin"
+          aria-label={`Read ${story.title} at ${lead.source.name}`}
+        />
+      )}
       <div className={safeImage ? "story-image-wrap" : "story-image-wrap is-placeholder"}>
         <div className="story-image-fallback" aria-hidden="true">
           <span>{sourceMark(fallbackSource)}</span>
@@ -68,7 +79,9 @@ export function StoryCard({ story, featured = false }: { story: StoryView; featu
             src={safeImage}
             alt=""
             className="story-image"
-            loading="lazy"
+            loading="eager"
+            fetchPriority={featured ? "high" : "auto"}
+            decoding="async"
             referrerPolicy="no-referrer"
             onError={(event) => {
               event.currentTarget.style.display = "none";

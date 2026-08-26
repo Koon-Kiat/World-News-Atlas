@@ -10,6 +10,7 @@ import type { NewsQuery } from "@/lib/news/types";
 const baseQuery: NewsQuery = {
   countries: [],
   sourcePerspective: "all",
+  sources: [],
   period: "7d",
   page: 1,
   pageSize: 50,
@@ -22,18 +23,54 @@ describe("news matching", () => {
     expect(result.stories.every((story) => story.countries.some(({ code }) => code === "JP"))).toBe(true);
   });
 
-  it("ranks direct two-country connections ahead of related coverage", () => {
+  it("returns only meaningful two-country connections", () => {
     const result = queryStories(getFixtureStories(), {
       ...baseQuery,
       countries: ["JP", "SG"],
     });
     expect(result.stories[0].id).toBe("fixture-story-jp-sg-digital-corridor");
-    expect(result.stories.length).toBeGreaterThan(1);
+    expect(result.stories.length).toBeGreaterThan(0);
     expect(
       result.stories.every((story) =>
-        story.countries.some((country) => ["JP", "SG"].includes(country.code)),
+        ["JP", "SG"].every(
+          (code) =>
+            story.countries.some((country) => country.code === code) ||
+            story.articles.some((article) => article.source.countryCode === code),
+        ),
       ),
     ).toBe(true);
+  });
+
+  it("excludes stories that involve only one side of a comparison", () => {
+    const result = queryStories(getFixtureStories(), {
+      ...baseQuery,
+      countries: ["JP", "SG"],
+    });
+    expect(result.stories.some((story) =>
+      story.countries.some((country) => country.code === "JP") &&
+      !story.countries.some((country) => country.code === "SG") &&
+      !story.articles.some((article) => article.source.countryCode === "SG")
+    )).toBe(false);
+  });
+
+  it("excludes broad country lists without a focused bilateral signal", () => {
+    const direct = getFixtureStories().find((story) => story.id === "fixture-story-jp-sg-digital-corridor")!;
+    const incidental = {
+      ...direct,
+      id: "incidental-country-list",
+      countries: [
+        { code: "JP", name: "Japan", relevanceScore: 0.73 },
+        { code: "SG", name: "Singapore", relevanceScore: 0.73 },
+        { code: "US", name: "United States", relevanceScore: 0.73 },
+        { code: "GB", name: "United Kingdom", relevanceScore: 0.73 },
+        { code: "FR", name: "France", relevanceScore: 0.73 },
+      ],
+    };
+    const result = queryStories([incidental], {
+      ...baseQuery,
+      countries: ["JP", "SG"],
+    });
+    expect(result.stories).toHaveLength(0);
   });
 
   it("includes reporting from one selected country about the other", () => {
@@ -96,6 +133,17 @@ describe("news matching", () => {
     expect(second.stories[0].articles.every((article) => article.source.countryCode === "SG")).toBe(true);
     expect(international.stories[0].articles.every((article) => !["JP", "SG"].includes(article.source.countryCode ?? ""))).toBe(true);
   });
+
+  it("filters stories and coverage by selected news outlet", () => {
+    const sourceName = getFixtureStories()[0].articles[0].source.name;
+    const result = queryStories(getFixtureStories(), {
+      ...baseQuery,
+      sources: [sourceName],
+    });
+    expect(result.stories.length).toBeGreaterThan(0);
+    expect(result.stories.flatMap((story) => story.articles).every((article) => article.source.name === sourceName)).toBe(true);
+    expect(result.sourceFacets.some((source) => source.name === sourceName && source.storyCount > 0)).toBe(true);
+  });
 });
 
 describe("API query validation", () => {
@@ -114,6 +162,11 @@ describe("API query validation", () => {
   it("supports a 30-day range and a progressively rendered response size", () => {
     const query = parseNewsQuery(new URLSearchParams("period=30d&pageSize=250"));
     expect(query).toMatchObject({ period: "30d", pageSize: 250 });
+  });
+
+  it("parses repeated outlet filters", () => {
+    const query = parseNewsQuery(new URLSearchParams("source=CNA&source=The+Japan+Times"));
+    expect(query.sources).toEqual(["CNA", "The Japan Times"]);
   });
 
   it.each([
