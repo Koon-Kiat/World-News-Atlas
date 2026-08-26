@@ -11,7 +11,45 @@ const REVIEWED_FEED_HOSTS = new Set([
   "www.theguardian.com",
   "www.aljazeera.com",
   "www.channelnewsasia.com",
+  "www.japantimes.co.jp",
+  "rss.dw.com",
+  "www.euronews.com",
+  "www.france24.com",
+  "feeds.skynews.com",
+  "feeds.npr.org",
 ]);
+
+interface RssMediaNode {
+  $?: {
+    url?: string;
+    width?: string;
+  };
+}
+
+interface RssMediaFields {
+  contentEncoded?: string;
+  id?: string;
+  mediaContent?: RssMediaNode[];
+  mediaThumbnail?: RssMediaNode[];
+}
+
+function feedImage(item: Parser.Item & RssMediaFields): string | null {
+  const mediaCandidates = [
+    ...(item.mediaContent ?? []),
+    ...(item.mediaThumbnail ?? []),
+  ]
+    .map((media) => ({
+      url: media.$?.url,
+      width: Number(media.$?.width ?? 0),
+    }))
+    .filter((candidate): candidate is { url: string; width: number } =>
+      Boolean(candidate.url) && !/\/(?:no-image|placeholder)[^/]*\.(?:gif|jpe?g|png|webp)(?:\?|$)/i.test(candidate.url ?? ""),
+    )
+    .sort((first, second) => second.width - first.width);
+  const encodedImage = item.contentEncoded?.match(/<img\b[^>]*\bsrc=["']([^"']+)["']/i)?.[1];
+  const fallback = item.enclosure?.url ?? encodedImage ?? null;
+  return mediaCandidates[0]?.url ?? (fallback && !/\/(?:no-image|placeholder)[^/]*\./i.test(fallback) ? fallback : null);
+}
 
 function isPrivateAddress(address: string): boolean {
   const normalized = address.toLowerCase();
@@ -93,7 +131,15 @@ export class RssProvider implements NewsProvider {
     sourceMetadata: true,
     requiresCredentials: false,
   } as const;
-  private readonly parser = new Parser();
+  private readonly parser = new Parser<Record<string, never>, RssMediaFields>({
+    customFields: {
+      item: [
+        ["media:content", "mediaContent", { keepArray: true }],
+        ["media:thumbnail", "mediaThumbnail", { keepArray: true }],
+        ["content:encoded", "contentEncoded"],
+      ],
+    },
+  });
 
   constructor(
     private readonly feeds: RssFeedConfig[],
@@ -111,7 +157,7 @@ export class RssProvider implements NewsProvider {
           title: item.title ?? "Untitled RSS item",
           description: item.contentSnippet ?? item.summary ?? null,
           url: item.link ?? feed.websiteUrl,
-          imageUrl: item.enclosure?.url ?? null,
+          imageUrl: feedImage(item),
           publishedAt: item.isoDate ?? item.pubDate ?? new Date().toISOString(),
           language: feed.language,
           sourceName: feed.name,

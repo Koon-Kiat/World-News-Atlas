@@ -16,7 +16,7 @@ export async function getNews(query: NewsQuery): Promise<NewsResponse> {
   const cached = responseCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
 
-  const dataset = await loadNewsDataset();
+  const dataset = await loadNewsDataset(query.period);
   const response = buildNewsResponse(
     dataset.stories,
     query,

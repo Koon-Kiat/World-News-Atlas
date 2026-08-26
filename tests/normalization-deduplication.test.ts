@@ -48,6 +48,24 @@ describe("provider normalization", () => {
     expect(result.title).toBe("World & regional update");
     expect(result.description).toBe("The latest report.");
   });
+
+  it("uses a national publisher country as a country signal", () => {
+    const result = normalizeProviderArticle({
+      provider: "RSS",
+      providerArticleId: "national-source",
+      title: "Government announces a new transport programme",
+      description: "The policy begins next month.",
+      url: "https://www.japantimes.co.jp/news/example",
+      publishedAt: new Date().toISOString(),
+      sourceName: "The Japan Times",
+      sourceCountry: "JP",
+      sourceScope: "NATIONAL",
+    });
+
+    expect(result.countries).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "JP" })]),
+    );
+  });
 });
 
 describe("article deduplication", () => {

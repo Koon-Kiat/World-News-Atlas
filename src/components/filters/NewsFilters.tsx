@@ -1,4 +1,5 @@
 import type { NewsPeriod } from "@/lib/news/types";
+import { NEWS_PERIOD_OPTIONS } from "@/lib/news/periods";
 import { FilterSelect } from "./FilterSelect";
 
 const TOPICS = ["all", "politics", "business", "technology", "society", "climate", "transport"];
@@ -8,12 +9,6 @@ const LANGUAGE_OPTIONS = [
   { value: "ja", label: "Japanese" },
   { value: "zh", label: "Chinese" },
 ];
-const PERIOD_OPTIONS: Array<{ value: NewsPeriod; label: string }> = [
-  { value: "latest", label: "Latest" },
-  { value: "24h", label: "Past 24 hours" },
-  { value: "7d", label: "Past 7 days" },
-];
-
 interface NewsFiltersProps {
   topic: string;
   language: string;
@@ -59,7 +54,7 @@ export function NewsFilters({
         <FilterSelect
           label="Published"
           value={period}
-          options={PERIOD_OPTIONS}
+          options={NEWS_PERIOD_OPTIONS.map(({ value, label }) => ({ value, label }))}
           onChange={onPeriodChange}
         />
       </div>
