@@ -105,6 +105,7 @@ export function WorldNewsExplorer({
   const [perspective, setPerspective] = useState<SourcePerspective>("all");
   const [topic, setTopic] = useState("all");
   const [language, setLanguage] = useState("all");
+  const [sources, setSources] = useState<string[]>([]);
   const [period, setPeriod] = useNewsPeriodPreference();
   const [search, setSearch] = useState("");
   const [data, setData] = useState(initialData);
@@ -112,6 +113,8 @@ export function WorldNewsExplorer({
   const [loadedPage, setLoadedPage] = useState(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loadMoreControllerRef = useRef<AbortController | null>(null);
+  const storiesSectionRef = useRef<HTMLElement>(null);
+  const lastScrolledSearchRef = useRef("");
   const [error, setError] = useState<string | null>(null);
   const deferredSearch = useDeferredValue(search.trim());
 
@@ -136,7 +139,7 @@ export function WorldNewsExplorer({
     return {
       eyebrow: "Bilateral lens",
       title: `${first} ↔ ${second}`,
-      description: `Direct connections first, followed by current reporting involving ${first} or ${second}.`,
+      description: `Stories with a meaningful connection to both ${first} and ${second}.`,
     };
   }, [selectedCountries]);
 
@@ -150,9 +153,10 @@ export function WorldNewsExplorer({
     if (selectedCountries.length > 0) parameters.set("countries", selectedCountries.join(","));
     if (topic !== "all") parameters.set("topic", topic);
     if (language !== "all") parameters.set("language", language);
+    for (const source of sources) parameters.append("source", source);
     if (deferredSearch) parameters.set("search", deferredSearch);
     return `/api/news?${parameters.toString()}`;
-  }, [deferredSearch, language, period, perspective, selectedCountries, topic]);
+  }, [deferredSearch, language, period, perspective, selectedCountries, sources, topic]);
   const isLoading = settledRequest !== requestUrl;
   const isInitialLiveLoad = isLoading && data.meta.dataSource === "fixtures";
 
@@ -182,6 +186,16 @@ export function WorldNewsExplorer({
       });
     return () => controller.abort();
   }, [requestUrl]);
+
+  useEffect(() => {
+    if (!deferredSearch) {
+      lastScrolledSearchRef.current = "";
+      return;
+    }
+    if (isLoading || lastScrolledSearchRef.current === deferredSearch) return;
+    lastScrolledSearchRef.current = deferredSearch;
+    storiesSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [deferredSearch, isLoading]);
 
   function loadNextPage() {
     if (isLoading || isLoadingMore || data.stories.length >= data.meta.total || loadMoreControllerRef.current) return;
@@ -226,6 +240,7 @@ export function WorldNewsExplorer({
   function changeCountries(countries: string[]) {
     setSelectedCountries(countries.slice(0, selectionLimit));
     setPerspective("all");
+    setSources([]);
   }
 
   function selectCountry(code: string) {
@@ -243,12 +258,18 @@ export function WorldNewsExplorer({
           <span className="brand-mark" aria-hidden="true"><span /></span>
           <span>WORLDLINE</span>
         </Link>
-        <div className="header-search">
+        <form
+          className="header-search"
+          role="search"
+          onSubmit={(event) => {
+            event.preventDefault();
+            storiesSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+        >
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.7-4.7m2.2-5.3a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" /></svg>
           <label className="sr-only" htmlFor="news-search">Search news</label>
           <input id="news-search" type="search" value={search} maxLength={120} placeholder="Search topics, people, places…" onChange={(event) => setSearch(event.target.value)} />
-          {search && <button type="button" onClick={() => setSearch("")} aria-label="Clear search">×</button>}
-        </div>
+        </form>
         <a className="latest-link" href="#stories">Latest <span aria-hidden="true">↓</span></a>
       </header>
 
@@ -322,7 +343,7 @@ export function WorldNewsExplorer({
           </div>
         </section>
 
-        <section className="stories-section" id="stories" aria-labelledby="stories-title" aria-busy={isLoading}>
+        <section ref={storiesSectionRef} className="stories-section" id="stories" aria-labelledby="stories-title" aria-busy={isLoading}>
           <div className="stories-heading">
             <div>
               <p className="eyebrow">{heading.eyebrow}</p>
@@ -341,7 +362,17 @@ export function WorldNewsExplorer({
             </div>
           </div>
 
-          <NewsFilters topic={topic} language={language} period={period} onTopicChange={setTopic} onLanguageChange={setLanguage} onPeriodChange={changePeriod} />
+          <NewsFilters
+            topic={topic}
+            language={language}
+            period={period}
+            sources={sources}
+            availableSources={data.meta.sourceFacets}
+            onTopicChange={setTopic}
+            onLanguageChange={setLanguage}
+            onPeriodChange={changePeriod}
+            onSourcesChange={setSources}
+          />
           {isLoading && (
             <div className="refresh-banner" role="status" aria-live="polite">
               <span className="refresh-spinner" aria-hidden="true" />

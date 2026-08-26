@@ -67,6 +67,7 @@ export interface StoryView {
 export interface NewsQuery {
   countries: string[];
   sourcePerspective: SourcePerspective;
+  sources: string[];
   topic?: string;
   language?: string;
   period: NewsPeriod;
@@ -83,6 +84,7 @@ export interface NewsResponse {
     page: number;
     pageSize: number;
     dataSource: "database" | "live" | "fixtures";
+    sourceFacets: Array<{ name: string; storyCount: number }>;
     generatedAt: string;
     notice?: string;
   };

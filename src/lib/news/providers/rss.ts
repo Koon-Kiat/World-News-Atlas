@@ -181,11 +181,14 @@ export class RssProvider implements NewsProvider {
 
   async search(query: string, request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
     const result = await this.fetchLatest(request);
-    const needle = query.toLowerCase();
+    const quotedTerms = [...query.matchAll(/"([^"]+)"/g)].map((match) => match[1].toLowerCase());
+    const terms = quotedTerms.length > 0
+      ? quotedTerms
+      : query.split(/\s+(?:and|or)\s+|\s+/i).map((term) => term.trim().toLowerCase()).filter(Boolean);
     return {
       ...result,
       articles: result.articles.filter((article) =>
-        `${article.title} ${article.description ?? ""}`.toLowerCase().includes(needle),
+        terms.every((term) => `${article.title} ${article.description ?? ""}`.toLowerCase().includes(term)),
       ),
     };
   }
