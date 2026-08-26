@@ -22,14 +22,42 @@ describe("news matching", () => {
     expect(result.stories.every((story) => story.countries.some(({ code }) => code === "JP"))).toBe(true);
   });
 
-  it("requires both selected countries for a two-country result", () => {
+  it("ranks direct two-country connections ahead of related coverage", () => {
     const result = queryStories(getFixtureStories(), {
       ...baseQuery,
       countries: ["JP", "SG"],
     });
-    expect(result.stories.map((story) => story.id)).toEqual([
-      "fixture-story-jp-sg-digital-corridor",
-    ]);
+    expect(result.stories[0].id).toBe("fixture-story-jp-sg-digital-corridor");
+    expect(result.stories.length).toBeGreaterThan(1);
+    expect(
+      result.stories.every((story) =>
+        story.countries.some((country) => ["JP", "SG"].includes(country.code)),
+      ),
+    ).toBe(true);
+  });
+
+  it("includes reporting from one selected country about the other", () => {
+    const sourceStory = getFixtureStories().find((story) =>
+      story.countries.some((country) => country.code === "US"),
+    );
+    expect(sourceStory).toBeDefined();
+    const contextualStory = {
+      ...sourceStory!,
+      id: "contextual-sg-us",
+      countries: sourceStory!.countries.filter((country) => country.code === "US"),
+      articles: sourceStory!.articles.map((article) => ({
+        ...article,
+        source: { ...article.source, countryCode: "SG" },
+        countries: article.countries.filter((country) => country.code === "US"),
+      })),
+    };
+
+    const result = queryStories([contextualStory], {
+      ...baseQuery,
+      countries: ["SG", "US"],
+    });
+
+    expect(result.stories.map((story) => story.id)).toEqual(["contextual-sg-us"]);
   });
 
   it("classifies local and international sources from publisher country", () => {

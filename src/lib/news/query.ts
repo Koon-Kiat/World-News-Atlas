@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getCountryName, normalizeCountryCode } from "./countries/metadata";
-import { rankStories, scoreTwoCountryRelevance } from "./ranking";
+import { rankStories } from "./ranking";
 import type {
   ArticleView,
   NewsPeriod,
@@ -152,6 +152,15 @@ function matchesSearch(story: StoryView, search: string): boolean {
   return haystack.includes(needle);
 }
 
+function storyMatchesCountry(
+  story: StoryView,
+  code: string,
+  includePublisherCountry: boolean,
+): boolean {
+  if (story.countries.some((country) => country.code === code)) return true;
+  return includePublisherCountry && story.articles.some((article) => article.source.countryCode === code);
+}
+
 export function queryStories(
   stories: StoryView[],
   query: NewsQuery,
@@ -160,16 +169,15 @@ export function queryStories(
   const cutoff = now.getTime() - periodHours(query.period) * 3_600_000;
   const matching = stories
     .filter((story) => new Date(story.lastUpdatedAt).getTime() >= cutoff)
-    .filter((story) =>
-      query.countries.every((code) =>
+    .filter((story) => {
+      if (query.countries.length !== 2) {
+        return query.countries.every((code) => storyMatchesCountry(story, code, false));
+      }
+      const hasDirectMention = query.countries.some((code) =>
         story.countries.some((country) => country.code === code),
-      ),
-    )
-    .filter(
-      (story) =>
-        query.countries.length !== 2 ||
-        scoreTwoCountryRelevance(story, query.countries[0], query.countries[1]) >= 0.55,
-    )
+      );
+      return hasDirectMention;
+    })
     .filter((story) => !query.topic || story.topics.includes(query.topic))
     .filter(
       (story) =>

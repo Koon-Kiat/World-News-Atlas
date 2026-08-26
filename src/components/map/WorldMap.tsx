@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import { geoNaturalEarth1, geoPath } from "d3-geo";
 import type { Feature, Geometry, GeoJsonProperties } from "geojson";
 import { feature } from "topojson-client";
@@ -51,6 +51,7 @@ export function WorldMap({
 }: WorldMapProps) {
   const [hoveredCountry, setHoveredCountry] = useState<MapCountry | null>(null);
   const [view, setView] = useState<MapView>({ scale: 1, x: 0, y: 0 });
+  const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<{
     pointerId: number;
     startX: number;
@@ -76,24 +77,36 @@ export function WorldMap({
     return geoPath(projection);
   }, [countries]);
 
+  useEffect(() => {
+    const element = svgRef.current;
+    if (!element) return;
+    const mapElement = element;
+    function handleWheel(event: WheelEvent) {
+      event.preventDefault();
+      event.stopPropagation();
+      const bounds = mapElement.getBoundingClientRect();
+      const pointX = ((event.clientX - bounds.left) / bounds.width) * WIDTH;
+      const pointY = ((event.clientY - bounds.top) / bounds.height) * HEIGHT;
+      setView((current) => {
+        const scale = Math.min(
+          MAX_ZOOM,
+          Math.max(MIN_ZOOM, current.scale + (event.deltaY < 0 ? 0.35 : -0.35)),
+        );
+        const x = pointX - ((pointX - current.x) / current.scale) * scale;
+        const y = pointY - ((pointY - current.y) / current.scale) * scale;
+        return clampView(scale, x, y);
+      });
+    }
+    mapElement.addEventListener("wheel", handleWheel, { passive: false });
+    return () => mapElement.removeEventListener("wheel", handleWheel);
+  }, []);
+
   function select(code: string) {
     if (suppressClickRef.current) {
       suppressClickRef.current = false;
       return;
     }
     onSelectionChange(updateCountrySelection(selectedCountries, code, selectionLimit));
-  }
-
-  function zoomAt(clientX: number, clientY: number, nextScale: number, element: SVGSVGElement) {
-    const bounds = element.getBoundingClientRect();
-    const pointX = ((clientX - bounds.left) / bounds.width) * WIDTH;
-    const pointY = ((clientY - bounds.top) / bounds.height) * HEIGHT;
-    setView((current) => {
-      const scale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextScale));
-      const x = pointX - ((pointX - current.x) / current.scale) * scale;
-      const y = pointY - ((pointY - current.y) / current.scale) * scale;
-      return clampView(scale, x, y);
-    });
   }
 
   function zoomFromCenter(direction: 1 | -1) {
@@ -157,14 +170,11 @@ export function WorldMap({
         <button type="button" className="map-reset" onClick={() => setView({ scale: 1, x: 0, y: 0 })} disabled={view.scale === 1} aria-label="Reset map zoom">Reset</button>
       </div>
       <svg
+        ref={svgRef}
         className="world-map"
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         role="group"
         aria-label={`Interactive world map. Select up to ${selectionLimit === 1 ? "one country" : "two countries"}.`}
-        onWheel={(event: ReactWheelEvent<SVGSVGElement>) => {
-          event.preventDefault();
-          zoomAt(event.clientX, event.clientY, view.scale + (event.deltaY < 0 ? 0.35 : -0.35), event.currentTarget);
-        }}
         onPointerDown={startDrag}
         onPointerMove={dragMap}
         onPointerUp={finishDrag}
