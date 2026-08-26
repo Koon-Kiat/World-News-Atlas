@@ -209,7 +209,6 @@ export function WorldMap({
                   select(country.code);
                   event.currentTarget.blur();
                 }}
-                onMouseDown={(event) => event.preventDefault()}
                 onMouseEnter={() => setHoveredCountry(country)}
                 onMouseLeave={() => setHoveredCountry(null)}
                 onFocus={() => setHoveredCountry(country)}
