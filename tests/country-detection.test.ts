@@ -22,6 +22,13 @@ describe("country detection", () => {
     expect(detectCountries("Turkish officials meet in Ankara").map(({ code }) => code)).toContain("TR");
   });
 
+  it("recognizes uppercase US without treating the lowercase pronoun as a country", () => {
+    expect(detectCountries("Singapore expands US technology partnership").map(({ code }) => code)).toEqual(
+      expect.arrayContaining(["SG", "US"]),
+    );
+    expect(detectCountries("Officials tell us the talks will continue").map(({ code }) => code)).not.toContain("US");
+  });
+
   it("normalizes provider source-country names and codes", () => {
     expect(countryNameToCode("United States of America")).toBe("US");
     expect(countryNameToCode("sg")).toBe("SG");

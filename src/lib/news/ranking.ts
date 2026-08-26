@@ -26,20 +26,32 @@ export function scoreTwoCountryRelevance(
 ): number {
   const first = story.countries.find((country) => country.code === firstCountry);
   const second = story.countries.find((country) => country.code === secondCountry);
-  if (!first || !second) return 0;
+  const firstPublisher = story.articles.some(
+    (article) => article.source.countryCode === firstCountry,
+  );
+  const secondPublisher = story.articles.some(
+    (article) => article.source.countryCode === secondCountry,
+  );
+  if ((!first && !firstPublisher) || (!second && !secondPublisher)) return 0;
 
-  const relationshipStrength = (first.relevanceScore + second.relevanceScore) / 2;
+  const relationshipStrength =
+    ((first?.relevanceScore ?? 0.62) + (second?.relevanceScore ?? 0.62)) / 2;
   const countryDilution = Math.min(1, 2 / Math.max(2, story.countries.length));
-  const titleFocus =
-    titleMentionsCountry(story.title, firstCountry) &&
-    titleMentionsCountry(story.title, secondCountry)
-      ? 1
+  const firstTitleMention = titleMentionsCountry(story.title, firstCountry);
+  const secondTitleMention = titleMentionsCountry(story.title, secondCountry);
+  const titleFocus = firstTitleMention && secondTitleMention
+    ? 1
+    : firstTitleMention || secondTitleMention
+      ? 0.62
       : 0.45;
   const publisherCountries = new Set(
     story.articles.map((article) => article.source.countryCode).filter(Boolean),
   );
-  const bilateralCoverage =
-    publisherCountries.has(firstCountry) && publisherCountries.has(secondCountry) ? 1 : 0.65;
+  const bilateralCoverage = publisherCountries.has(firstCountry) && publisherCountries.has(secondCountry)
+    ? 1
+    : publisherCountries.has(firstCountry) || publisherCountries.has(secondCountry)
+      ? 0.8
+      : 0.65;
 
   return clamp(
     relationshipStrength * 0.5 +

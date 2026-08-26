@@ -1,6 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { NewsFilters } from "@/components/filters/NewsFilters";
 import { PerspectiveFilter } from "@/components/filters/PerspectiveFilter";
 import { CountryPicker } from "@/components/map/CountryPicker";
@@ -16,9 +17,17 @@ function flag(code: string): string {
   return String.fromCodePoint(...code.split("").map((character) => 127397 + character.charCodeAt(0)));
 }
 
-export function WorldNewsExplorer({ initialData }: { initialData: NewsResponse }) {
+export type ExplorerMode = "country" | "compare";
+
+export function WorldNewsExplorer({
+  initialData,
+  mode,
+}: {
+  initialData: NewsResponse;
+  mode: ExplorerMode;
+}) {
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
-  const [selectionLimit, setSelectionLimit] = useState<1 | 2>(1);
+  const selectionLimit: 1 | 2 = mode === "country" ? 1 : 2;
   const [perspective, setPerspective] = useState<SourcePerspective>("all");
   const [topic, setTopic] = useState("all");
   const [language, setLanguage] = useState("all");
@@ -50,7 +59,7 @@ export function WorldNewsExplorer({ initialData }: { initialData: NewsResponse }
     return {
       eyebrow: "Bilateral lens",
       title: `${first} ↔ ${second}`,
-      description: `Stories with a meaningful connection to both ${first} and ${second}.`,
+      description: `Direct connections first, followed by current reporting involving ${first} or ${second}.`,
     };
   }, [selectedCountries]);
 
@@ -67,6 +76,7 @@ export function WorldNewsExplorer({ initialData }: { initialData: NewsResponse }
     return `/api/news?${parameters.toString()}`;
   }, [deferredSearch, language, period, perspective, selectedCountries, topic]);
   const isLoading = settledRequest !== requestUrl;
+  const isInitialLiveLoad = isLoading && data.meta.dataSource === "fixtures";
 
   useEffect(() => {
     const controller = new AbortController();
@@ -97,12 +107,6 @@ export function WorldNewsExplorer({ initialData }: { initialData: NewsResponse }
     setPerspective("all");
   }
 
-  function changeSelectionLimit(limit: 1 | 2) {
-    setSelectionLimit(limit);
-    if (limit === 1) setSelectedCountries((countries) => countries.slice(0, 1));
-    setPerspective("all");
-  }
-
   function selectCountry(code: string) {
     changeCountries(updateCountrySelection(selectedCountries, code, selectionLimit));
   }
@@ -110,10 +114,10 @@ export function WorldNewsExplorer({ initialData }: { initialData: NewsResponse }
   return (
     <div className="site-frame">
       <header className="site-header">
-        <a className="brand" href="#top" aria-label="Worldline home">
+        <Link className="brand" href="/country#top" aria-label="Worldline home">
           <span className="brand-mark" aria-hidden="true"><span /></span>
           <span>WORLDLINE</span>
-        </a>
+        </Link>
         <div className="header-search">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.7-4.7m2.2-5.3a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" /></svg>
           <label className="sr-only" htmlFor="news-search">Search news</label>
@@ -126,9 +130,9 @@ export function WorldNewsExplorer({ initialData }: { initialData: NewsResponse }
       <main id="top">
         <section className="hero-section" aria-labelledby="hero-title">
           <div className="hero-copy">
-            <p className="eyebrow">News without borders</p>
+            <p className="eyebrow">{mode === "country" ? "Single-country briefing" : "Two-country comparison"}</p>
             <h1 id="hero-title">See where the <em>story meets.</em></h1>
-            <p>Explore what is happening—and what connects us—one country at a time.</p>
+            <p>{mode === "country" ? "Explore current reporting through one country at a time." : "Compare two countries through direct links and cross-border reporting."}</p>
           </div>
 
           <div className="map-layout">
@@ -140,7 +144,7 @@ export function WorldNewsExplorer({ initialData }: { initialData: NewsResponse }
             <aside className="map-guide">
               <div>
                 <p className="eyebrow">Your lens</p>
-                <h2>{selectedCountries.length === 0 ? "Start anywhere." : selectionLimit === 1 ? "Country selected." : selectedCountries.length === 1 ? "Now add a connection." : "Connection found."}</h2>
+                <h2>{selectedCountries.length === 0 ? (mode === "country" ? "Choose your country." : "Build a comparison.") : selectionLimit === 1 ? "Country selected." : selectedCountries.length === 1 ? "Add the second country." : "Connection found."}</h2>
                 <p>
                   {selectedCountries.length === 0
                     ? `Choose ${selectionLimit === 1 ? "one country" : "up to two countries"} on the map or search by name below.`
@@ -148,20 +152,20 @@ export function WorldNewsExplorer({ initialData }: { initialData: NewsResponse }
                       ? "Your briefing now focuses on stories involving this country. Choose another country to switch the lens."
                       : selectedCountries.length === 1
                       ? "Choose one more country to surface diplomacy, trade, technology, travel and other shared stories."
-                      : "Results now require both countries to be central to the same event—not just incidental mentions."}
+                      : "Direct bilateral links appear first, followed by current reporting involving either selected country."}
                 </p>
               </div>
-              <div className="selection-mode" aria-label="Country selection mode">
-                <span>Explore mode</span>
+              <nav className="selection-mode" aria-label="News explorer pages">
+                <span>Choose a page</span>
                 <div>
-                  <button type="button" className={selectionLimit === 1 ? "active" : ""} aria-pressed={selectionLimit === 1} onClick={() => changeSelectionLimit(1)}>
+                  <Link href="/country#top" className={mode === "country" ? "active" : ""} aria-current={mode === "country" ? "page" : undefined}>
                     One country
-                  </button>
-                  <button type="button" className={selectionLimit === 2 ? "active" : ""} aria-pressed={selectionLimit === 2} onClick={() => changeSelectionLimit(2)}>
+                  </Link>
+                  <Link href="/compare#top" className={mode === "compare" ? "active" : ""} aria-current={mode === "compare" ? "page" : undefined}>
                     Compare two
-                  </button>
+                  </Link>
                 </div>
-              </div>
+              </nav>
               <div className="selection-slots" aria-label="Selected countries">
                 {Array.from({ length: selectionLimit }, (_, index) => {
                   const code = selectedCountries[index];
@@ -202,7 +206,7 @@ export function WorldNewsExplorer({ initialData }: { initialData: NewsResponse }
           </div>
         </section>
 
-        <section className="stories-section" id="stories" aria-labelledby="stories-title">
+        <section className="stories-section" id="stories" aria-labelledby="stories-title" aria-busy={isLoading}>
           <div className="stories-heading">
             <div>
               <p className="eyebrow">{heading.eyebrow}</p>
@@ -210,20 +214,38 @@ export function WorldNewsExplorer({ initialData }: { initialData: NewsResponse }
               <p>{heading.description}</p>
             </div>
             <div className="result-meta" aria-live="polite">
-              <span>{data.meta.total} {data.meta.total === 1 ? "story" : "stories"}</span>
-              {isLoading && <span className="refreshing">Refreshing…</span>}
+              {isLoading ? (
+                <span className="refreshing"><i aria-hidden="true" /> Checking live sources…</span>
+              ) : (
+                <span>{data.meta.total} {data.meta.total === 1 ? "story" : "stories"}</span>
+              )}
             </div>
           </div>
 
           <NewsFilters topic={topic} language={language} period={period} onTopicChange={setTopic} onLanguageChange={setLanguage} onPeriodChange={setPeriod} />
-          {data.meta.dataSource === "fixtures" && (
+          {isLoading && (
+            <div className="refresh-banner" role="status" aria-live="polite">
+              <span className="refresh-spinner" aria-hidden="true" />
+              <div>
+                <strong>Refreshing live coverage</strong>
+                <small>Checking the latest publisher feeds and updating this briefing.</small>
+              </div>
+            </div>
+          )}
+          {!isLoading && data.meta.dataSource === "fixtures" && (
             <div className="notice-banner" role="status">
               <span>Demo feed</span>
               <p>{data.meta.notice ?? "Sample stories are being used while live ingestion is unavailable."}</p>
             </div>
           )}
           {error && <div className="error-banner" role="alert">{error}</div>}
-          <StoryList stories={data.stories} />
+          {isInitialLiveLoad ? (
+            <div className="story-loading-grid" aria-hidden="true">
+              <span /><span /><span />
+            </div>
+          ) : (
+            <StoryList stories={data.stories} />
+          )}
         </section>
       </main>
 
