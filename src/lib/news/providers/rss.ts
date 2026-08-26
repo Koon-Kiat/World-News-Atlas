@@ -185,11 +185,15 @@ export class RssProvider implements NewsProvider {
     const terms = quotedTerms.length > 0
       ? quotedTerms
       : query.split(/\s+(?:and|or)\s+|\s+/i).map((term) => term.trim().toLowerCase()).filter(Boolean);
+    const matchAnyTerm = /\s+OR\s+/i.test(query) && !/\s+AND\s+/i.test(query);
     return {
       ...result,
-      articles: result.articles.filter((article) =>
-        terms.every((term) => `${article.title} ${article.description ?? ""}`.toLowerCase().includes(term)),
-      ),
+      articles: result.articles.filter((article) => {
+        const haystack = `${article.title} ${article.description ?? ""}`.toLowerCase();
+        return matchAnyTerm
+          ? terms.some((term) => haystack.includes(term))
+          : terms.every((term) => haystack.includes(term));
+      }),
     };
   }
 }

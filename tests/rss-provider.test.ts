@@ -63,4 +63,24 @@ describe("RSS provider", () => {
 
     expect(result.articles.map((article) => article.providerArticleId)).toEqual(["bilateral"]);
   });
+
+  it("matches either quoted term when gathering broad bilateral candidates", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          `<?xml version="1.0"?><rss version="2.0"><channel><title>World</title><item><title>Japan announces a domestic policy</title><link>https://www.bbc.com/news/articles/japan</link><guid>japan</guid><pubDate>Tue, 25 Aug 2026 12:00:00 GMT</pubDate></item><item><title>Singapore opens a new trade corridor</title><link>https://www.bbc.com/news/articles/singapore</link><guid>singapore</guid><pubDate>Tue, 25 Aug 2026 12:00:00 GMT</pubDate></item><item><title>Unrelated world update</title><link>https://www.bbc.com/news/articles/other</link><guid>other</guid><pubDate>Tue, 25 Aug 2026 12:00:00 GMT</pubDate></item></channel></rss>`,
+          { status: 200, headers: { "Content-Type": "application/rss+xml" } },
+        ),
+      ),
+    );
+
+    const provider = new RssProvider([DEFAULT_RSS_FEEDS[0]]);
+    const result = await provider.search('"Japan" OR "Singapore"');
+
+    expect(result.articles.map((article) => article.providerArticleId)).toEqual([
+      "japan",
+      "singapore",
+    ]);
+  });
 });

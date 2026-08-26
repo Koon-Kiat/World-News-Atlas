@@ -95,7 +95,11 @@ function providerSearchQuery(query: NewsQuery): string | undefined {
     .map((term) => term.replace(/["\\]/g, " ").replace(/\s+/g, " ").trim())
     .filter(Boolean);
   if (terms.length === 0) return undefined;
-  return terms.map((term) => `"${term}"`).join(" AND ");
+  // Fetch a broad candidate pool and let queryStories enforce the final
+  // country/search intersection. This also finds reporting from one selected
+  // country about the other when the publisher's own country is not repeated
+  // in the headline.
+  return terms.map((term) => `"${term}"`).join(" OR ");
 }
 
 async function loadLiveStories(query: NewsQuery): Promise<StoryView[]> {
@@ -107,12 +111,26 @@ async function loadLiveStories(query: NewsQuery): Promise<StoryView[]> {
   try {
     const providers = createConfiguredProviders();
     if (providers.length === 0) return [];
-    const result = await fetchProviderArticlesGracefully(providers, {
+    const request = {
       from: new Date(Date.now() - newsPeriodHours(query.period) * 3_600_000),
       limit: 250,
-      query: searchQuery,
-    });
-    const normalized = normalizeProviderArticles(result.articles);
+    };
+    const results = searchQuery
+      ? await Promise.all([
+          fetchProviderArticlesGracefully(
+            providers.filter((provider) => provider.name !== "RSS"),
+            { ...request, query: searchQuery },
+          ),
+          // Publisher feeds are already a bounded, reviewed candidate set.
+          // Keep the complete feed pool so local/national publishers can
+          // establish one side of a country connection through source metadata.
+          fetchProviderArticlesGracefully(
+            providers.filter((provider) => provider.name === "RSS"),
+            request,
+          ),
+        ])
+      : [await fetchProviderArticlesGracefully(providers, request)];
+    const normalized = normalizeProviderArticles(results.flatMap((result) => result.articles));
     const deduplicated = deduplicateArticles(normalized);
     const stories = clusterArticles(deduplicated.articles).map<StoryView>((story) => ({
       id: story.fingerprint,
