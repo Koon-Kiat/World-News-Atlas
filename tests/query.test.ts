@@ -33,9 +33,7 @@ describe("news matching", () => {
     expect(
       result.stories.every((story) =>
         ["JP", "SG"].every(
-          (code) =>
-            story.countries.some((country) => country.code === code) ||
-            story.articles.some((article) => article.source.countryCode === code),
+          (code) => story.countries.some((country) => country.code === code),
         ),
       ),
     ).toBe(true);
@@ -48,8 +46,7 @@ describe("news matching", () => {
     });
     expect(result.stories.some((story) =>
       story.countries.some((country) => country.code === "JP") &&
-      !story.countries.some((country) => country.code === "SG") &&
-      !story.articles.some((article) => article.source.countryCode === "SG")
+      !story.countries.some((country) => country.code === "SG")
     )).toBe(false);
   });
 
@@ -73,7 +70,7 @@ describe("news matching", () => {
     expect(result.stories).toHaveLength(0);
   });
 
-  it("includes reporting from one selected country about the other", () => {
+  it("does not mistake a publisher's home country for a bilateral connection", () => {
     const sourceStory = getFixtureStories().find((story) =>
       story.countries.some((country) => country.code === "US"),
     );
@@ -94,7 +91,7 @@ describe("news matching", () => {
       countries: ["SG", "US"],
     });
 
-    expect(result.stories.map((story) => story.id)).toEqual(["contextual-sg-us"]);
+    expect(result.stories).toHaveLength(0);
   });
 
   it("classifies local and international sources from publisher country", () => {

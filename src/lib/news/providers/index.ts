@@ -2,6 +2,7 @@ import { z } from "zod";
 import { DEFAULT_RSS_FEEDS, type RssFeedConfig } from "@/config/news-sources";
 import { logNews } from "../logger";
 import type { ProviderArticle, ProviderFetchRequest, ProviderName } from "../types";
+import { BingNewsProvider } from "./bing-news";
 import { GdeltProvider } from "./gdelt";
 import { NewsApiProvider } from "./newsapi";
 import type { NewsProvider } from "./provider";
@@ -16,6 +17,7 @@ const rssFeedSchema = z.object({
   region: z.string().max(100).nullable(),
   language: z.string().regex(/^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})?$/),
   scope: z.enum(["LOCAL", "REGIONAL", "NATIONAL", "INTERNATIONAL"]),
+  coverageCountries: z.array(z.string().regex(/^[A-Za-z]{2}$/)).max(4).optional(),
 });
 
 export function providerTimeoutFromEnvironment(): number {
@@ -28,7 +30,11 @@ export function rssFeedsFromEnvironment(): RssFeedConfig[] {
   if (!raw) return DEFAULT_RSS_FEEDS;
   try {
     const parsed = z.array(rssFeedSchema).max(100).parse(JSON.parse(raw));
-    return parsed.map((feed) => ({ ...feed, countryCode: feed.countryCode?.toUpperCase() ?? null }));
+    return parsed.map((feed) => ({
+      ...feed,
+      countryCode: feed.countryCode?.toUpperCase() ?? null,
+      coverageCountries: feed.coverageCountries?.map((code) => code.toUpperCase()),
+    }));
   } catch {
     logNews("warn", "rss_config_invalid", { configured: true });
     return DEFAULT_RSS_FEEDS;
@@ -38,6 +44,7 @@ export function rssFeedsFromEnvironment(): RssFeedConfig[] {
 export function createConfiguredProviders(): NewsProvider[] {
   const providers: NewsProvider[] = [];
   const timeout = providerTimeoutFromEnvironment();
+  providers.push(new BingNewsProvider(timeout));
   const newsApiKey = process.env.NEWSAPI_KEY?.trim();
   if (newsApiKey) providers.push(new NewsApiProvider(newsApiKey, timeout));
   else logNews("info", "provider_disabled", { provider: "NEWSAPI", reason: "missing_credential" });

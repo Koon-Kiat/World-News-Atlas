@@ -26,13 +26,7 @@ export function scoreTwoCountryRelevance(
 ): number {
   const first = story.countries.find((country) => country.code === firstCountry);
   const second = story.countries.find((country) => country.code === secondCountry);
-  const firstPublisher = story.articles.some(
-    (article) => article.source.countryCode === firstCountry,
-  );
-  const secondPublisher = story.articles.some(
-    (article) => article.source.countryCode === secondCountry,
-  );
-  if ((!first && !firstPublisher) || (!second && !secondPublisher)) return 0;
+  if (!first || !second) return 0;
 
   const relationshipStrength =
     ((first?.relevanceScore ?? 0.62) + (second?.relevanceScore ?? 0.62)) / 2;

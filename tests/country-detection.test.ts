@@ -53,3 +53,14 @@ describe("publisher country versus mentioned countries", () => {
     expect(article.countries.map(({ code }) => code)).not.toContain("GB");
   });
 });
+
+describe("country-code ambiguity", () => {
+  it("does not interpret the US dollar prefix as a United States mention", () => {
+    const countries = detectCountries(
+      "Airline seeks US$1.5 billion from investors",
+      "The carrier reported a large annual loss.",
+    );
+
+    expect(countries.some((country) => country.code === "US")).toBe(false);
+  });
+});

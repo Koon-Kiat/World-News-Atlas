@@ -94,6 +94,7 @@ export interface RssFeedConfig {
   region: string | null;
   language: string;
   scope: SourceScope;
+  coverageCountries?: string[];
 }
 
 // These publisher-operated feeds expose headlines, excerpts, links, and images
@@ -134,6 +135,44 @@ export const DEFAULT_RSS_FEEDS: RssFeedConfig[] = [
     region: "Asia",
     language: "en",
     scope: "INTERNATIONAL",
+  },
+  {
+    name: "CNA",
+    feedUrl: "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=10416",
+    websiteUrl: "https://www.channelnewsasia.com/singapore",
+    countryCode: "SG",
+    region: "Asia",
+    language: "en",
+    scope: "NATIONAL",
+    coverageCountries: ["SG"],
+  },
+  {
+    name: "CNA",
+    feedUrl: "https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=6511",
+    websiteUrl: "https://www.channelnewsasia.com/asia",
+    countryCode: "SG",
+    region: "Asia",
+    language: "en",
+    scope: "REGIONAL",
+  },
+  {
+    name: "The Straits Times",
+    feedUrl: "https://www.straitstimes.com/news/singapore/rss.xml",
+    websiteUrl: "https://www.straitstimes.com/singapore",
+    countryCode: "SG",
+    region: "Asia",
+    language: "en",
+    scope: "NATIONAL",
+    coverageCountries: ["SG"],
+  },
+  {
+    name: "The Straits Times",
+    feedUrl: "https://www.straitstimes.com/news/asia/rss.xml",
+    websiteUrl: "https://www.straitstimes.com/asia",
+    countryCode: "SG",
+    region: "Asia",
+    language: "en",
+    scope: "REGIONAL",
   },
   {
     name: "The Japan Times",

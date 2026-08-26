@@ -11,6 +11,13 @@ function containsPhrase(text: string, phrase: string, caseSensitive = false): bo
   return new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(phrase)}([^\\p{L}\\p{N}]|$)`, flags).test(text);
 }
 
+function containsIsoCode(text: string, code: string): boolean {
+  return new RegExp(
+    `(^|[^\\p{L}\\p{N}])${escapeRegExp(code)}(?!\\$)([^\\p{L}\\p{N}]|$)`,
+    "u",
+  ).test(text);
+}
+
 export function detectCountries(
   title: string,
   description: string | null | undefined = null,
@@ -21,9 +28,7 @@ export function detectCountries(
   for (const signal of COUNTRY_SIGNALS) {
     const nameHits = signal.names.filter((name) => containsPhrase(text, name)).length;
     const locationHits = signal.locations.filter((location) => containsPhrase(text, location)).length;
-    const codeHits = (signal.isoCodes ?? []).filter((code) =>
-      containsPhrase(text, code, true),
-    ).length;
+    const codeHits = (signal.isoCodes ?? []).filter((code) => containsIsoCode(text, code)).length;
     const total = nameHits + locationHits + codeHits;
 
     if (total === 0) continue;

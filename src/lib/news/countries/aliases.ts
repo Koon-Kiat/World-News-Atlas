@@ -8,7 +8,7 @@ export interface CountrySignals {
 
 export const COUNTRY_SIGNALS: CountrySignals[] = [
   { code: "JP", names: ["Japan", "Japanese"], locations: ["Tokyo", "Osaka", "Kyoto"], isoCodes: ["JP", "JPN"] },
-  { code: "SG", names: ["Singapore", "Singaporean"], locations: ["Singapore City"], isoCodes: ["SG", "SGP"] },
+  { code: "SG", names: ["Singapore", "Singaporean", "S'pore", "S’pore"], locations: ["Singapore City"], isoCodes: ["SG", "SGP"] },
   { code: "US", names: ["United States", "United States of America", "American", "U.S."], locations: ["Washington, D.C.", "New York City"], isoCodes: ["US", "USA"] },
   { code: "CN", names: ["China", "Chinese"], locations: ["Beijing", "Shanghai", "Shenzhen"], isoCodes: ["CN", "CHN"] },
   { code: "GB", names: ["United Kingdom", "British", "Britain"], locations: ["London", "Edinburgh"], isoCodes: ["UK", "GBR"] },

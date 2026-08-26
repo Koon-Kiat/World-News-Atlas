@@ -40,7 +40,7 @@ export async function runNewsIngestion(options: {
 
   if (
     batch.articles.length === 0 &&
-    process.env.NEWS_FIXTURES_ENABLED?.toLowerCase() !== "false"
+    process.env.NEWS_FIXTURES_ENABLED?.toLowerCase() === "true"
   ) {
     const fixtureBatch = await fetchProviderArticlesGracefully([new FixtureProvider()], { limit: 200 });
     batch = {
