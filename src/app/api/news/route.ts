@@ -28,7 +28,9 @@ export async function GET(request: Request): Promise<Response> {
     const response = await getNews(query);
     return Response.json(response, {
       headers: {
-        "Cache-Control": "public, max-age=20, s-maxage=60, stale-while-revalidate=180",
+        "Cache-Control": response.meta.dataSource === "fixtures"
+          ? "no-store"
+          : "public, max-age=20, s-maxage=60, stale-while-revalidate=180",
         "X-RateLimit-Remaining": String(limit.remaining),
       },
     });

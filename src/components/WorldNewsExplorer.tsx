@@ -82,6 +82,7 @@ export function WorldNewsExplorer({
     const controller = new AbortController();
     fetch(requestUrl, {
       signal: controller.signal,
+      cache: "no-store",
       headers: { Accept: "application/json" },
     })
       .then(async (response) => {
