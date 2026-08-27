@@ -41,7 +41,7 @@ describe("progressive story list", () => {
     render(
       <ProgressiveStoryList
         stories={stories(25)}
-        total={25}
+        canFetchMore={false}
         isFetchingMore={false}
         onRequestMore={() => {}}
       />,
@@ -61,7 +61,7 @@ describe("progressive story list", () => {
     render(
       <ProgressiveStoryList
         stories={stories(12)}
-        total={30}
+        canFetchMore
         isFetchingMore={false}
         onRequestMore={onRequestMore}
       />,
@@ -80,7 +80,7 @@ describe("progressive story list", () => {
     const view = render(
       <ProgressiveStoryList
         stories={stories(12)}
-        total={40}
+        canFetchMore
         isFetchingMore={false}
         onRequestMore={onRequestMore}
       />,
@@ -95,7 +95,7 @@ describe("progressive story list", () => {
     view.rerender(
       <ProgressiveStoryList
         stories={stories(24)}
-        total={40}
+        canFetchMore
         isFetchingMore={false}
         onRequestMore={onRequestMore}
       />,
@@ -110,5 +110,25 @@ describe("progressive story list", () => {
       {} as IntersectionObserver,
     ));
     expect(onRequestMore).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops requesting when the server reports no further usable page", async () => {
+    vi.stubGlobal("IntersectionObserver", TestIntersectionObserver);
+    const onRequestMore = vi.fn();
+    render(
+      <ProgressiveStoryList
+        stories={stories(24)}
+        canFetchMore={false}
+        isFetchingMore={false}
+        onRequestMore={onRequestMore}
+      />,
+    );
+
+    await act(async () => observerCallback?.(
+      [{ isIntersecting: true } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    ));
+    expect(screen.getByText("All 24 available matching stories are loaded.")).toBeInTheDocument();
+    expect(onRequestMore).not.toHaveBeenCalled();
   });
 });

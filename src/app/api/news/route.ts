@@ -7,7 +7,9 @@ export const runtime = "nodejs";
 
 function clientKey(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return forwarded?.slice(0, 64) || "anonymous";
+  const connecting = request.headers.get("cf-connecting-ip")?.trim();
+  const real = request.headers.get("x-real-ip")?.trim();
+  return (forwarded || connecting || real || "anonymous").slice(0, 64);
 }
 
 export async function GET(request: Request): Promise<Response> {

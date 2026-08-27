@@ -11,6 +11,7 @@ import { updateCountrySelection } from "@/components/map/selection";
 import { StoryList } from "@/components/news/StoryList";
 import { getCountryName } from "@/lib/news/countries/metadata";
 import { newsPeriodLabel } from "@/lib/news/periods";
+import { mergeNextPage, nextPageNumber, responseHasNextPage } from "@/lib/news/pagination";
 import { useNewsPeriodPreference } from "@/hooks/useNewsPeriodPreference";
 import type { NewsPeriod, NewsResponse, NewsSort, SourcePerspective, StoryView } from "@/lib/news/types";
 
@@ -26,12 +27,12 @@ export type ExplorerMode = "country" | "compare";
 
 export function ProgressiveStoryList({
   stories,
-  total,
+  canFetchMore,
   isFetchingMore,
   onRequestMore,
 }: {
   stories: StoryView[];
-  total: number;
+  canFetchMore: boolean;
   isFetchingMore: boolean;
   onRequestMore: () => void;
 }) {
@@ -39,7 +40,7 @@ export function ProgressiveStoryList({
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const visibleStories = stories.slice(0, visibleStoryCount);
   const hasMoreRenderedStories = visibleStoryCount < stories.length;
-  const hasMoreServerStories = stories.length < total;
+  const hasMoreServerStories = canFetchMore;
   const hasMoreStories = hasMoreRenderedStories || hasMoreServerStories;
 
   const revealOrRequestMore = useCallback(() => {
@@ -85,7 +86,7 @@ export function ProgressiveStoryList({
               </button>
             </>
           ) : (
-            <p>All {total} matching stories are loaded.</p>
+            <p>All {visibleStories.length} available matching stories are loaded.</p>
           )}
         </div>
       )}
@@ -112,6 +113,7 @@ export function WorldNewsExplorer({
   const [data, setData] = useState(initialData);
   const [settledRequest, setSettledRequest] = useState<string | null>(null);
   const [loadedPage, setLoadedPage] = useState(1);
+  const [canFetchMore, setCanFetchMore] = useState(responseHasNextPage(initialData));
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loadMoreControllerRef = useRef<AbortController | null>(null);
   const storiesSectionRef = useRef<HTMLElement>(null);
@@ -177,6 +179,7 @@ export function WorldNewsExplorer({
       .then((responseData) => {
         setData(responseData);
         setLoadedPage(responseData.meta.page);
+        setCanFetchMore(responseHasNextPage(responseData));
         setError(null);
       })
       .catch((requestError: unknown) => {
@@ -200,11 +203,21 @@ export function WorldNewsExplorer({
   }, [deferredSearch, isLoading]);
 
   function loadNextPage() {
-    if (isLoading || isLoadingMore || data.stories.length >= data.meta.total || loadMoreControllerRef.current) return;
+    if (
+      isLoading ||
+      isLoadingMore ||
+      !canFetchMore ||
+      data.stories.length >= data.meta.total ||
+      loadMoreControllerRef.current
+    ) return;
+    const nextPage = nextPageNumber({ ...data, meta: { ...data.meta, page: loadedPage } });
+    if (nextPage === null) {
+      setCanFetchMore(false);
+      return;
+    }
     const controller = new AbortController();
     loadMoreControllerRef.current = controller;
     setIsLoadingMore(true);
-    const nextPage = loadedPage + 1;
     const nextUrl = new URL(requestUrl, window.location.origin);
     nextUrl.searchParams.set("page", String(nextPage));
     fetch(`${nextUrl.pathname}?${nextUrl.searchParams.toString()}`, {
@@ -217,19 +230,22 @@ export function WorldNewsExplorer({
         return (await response.json()) as NewsResponse;
       })
       .then((responseData) => {
+        const mergedPage = mergeNextPage(data.stories, responseData, nextPage);
         setData((current) => {
-          const knownIds = new Set(current.stories.map((story) => story.id));
+          const mergedCurrentPage = mergeNextPage(current.stories, responseData, nextPage);
           return {
-            stories: [...current.stories, ...responseData.stories.filter((story) => !knownIds.has(story.id))],
+            stories: mergedCurrentPage.stories,
             meta: responseData.meta,
           };
         });
         setLoadedPage(responseData.meta.page);
+        setCanFetchMore(mergedPage.canFetchMore);
         setError(null);
       })
       .catch((requestError: unknown) => {
         if (requestError instanceof DOMException && requestError.name === "AbortError") return;
-        setError("Could not load the next page of coverage. You can try again.");
+        setCanFetchMore(false);
+        setError("Could not load the next page of coverage. Refresh the page to try again.");
       })
       .finally(() => {
         if (loadMoreControllerRef.current === controller) {
@@ -401,7 +417,7 @@ export function WorldNewsExplorer({
             <ProgressiveStoryList
               key={requestUrl}
               stories={data.stories}
-              total={data.meta.total}
+              canFetchMore={canFetchMore}
               isFetchingMore={isLoadingMore}
               onRequestMore={loadNextPage}
             />
