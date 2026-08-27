@@ -73,4 +73,42 @@ describe("progressive story list", () => {
     ));
     expect(onRequestMore).toHaveBeenCalledTimes(1);
   });
+
+  it("continues requesting later pages as appended stories are consumed", async () => {
+    vi.stubGlobal("IntersectionObserver", TestIntersectionObserver);
+    const onRequestMore = vi.fn();
+    const view = render(
+      <ProgressiveStoryList
+        stories={stories(12)}
+        total={40}
+        isFetchingMore={false}
+        onRequestMore={onRequestMore}
+      />,
+    );
+
+    await act(async () => observerCallback?.(
+      [{ isIntersecting: true } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    ));
+    expect(onRequestMore).toHaveBeenCalledTimes(1);
+
+    view.rerender(
+      <ProgressiveStoryList
+        stories={stories(24)}
+        total={40}
+        isFetchingMore={false}
+        onRequestMore={onRequestMore}
+      />,
+    );
+    await act(async () => observerCallback?.(
+      [{ isIntersecting: true } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    ));
+    expect(screen.getAllByRole("article")).toHaveLength(24);
+    await act(async () => observerCallback?.(
+      [{ isIntersecting: true } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    ));
+    expect(onRequestMore).toHaveBeenCalledTimes(2);
+  });
 });

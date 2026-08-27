@@ -47,4 +47,22 @@ describe("Bing News RSS provider", () => {
 
     expect(result.articles).toHaveLength(0);
   });
+
+  it("fans out country discovery topics and deduplicates publisher URLs", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        `<?xml version="1.0"?><rss version="2.0" xmlns:News="https://www.bing.com/news"><channel><title>News</title><item><title>Japan expands a current programme</title><link>http://www.bing.com/news/apiclick.aspx?url=https%3A%2F%2Fexample.com%2Fjapan-story</link><pubDate>Thu, 27 Aug 2026 08:40:00 GMT</pubDate><News:Source>Example News</News:Source></item></channel></rss>`,
+        { status: 200, headers: { "Content-Type": "application/rss+xml" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await new BingNewsProvider().search('"Japan"', {
+      countries: ["JP"],
+      from: new Date("2026-08-01T00:00:00Z"),
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(12);
+    expect(result.articles).toHaveLength(1);
+  });
 });

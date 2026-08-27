@@ -96,16 +96,40 @@ export function scoreStory(story: StoryView, query: NewsQuery, now = new Date())
   );
 }
 
+export function scorePopularity(story: StoryView, query: NewsQuery, now = new Date()): number {
+  const geographic = geographicScore(story, query.countries);
+  return clamp(
+    story.importanceScore * 0.38 +
+      independentSourceScore(story) * 0.27 +
+      sourceDiversityScore(story) * 0.12 +
+      geographic * 0.18 +
+      recencyScore(story, now) * 0.05,
+  );
+}
+
 export function rankStories(
   stories: StoryView[],
   query: NewsQuery,
   now = new Date(),
 ): StoryView[] {
-  return stories
-    .map((story) => ({ ...story, rankScore: scoreStory(story, query, now) }))
-    .sort(
+  const scored = stories.map((story) => ({
+    ...story,
+    rankScore: query.sort === "popular"
+      ? scorePopularity(story, query, now)
+      : scoreStory(story, query, now),
+  }));
+  if (query.sort === "newest") {
+    return scored.sort(
       (a, b) =>
+        new Date(b.lastUpdatedAt).getTime() - new Date(a.lastUpdatedAt).getTime() ||
         (b.rankScore ?? 0) - (a.rankScore ?? 0) ||
-        new Date(b.lastUpdatedAt).getTime() - new Date(a.lastUpdatedAt).getTime(),
+        a.id.localeCompare(b.id),
     );
+  }
+  return scored.sort(
+    (a, b) =>
+      (b.rankScore ?? 0) - (a.rankScore ?? 0) ||
+      new Date(b.lastUpdatedAt).getTime() - new Date(a.lastUpdatedAt).getTime() ||
+      a.id.localeCompare(b.id),
+  );
 }

@@ -117,6 +117,7 @@ async function loadLiveStories(query: NewsQuery): Promise<StoryView[]> {
     if (providers.length === 0) return [];
     const request = {
       from: new Date(Date.now() - newsPeriodHours(query.period) * 3_600_000),
+      countries: query.countries,
       limit: 250,
     };
     const results = searchQuery

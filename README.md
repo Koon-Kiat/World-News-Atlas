@@ -10,7 +10,7 @@ Fixture mode is an explicit development option only. Production returns live sto
 - Global, one-country, and two-country exploration.
 - Local/international perspective filtering based on publisher country—not article subject.
 - Bilateral source filters for first-country, second-country, and outside sources.
-- Topic, language, time, and keyword filters.
+- Topic, language, time, outlet, keyword, and newest/popularity sorting controls.
 - Story-first results with grouped publisher coverage and links to original live articles.
 - Provider adapters for NewsAPI, GDELT, publisher RSS/Atom feeds, and Bing News RSS discovery with original-publisher URL extraction.
 - Provider-independent source registry and many-to-one provider identifier mapping.
@@ -76,7 +76,7 @@ The normalized schema includes `Country`, `Source`, `SourceProviderIdentifier`, 
 | --- | --- | --- |
 | `DATABASE_URL` | For persistence | PostgreSQL connection string used only on the server. |
 | `NEWSAPI_KEY` | No | Enables NewsAPI ingestion. Missing credentials disable only this adapter. |
-| `GDELT_ENABLED` | No | Enables credential-free GDELT ingestion; defaults to `true`. |
+| `GDELT_ENABLED` | No | Enables credential-free GDELT ingestion; defaults to `false`. |
 | `NEWS_FIXTURES_ENABLED` | No | Opts into fixture fallback for local development or ingestion tests; defaults to `false`. |
 | `NEWS_PROVIDER_TIMEOUT_MS` | No | External request timeout, clamped to 2–30 seconds; defaults to 8 seconds. |
 | `RSS_FEEDS_JSON` | No | JSON array of server-controlled, rights-reviewed RSS/Atom feed definitions. |
@@ -150,6 +150,7 @@ GET /api/news?countries=JP,SG
 GET /api/news?countries=JP&sourcePerspective=local&period=24h
 GET /api/news?countries=JP,SG&sourcePerspective=second-country&topic=technology
 GET /api/news?countries=JP&source=The+Japan+Times&source=Al+Jazeera
+GET /api/news?countries=JP&period=30d&sort=newest&page=2
 ```
 
 Typed values:
@@ -157,6 +158,7 @@ Typed values:
 - `countries`: zero to two unique ISO 3166-1 alpha-2 codes.
 - `sourcePerspective`: `all`; `local` or `international` for one country; `first-country`, `second-country`, or `international` for two countries.
 - `period`: `latest`, `24h`, `7d`, or `30d`.
+- `sort`: `newest` (strict publication-time order) or `popular` (multi-source coverage and story-importance score).
 - `source`: repeatable exact news-outlet name; up to 20 outlets.
 - `topic`: lowercase topic slug.
 - `language`: BCP 47-style short language tag when metadata exists.
@@ -167,7 +169,7 @@ Invalid combinations return a sanitized `400` response. The API uses a short in-
 
 ## Ranking and two-country relevance
 
-Ranking is deterministic and politically neutral. The current score combines recency, geographic relevance, story importance, independent source count, and source-country diversity. Two-country results require both countries through direct article or reviewed country-category signals, reward balanced country relevance and bilateral headline focus, and penalize long incidental country lists. A publisher's home country alone never creates a bilateral match.
+Ranking is deterministic and politically neutral. Newest sorting uses publication time. Popularity is an explicit coverage proxy—not readership data—and prioritizes story importance, independent-source count, source-country diversity, geographic relevance, and modest recency. Two-country results require both countries through direct article or reviewed country-category signals, reward balanced country relevance and bilateral headline focus, and penalize long incidental country lists. A publisher's home country alone never creates a bilateral match.
 
 These modules are intentionally replaceable. Future entity extraction, embeddings, or human editorial signals can be added without changing provider adapters or UI contracts.
 
@@ -177,7 +179,7 @@ These modules are intentionally replaceable. Future entity extraction, embedding
 - API parameters and provider response shapes are validated.
 - Provider calls use bounded timeouts and isolated failure handling.
 - RSS ingestion is allow-list only and applies SSRF-oriented URL, DNS, redirect, protocol, and size checks.
-- Article/image URLs are restricted to HTTP(S), external article links use safe target attributes, and provider error details are not returned to ordinary users.
+- Article/image URLs are restricted to HTTP(S), external article links use safe target attributes, and provider error details are not returned to ordinary users. A reviewed same-origin media relay resolves missing publisher `og:image` metadata and rejects unapproved article, image, and redirect hosts.
 - Security headers include CSP, frame denial, content-type protection, a restrictive permissions policy, and a strict referrer policy.
 - Full article bodies are never stored or rendered by this MVP. Live cards show attribution, metadata, permitted short descriptions, and original-publisher links.
 

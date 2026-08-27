@@ -16,13 +16,13 @@ function sourceMark(name: string): string {
     .join("") || "WN";
 }
 
-function displayImageUrl(value: string | null | undefined): string | null {
-  if (!isSafeHttpUrl(value)) return null;
-  const url = new URL(value);
-  if (url.hostname.toLowerCase() === "www.japantimes.co.jp") {
-    return `/api/image?url=${encodeURIComponent(value)}`;
-  }
-  return value;
+function displayImageUrl(
+  imageUrl: string | null | undefined,
+  articleUrl: string | null | undefined,
+): string | null {
+  if (isSafeHttpUrl(imageUrl)) return `/api/image?url=${encodeURIComponent(imageUrl)}`;
+  if (isSafeHttpUrl(articleUrl)) return `/api/image?article=${encodeURIComponent(articleUrl)}`;
+  return null;
 }
 
 function relativeTime(value: string): string {
@@ -52,7 +52,7 @@ function ArticleLink({ article }: { article: ArticleView }) {
 export function StoryCard({ story, featured = false }: { story: StoryView; featured?: boolean }) {
   const lead = story.articles[0];
   const imageArticle = story.articles.find((article) => isSafeHttpUrl(article.imageUrl));
-  const safeImage = displayImageUrl(imageArticle?.imageUrl);
+  const safeImage = displayImageUrl(imageArticle?.imageUrl, lead?.url);
   const fallbackSource = imageArticle?.source.name ?? lead?.source.name ?? "World News Atlas";
   const sourceNames = [...new Set(story.articles.map((article) => article.source.name))];
   const cardUrl = lead && !lead.isFixture && isSafeHttpUrl(lead.url) ? lead.url : null;
@@ -79,7 +79,7 @@ export function StoryCard({ story, featured = false }: { story: StoryView; featu
             src={safeImage}
             alt=""
             className="story-image"
-            loading="eager"
+            loading={featured ? "eager" : "lazy"}
             fetchPriority={featured ? "high" : "auto"}
             decoding="async"
             referrerPolicy="no-referrer"

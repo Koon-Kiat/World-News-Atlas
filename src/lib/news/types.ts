@@ -15,6 +15,8 @@ export type SourcePerspective =
 
 export type NewsPeriod = "latest" | "24h" | "7d" | "30d";
 
+export type NewsSort = "newest" | "popular";
+
 export interface CountryReference {
   code: string;
   name: string;
@@ -71,6 +73,7 @@ export interface NewsQuery {
   topic?: string;
   language?: string;
   period: NewsPeriod;
+  sort: NewsSort;
   search?: string;
   page: number;
   pageSize: number;

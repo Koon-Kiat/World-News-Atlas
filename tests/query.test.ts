@@ -12,6 +12,7 @@ const baseQuery: NewsQuery = {
   sourcePerspective: "all",
   sources: [],
   period: "7d",
+  sort: "newest",
   page: 1,
   pageSize: 50,
 };
@@ -141,17 +142,44 @@ describe("news matching", () => {
     expect(result.stories.flatMap((story) => story.articles).every((article) => article.source.name === sourceName)).toBe(true);
     expect(result.sourceFacets.some((source) => source.name === sourceName && source.storyCount > 0)).toBe(true);
   });
+
+  it("sorts newest by publication time and popular by coverage strength", () => {
+    const template = getFixtureStories()[0];
+    const newest = {
+      ...template,
+      id: "newest-story",
+      lastUpdatedAt: "2026-08-27T11:00:00Z",
+      importanceScore: 0.2,
+      articles: [template.articles[0]],
+    };
+    const popular = {
+      ...template,
+      id: "popular-story",
+      lastUpdatedAt: "2026-08-27T01:00:00Z",
+      importanceScore: 1,
+      articles: [
+        template.articles[0],
+        { ...template.articles[1], id: "popular-second", source: { ...template.articles[1].source, domain: "second.example", countryCode: "SG" } },
+        { ...template.articles[2], id: "popular-third", source: { ...template.articles[2].source, domain: "third.example", countryCode: "GB" } },
+      ],
+    };
+    const now = new Date("2026-08-27T12:00:00Z");
+
+    expect(queryStories([popular, newest], { ...baseQuery, sort: "newest", period: "30d" }, now).stories[0].id).toBe("newest-story");
+    expect(queryStories([popular, newest], { ...baseQuery, sort: "popular", period: "30d" }, now).stories[0].id).toBe("popular-story");
+  });
 });
 
 describe("API query validation", () => {
   it("parses a typed two-country query", () => {
     const query = parseNewsQuery(
-      new URLSearchParams("countries=jp,sg&sourcePerspective=second-country&period=24h&page=2"),
+      new URLSearchParams("countries=jp,sg&sourcePerspective=second-country&period=24h&sort=popular&page=2"),
     );
     expect(query).toMatchObject({
       countries: ["JP", "SG"],
       sourcePerspective: "second-country",
       period: "24h",
+      sort: "popular",
       page: 2,
     });
   });
@@ -172,6 +200,7 @@ describe("API query validation", () => {
     "countries=JP,JP",
     "countries=JP&sourcePerspective=first-country",
     "search=" + "x".repeat(121),
+    "sort=trending",
   ])("rejects invalid parameters: %s", (parameters) => {
     expect(() => parseNewsQuery(new URLSearchParams(parameters))).toThrow(
       NewsQueryValidationError,

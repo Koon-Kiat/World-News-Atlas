@@ -41,4 +41,39 @@ describe("publisher image relay", () => {
       }),
     );
   });
+
+  it("resolves a reviewed article og:image before relaying it", async () => {
+    const article = "https://www.straitstimes.com/singapore/example-story";
+    const image = "https://cassette.sphdigital.com.sg/image/straitstimes/example";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(`<html><head><meta property="og:image" content="${image}"></head></html>`, {
+          status: 200,
+          headers: { "Content-Type": "text/html" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(new Uint8Array([4, 5, 6]), {
+          status: 200,
+          headers: { "Content-Type": "image/webp", "Content-Length": "3" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await GET(
+      new Request(`https://example.test/api/image?article=${encodeURIComponent(article)}`),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/webp");
+    expect(fetchMock).toHaveBeenNthCalledWith(1, new URL(article), expect.any(Object));
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      new URL(image),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Referer: "https://www.straitstimes.com/" }),
+      }),
+    );
+  });
 });

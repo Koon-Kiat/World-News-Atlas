@@ -63,7 +63,7 @@ export class BingNewsProvider implements NewsProvider {
 
   constructor(private readonly timeoutMs = 8_000) {}
 
-  private async request(
+  private async requestOnce(
     query: string,
     request: ProviderFetchRequest = {},
   ): Promise<ProviderFetchResult> {
@@ -127,10 +127,39 @@ export class BingNewsProvider implements NewsProvider {
   }
 
   fetchLatest(request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
-    return this.request("world OR international", request);
+    return this.requestOnce("world OR international", request);
   }
 
-  search(query: string, request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
-    return this.request(query, request);
+  async search(query: string, request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
+    const discoveryTopics = request.countries?.length
+      ? [
+          "",
+          "politics",
+          "business",
+          "technology",
+          "society",
+          "climate",
+          "transport",
+          "health",
+          "education",
+          "culture",
+          "science",
+          "sport",
+        ]
+      : [""];
+    const settled = await Promise.allSettled(
+      discoveryTopics.map((topic) => this.requestOnce(topic ? `${query} ${topic}` : query, request)),
+    );
+    const successful = settled.flatMap((result) => result.status === "fulfilled" ? result.value.articles : []);
+    if (successful.length === 0 && settled.every((result) => result.status === "rejected")) {
+      throw new ProviderError(this.name, "REQUEST_FAILED", "Bing News RSS discovery failed");
+    }
+    const unique = new Map<string, ProviderArticle>();
+    for (const article of successful) unique.set(article.url, article);
+    return {
+      provider: this.name,
+      articles: [...unique.values()].slice(0, request.limit ?? 250),
+      receivedAt: new Date().toISOString(),
+    };
   }
 }
