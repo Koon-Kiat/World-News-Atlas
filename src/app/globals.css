@@ -199,7 +199,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .story-image-wrap { position: relative; min-height: 210px; overflow: hidden; background: #cbd8d2; }
 .is-featured .story-image-wrap { min-height: 100%; }
 .story-image-fallback { position: absolute; z-index: 0; inset: 0; display: grid; align-content: center; justify-items: center; gap: 12px; padding: 24px; color: #d9e7e2; text-align: center; background: radial-gradient(circle at 24% 18%, rgba(245,111,82,.38), transparent 28%), radial-gradient(circle at 82% 76%, rgba(169,213,202,.2), transparent 30%), repeating-linear-gradient(120deg, transparent 0 30px, rgba(255,255,255,.028) 31px 32px), #15383e; }
-.story-image-fallback > span { width: 68px; height: 68px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.28); border-radius: 50%; font-family: var(--display); font-size: 1.65rem; }
+.story-image-fallback > svg { width: 74px; height: 74px; fill: none; stroke: currentColor; stroke-width: 1.6; opacity: .86; }
+.story-image-fallback .story-image-fallback-dot { fill: var(--accent); stroke: none; }
+.story-image-fallback strong { color: #f7f1e8; font-family: var(--display); font-size: 1.2rem; font-weight: 500; text-transform: capitalize; }
 .story-image-fallback small { max-width: 190px; color: #b8ccc7; font-size: .66rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
 .story-image-wrap.is-placeholder .image-shade { background: linear-gradient(180deg, transparent, rgba(5,25,29,.35)); }
 .story-image { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; min-height: 210px; display: block; object-fit: cover; transition: transform .5s ease; }

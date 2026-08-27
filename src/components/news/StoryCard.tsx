@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import { getCountryName } from "@/lib/news/countries/metadata";
+import { approvedArticleUrl, approvedImageUrl } from "@/lib/news/image-policy";
 import type { ArticleView, StoryView } from "@/lib/news/types";
 import { isSafeHttpUrl } from "@/lib/news/url";
 
@@ -7,21 +8,14 @@ function flag(code: string): string {
   return String.fromCodePoint(...code.split("").map((character) => 127397 + character.charCodeAt(0)));
 }
 
-function sourceMark(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0]?.toUpperCase())
-    .join("") || "WN";
-}
-
 function displayImageUrl(
   imageUrl: string | null | undefined,
   articleUrl: string | null | undefined,
+  topic: string,
 ): string | null {
-  if (isSafeHttpUrl(imageUrl)) return `/api/image?url=${encodeURIComponent(imageUrl)}`;
-  if (isSafeHttpUrl(articleUrl)) return `/api/image?article=${encodeURIComponent(articleUrl)}`;
+  const topicParameter = `&topic=${encodeURIComponent(topic)}`;
+  if (approvedImageUrl(imageUrl)) return `/api/image?url=${encodeURIComponent(imageUrl!)}${topicParameter}`;
+  if (approvedArticleUrl(articleUrl)) return `/api/image?article=${encodeURIComponent(articleUrl!)}${topicParameter}`;
   return null;
 }
 
@@ -52,7 +46,8 @@ function ArticleLink({ article }: { article: ArticleView }) {
 export function StoryCard({ story, featured = false }: { story: StoryView; featured?: boolean }) {
   const lead = story.articles[0];
   const imageArticle = story.articles.find((article) => isSafeHttpUrl(article.imageUrl));
-  const safeImage = displayImageUrl(imageArticle?.imageUrl, lead?.url);
+  const primaryTopic = story.topics[0] ?? "world";
+  const safeImage = displayImageUrl(imageArticle?.imageUrl, lead?.url, primaryTopic);
   const fallbackSource = imageArticle?.source.name ?? lead?.source.name ?? "World News Atlas";
   const sourceNames = [...new Set(story.articles.map((article) => article.source.name))];
   const cardUrl = lead && !lead.isFixture && isSafeHttpUrl(lead.url) ? lead.url : null;
@@ -71,8 +66,9 @@ export function StoryCard({ story, featured = false }: { story: StoryView; featu
       )}
       <div className={safeImage ? "story-image-wrap" : "story-image-wrap is-placeholder"}>
         <div className="story-image-fallback" aria-hidden="true">
-          <span>{sourceMark(fallbackSource)}</span>
-          <small>Live coverage from {fallbackSource}</small>
+          <svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="29"/><ellipse cx="40" cy="40" rx="13" ry="29"/><path d="M12 40h56M18 27h44M18 53h44"/><circle className="story-image-fallback-dot" cx="60" cy="20" r="5"/></svg>
+          <strong>{primaryTopic} briefing</strong>
+          <small>{fallbackSource}</small>
         </div>
         {safeImage && (
           <img
