@@ -9,6 +9,7 @@ import { CountryPicker } from "@/components/map/CountryPicker";
 import { WorldMap } from "@/components/map/WorldMap";
 import { updateCountrySelection } from "@/components/map/selection";
 import { StoryList } from "@/components/news/StoryList";
+import { ThemeControl } from "@/components/ThemeControl";
 import { getCountryName } from "@/lib/news/countries/metadata";
 import { newsPeriodLabel } from "@/lib/news/periods";
 import { mergeNextPage, nextPageNumber, responseHasNextPage } from "@/lib/news/pagination";
@@ -288,7 +289,10 @@ export function WorldNewsExplorer({
           <label className="sr-only" htmlFor="news-search">Search news</label>
           <input id="news-search" type="search" value={search} maxLength={120} placeholder="Search topics, people, places…" onChange={(event) => setSearch(event.target.value)} />
         </form>
-        <a className="latest-link" href="#stories">Latest <span aria-hidden="true">↓</span></a>
+        <div className="header-actions">
+          <ThemeControl compact />
+          <a className="latest-link" href="#stories">Latest <span aria-hidden="true">↓</span></a>
+        </div>
       </header>
 
       <ExploreNavigation active={mode} />

@@ -1,4 +1,4 @@
-import type { ProviderName, SourceScope } from "@prisma/client";
+import type { Prisma, PrismaClient, ProviderName, SourceScope } from "@prisma/client";
 import { getFixtureStories } from "@/data/fixture-news";
 import { clusterArticles } from "./cluster";
 import { deduplicateArticles } from "./deduplicate";
@@ -7,7 +7,7 @@ import { normalizeProviderArticles } from "./normalize";
 import { createConfiguredProviders, fetchProviderArticlesGracefully } from "./providers";
 import { newsPeriodHours } from "./periods";
 import { getCountryName } from "./countries/metadata";
-import type { NewsPeriod, NewsQuery, StoryView } from "./types";
+import type { NewsQuery, StoryView } from "./types";
 
 const LIVE_CACHE_TTL_MS = 60 * 60_000;
 const MAX_LIVE_CACHE_ENTRIES = 40;
@@ -23,12 +23,84 @@ function enumValue<T extends string>(value: T): T {
   return value;
 }
 
-async function loadDatabaseStories(period: NewsPeriod): Promise<StoryView[]> {
-  const { prisma } = await import("@/lib/db/prisma");
-  const records = await prisma.story.findMany({
-    where: { lastUpdatedAt: { gte: new Date(Date.now() - newsPeriodHours(period) * 3_600_000) } },
-    orderBy: [{ importanceScore: "desc" }, { lastUpdatedAt: "desc" }],
-    take: 250,
+function databaseArticleAccessWhere(query: NewsQuery): Prisma.ArticleWhereInput | undefined {
+  const filters: Prisma.ArticleWhereInput[] = [];
+
+  if (query.sources.length > 0) {
+    filters.push({ source: { name: { in: query.sources } } });
+  }
+
+  const perspectiveCountry = query.sourcePerspective === "local" || query.sourcePerspective === "first-country"
+    ? query.countries[0]
+    : query.sourcePerspective === "second-country"
+      ? query.countries[1]
+      : undefined;
+  if (perspectiveCountry) {
+    filters.push({ source: { countryCode: perspectiveCountry } });
+  } else if (query.sourcePerspective === "international") {
+    filters.push({
+      source: {
+        is: {
+          OR: [
+            { countryCode: null },
+            { countryCode: { notIn: query.countries } },
+          ],
+        },
+      },
+    });
+  }
+
+  return filters.length > 0 ? { AND: filters } : undefined;
+}
+
+function databaseStoryWhere(query: NewsQuery, now = new Date()): Prisma.StoryWhereInput {
+  const filters: Prisma.StoryWhereInput[] = query.countries.map((countryCode) => ({
+    countries: { some: { countryCode } },
+  }));
+  const articleAccessWhere = databaseArticleAccessWhere(query);
+
+  if (query.topic) {
+    filters.push({ topics: { some: { topic: { slug: query.topic } } } });
+  }
+  if (query.language) {
+    filters.push({ articles: { some: { article: { language: query.language } } } });
+  }
+  if (articleAccessWhere) {
+    filters.push({ articles: { some: { article: articleAccessWhere } } });
+  }
+  if (query.search) {
+    const contains = { contains: query.search, mode: "insensitive" as const };
+    filters.push({
+      OR: [
+        { title: contains },
+        { summary: contains },
+        { countries: { some: { country: { name: contains } } } },
+        { topics: { some: { topic: { slug: contains } } } },
+        { articles: { some: { article: { title: contains } } } },
+        { articles: { some: { article: { description: contains } } } },
+        { articles: { some: { article: { source: { name: contains } } } } },
+      ],
+    });
+  }
+
+  return {
+    lastUpdatedAt: {
+      gte: new Date(now.getTime() - newsPeriodHours(query.period) * 3_600_000),
+    },
+    ...(filters.length > 0 ? { AND: filters } : {}),
+  };
+}
+
+export async function loadDatabaseStories(
+  query: NewsQuery,
+  client?: PrismaClient,
+): Promise<StoryView[]> {
+  const database = client ?? (await import("@/lib/db/prisma")).prisma;
+  const records = await database.story.findMany({
+    where: databaseStoryWhere(query),
+    orderBy: query.sort === "newest"
+      ? [{ lastUpdatedAt: "desc" }, { importanceScore: "desc" }]
+      : [{ importanceScore: "desc" }, { lastUpdatedAt: "desc" }],
     include: {
       countries: { include: { country: true } },
       topics: { include: { topic: true } },
@@ -193,7 +265,7 @@ export async function loadNewsDataset(query: NewsQuery): Promise<{
     );
   }
   try {
-    const stories = await loadDatabaseStories(query.period);
+    const stories = await loadDatabaseStories(query);
     if (stories.length > 0) return { stories, dataSource: "database" };
     return liveDatasetOrFixtures(query, "The news database is empty.");
   } catch {

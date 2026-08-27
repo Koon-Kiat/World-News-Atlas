@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { DEFAULT_RSS_FEEDS, type RssFeedConfig } from "@/config/news-sources";
+import { MemoryTtlCache } from "../bounded-cache";
 import { logNews } from "../logger";
-import type { ProviderArticle, ProviderFetchRequest, ProviderName } from "../types";
+import type {
+  ProviderArticle,
+  ProviderFetchRequest,
+  ProviderFetchResult,
+  ProviderName,
+} from "../types";
 import { BingNewsProvider } from "./bing-news";
 import { GdeltProvider } from "./gdelt";
 import { NewsApiProvider } from "./newsapi";
@@ -67,35 +73,110 @@ export interface ProviderBatchResult {
   providerCounts: Partial<Record<ProviderName, number>>;
 }
 
+interface ProviderOutcome {
+  result?: ProviderFetchResult;
+  failure?: { provider: ProviderName; code: string };
+}
+
+const PROVIDER_RESULT_TTL_MS = 5 * 60_000;
+const PROVIDER_EMPTY_TTL_MS = 45_000;
+const PROVIDER_FAILURE_TTL_MS = 20_000;
+const MAX_PROVIDER_CACHE_ENTRIES = 160;
+const providerResultCache = new MemoryTtlCache<ProviderOutcome>(MAX_PROVIDER_CACHE_ENTRIES);
+const providerRequestsInFlight = new Map<string, Promise<ProviderOutcome>>();
+
+function requestTimeBucket(value?: Date): number | null {
+  return value ? Math.floor(value.getTime() / (5 * 60_000)) : null;
+}
+
+function providerRequestKey(provider: NewsProvider, request: ProviderFetchRequest): string {
+  return JSON.stringify({
+    provider: provider.name,
+    query: request.query?.trim() ?? null,
+    from: requestTimeBucket(request.from),
+    to: requestTimeBucket(request.to),
+    countries: [...(request.countries ?? [])].sort(),
+    limit: request.limit ?? null,
+  });
+}
+
+async function fetchProviderOnce(
+  provider: NewsProvider,
+  request: ProviderFetchRequest,
+): Promise<ProviderOutcome> {
+  try {
+    const result = request.query
+      ? await provider.search(request.query, request)
+      : await provider.fetchLatest(request);
+    logNews("info", "provider_fetch_complete", {
+      provider: provider.name,
+      receivedCount: result.articles.length,
+    });
+    return { result };
+  } catch (error) {
+    const code = error instanceof ProviderError ? error.code : "UNEXPECTED_FAILURE";
+    logNews("warn", "provider_fetch_failed", { provider: provider.name, code });
+    return { failure: { provider: provider.name, code } };
+  }
+}
+
+async function fetchProviderCached(
+  provider: NewsProvider,
+  request: ProviderFetchRequest,
+): Promise<ProviderOutcome> {
+  const key = providerRequestKey(provider, request);
+  const cached = providerResultCache.get(key);
+  if (cached) return cached;
+
+  const existing = providerRequestsInFlight.get(key);
+  if (existing) return existing;
+
+  while (providerRequestsInFlight.size >= MAX_PROVIDER_CACHE_ENTRIES) {
+    const oldestKey = providerRequestsInFlight.keys().next().value;
+    if (oldestKey === undefined) break;
+    providerRequestsInFlight.delete(oldestKey);
+  }
+
+  const pending = fetchProviderOnce(provider, request).then((outcome) => {
+    const ttlMs = outcome.failure
+      ? PROVIDER_FAILURE_TTL_MS
+      : outcome.result?.articles.length
+        ? PROVIDER_RESULT_TTL_MS
+        : PROVIDER_EMPTY_TTL_MS;
+    providerResultCache.set(key, outcome, ttlMs);
+    return outcome;
+  });
+  providerRequestsInFlight.set(key, pending);
+  try {
+    return await pending;
+  } finally {
+    if (providerRequestsInFlight.get(key) === pending) providerRequestsInFlight.delete(key);
+  }
+}
+
+export function resetProviderRequestCacheForTesting(): void {
+  providerResultCache.clear();
+  providerRequestsInFlight.clear();
+}
+
 export async function fetchProviderArticlesGracefully(
   providers: NewsProvider[],
   request: ProviderFetchRequest = {},
 ): Promise<ProviderBatchResult> {
-  const settled = await Promise.allSettled(
-    providers.map(async (provider) => {
-      const result = request.query
-        ? await provider.search(request.query, request)
-        : await provider.fetchLatest(request);
-      logNews("info", "provider_fetch_complete", {
-        provider: provider.name,
-        receivedCount: result.articles.length,
-      });
-      return result;
-    }),
+  const outcomes = await Promise.all(
+    providers.map((provider) => fetchProviderCached(provider, request)),
   );
   const articles: ProviderArticle[] = [];
   const failures: ProviderBatchResult["failures"] = [];
   const providerCounts: ProviderBatchResult["providerCounts"] = {};
 
-  settled.forEach((result, index) => {
+  outcomes.forEach((outcome, index) => {
     const provider = providers[index];
-    if (result.status === "fulfilled") {
-      articles.push(...result.value.articles);
-      providerCounts[provider.name] = result.value.articles.length;
-    } else {
-      const code = result.reason instanceof ProviderError ? result.reason.code : "UNEXPECTED_FAILURE";
-      failures.push({ provider: provider.name, code });
-      logNews("warn", "provider_fetch_failed", { provider: provider.name, code });
+    if (outcome.result) {
+      articles.push(...outcome.result.articles);
+      providerCounts[provider.name] = outcome.result.articles.length;
+    } else if (outcome.failure) {
+      failures.push(outcome.failure);
     }
   });
   return { articles, failures, providerCounts };

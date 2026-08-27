@@ -16,6 +16,7 @@ Fixture mode is an explicit development option only. Production returns live sto
 - Provider-independent source registry and many-to-one provider identifier mapping.
 - Deterministic country detection, topic classification, URL canonicalization, deduplication, story clustering, and ranking.
 - PostgreSQL schema, Prisma migration, database seed, manual ingestion command, structured logs, caching, rate limiting, response validation, provider timeouts, and RSS SSRF controls.
+- Device-local Light, Dark, and System themes with a pre-hydration theme bootstrap to prevent a wrong-theme flash.
 - Opt-in fixtures for local development and tests; disabled by default and never required by the production UI.
 
 ## Architecture
@@ -44,14 +45,14 @@ The browser calls only this application's `/api/news` route. Provider credential
 
 ## Quick start with no services or API keys
 
-Requirements: Node.js 20 or newer and npm.
+Requirements: Node.js 24.15.0 or newer and npm.
 
 ```powershell
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. The UI and all core interactions use clearly marked fixtures. PostgreSQL and provider credentials are optional for this mode.
+Open `http://localhost:3000`. Reviewed RSS feeds and Bing News RSS discovery require no API key. PostgreSQL and paid provider credentials are optional. Fixtures appear only when `NEWS_FIXTURES_ENABLED=true`; they are never silently substituted in production.
 
 ## PostgreSQL setup
 
@@ -69,6 +70,12 @@ npm run db:seed
 ```
 
 The normalized schema includes `Country`, `Source`, `SourceProviderIdentifier`, `Article`, `ArticleProviderRef`, `ArticleCountry`, `Topic`, `ArticleTopic`, `Story`, `StoryArticle`, `StoryCountry`, `StoryTopic`, and `ProviderIngestionRun`. Important time, source, country, language, topic, and relationship fields are indexed.
+
+Database reads apply the time range, selected countries, topic, language, and text search in PostgreSQL before mapping records. The final deterministic bilateral relevance and popularity ranking stays in application code. There is no pre-filter 250-story truncation, so newest sorting and pagination remain correct for larger stored datasets.
+
+Ingestion is transactional and idempotent. When an article's countries, topics, or cluster fingerprint changes, the new cluster becomes authoritative, obsolete story rows and their relationships are retired, and an article is not left attached to a stale cluster.
+
+The current ChatGPT Sites deployment uses live HTTP providers because hosted Sites workers do not open raw PostgreSQL TCP connections. Durable hosted ingestion therefore needs an HTTP-accessible database API, a supported platform binding, or a private HTTP tunnel. Local development and GitHub Actions use PostgreSQL directly through Prisma.
 
 ## Environment variables
 
@@ -112,11 +119,13 @@ The command has no hosting-provider dependency. A later deployment can invoke it
 | --- | --- | --- |
 | GDELT | None | Opt in with `GDELT_ENABLED=true`. Availability and metadata quality can vary. |
 | RSS/Atom | None | Reviewed feeds from BBC News, The Guardian, Al Jazeera, CNA, The Straits Times, The Japan Times, DW, Euronews, France 24, Sky News, and NPR are enabled by default. Country-category feeds carry an explicit coverage signal instead of treating every story from a national publisher as domestic news. |
-| Bing News RSS | None | Adds targeted country and bilateral discovery—including focused Reuters and AP discovery—then extracts the original publisher URL, source name, excerpt, date, and available thumbnail. This is discovery, not a Reuters/AP content licence. |
+| Bing News RSS | None | Adds a bounded set of country and bilateral discovery queries—including focused Reuters and AP discovery—then extracts the original publisher URL, source name, excerpt, date, and available thumbnail. This is discovery, not a Reuters/AP content licence. |
 | NewsAPI | `NEWSAPI_KEY` | Disabled gracefully when the key is absent. |
 | Fixtures | None | Disabled by default. Available only as an explicit local development/testing fallback. |
 
 Publisher availability is never assumed. Entries such as BBC, Reuters, AP, NHK, and CNA in the source registry are identity mappings only; they do not claim that a current provider or subscription returns those publishers.
+
+RSS items are accepted only when the publisher supplies a parseable publication time. Missing, invalid, implausibly future, or out-of-range dates are rejected rather than being relabelled as newly published.
 
 ### Configuring approved RSS feeds
 
@@ -167,6 +176,20 @@ Typed values:
 
 Invalid combinations return a sanitized `400` response. The API uses a short in-memory result cache and a best-effort per-instance rate limit. A multi-instance production deployment should replace both with shared infrastructure such as Redis.
 
+## Caching and request control
+
+- API responses are cached per normalized query for 30 seconds in a bounded in-memory cache.
+- Provider requests are coalesced while in flight. Successful results are cached for five minutes, empty results for 45 seconds, and failures for 20 seconds, preventing rapid retry amplification.
+- Provider caching is capped at 160 entries. The request limiter is capped at 2,000 client windows and trusts the deployment-provided Cloudflare client address before generic proxy headers.
+- The cache and limiter expose small store interfaces so a multi-instance deployment can replace process-local state with Redis, Durable Objects, or KV without changing the API contract.
+- Bing country discovery uses at most eight upstream searches per focused request, including Reuters and AP discovery.
+
+No cache key, log entry, or API response contains provider credentials.
+
+## Theme preferences
+
+The Settings page and every news-page header provide Light, Dark, and System controls. System is the default. A manual selection is stored in browser `localStorage`, never sent to the server, and applies across the country, comparison, and settings pages. A small server-rendered bootstrap runs before page content and resolves the theme before hydration to avoid a light-to-dark flash. Both themes use shared CSS design tokens, preserve map hover/selected states, and respect reduced-motion preferences.
+
 ## Ranking and two-country relevance
 
 Ranking is deterministic and politically neutral. Newest sorting uses publication time. Popularity is an explicit coverage proxy—not readership data—and prioritizes story importance, independent-source count, source-country diversity, geographic relevance, and modest recency. Two-country results require both countries through direct article or reviewed country-category signals, reward balanced country relevance and bilateral headline focus, and penalize long incidental country lists. A publisher's home country alone never creates a bilateral match.
@@ -199,7 +222,8 @@ Review the current official terms for every selected provider and publisher befo
 - Country detection is conservative and primarily optimized for English metadata.
 - Lexical clustering is effective for close headline variants but is not semantic clustering.
 - Source-country discovery for unknown domains depends on provider/config metadata and will need an expanded maintained registry.
-- Cache and rate-limit state are process-local.
+- Cache and rate-limit state are process-local; multi-instance deployments should use a shared implementation.
+- Live-provider browsing is finite for the chosen time range and provider result windows. Infinite scroll paginates the complete candidate set; it does not crawl publisher sites or bypass provider/API limits.
 - No automatic translation, accounts, saved stories, admin UI, or full-content storage is implemented.
 - Fixture URLs are intentionally non-live and shown as “Sample article” rather than pretending to be publisher links.
 
@@ -210,7 +234,8 @@ npm run lint
 npm run typecheck
 npm test
 npm run build
+npx prisma validate
 npm audit
 ```
 
-The test suite covers selection limits and deselection, one- and two-country matching, source-country perspectives, country/source distinction, ambiguous country terms, provider normalization, canonical URLs, deduplication, clustering, two-country relevance, provider failure isolation, API validation, and rate limiting.
+The test suite covers selection limits and deselection, one- and two-country matching, source-country perspectives, country/source distinction, ambiguous country terms, provider normalization, canonical URLs, deduplication, clustering, two-country relevance, provider failure isolation and coalescing, RSS publication dates, API validation, bounded rate limiting, progressive pagination, and theme persistence. GitHub Actions starts PostgreSQL 17, applies the real migration, and runs integration tests for persistence, repeated ingestion, reclustering, stale-story cleanup, database filtering, newest ordering, two-country results, and pagination beyond 250 stories.

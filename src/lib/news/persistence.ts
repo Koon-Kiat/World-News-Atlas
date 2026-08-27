@@ -133,13 +133,30 @@ export async function persistStoryCandidates(
 ): Promise<{ storedArticles: number; storiesUpdated: number }> {
   const articleIds = new Set<string>();
   await client.$transaction(async (tx) => {
+    const storedArticleIds = new Map<string, string>();
+    for (const article of candidates.flatMap((candidate) => candidate.articles)) {
+      if (storedArticleIds.has(article.canonicalUrl)) continue;
+      const id = await upsertArticle(tx, article);
+      storedArticleIds.set(article.canonicalUrl, id);
+      articleIds.add(id);
+    }
+
+    const existingStoryIds = new Set(
+      (
+        await tx.storyArticle.findMany({
+          where: { articleId: { in: [...articleIds] } },
+          select: { storyId: true },
+        })
+      ).map((link) => link.storyId),
+    );
+    const desiredStoryIds = new Set<string>();
+
     for (const candidate of candidates) {
-      const storedIds: string[] = [];
-      for (const article of candidate.articles) {
-        const id = await upsertArticle(tx, article);
-        storedIds.push(id);
-        articleIds.add(id);
-      }
+      const storedIds = candidate.articles.map((article) => {
+        const articleId = storedArticleIds.get(article.canonicalUrl);
+        if (!articleId) throw new Error("Persisted article could not be reconciled");
+        return articleId;
+      });
       for (const country of candidate.countries) await ensureCountry(tx, country.code);
       const story = await tx.story.upsert({
         where: { fingerprint: candidate.fingerprint },
@@ -161,6 +178,7 @@ export async function persistStoryCandidates(
           clusterScore: candidate.clusterScore,
         },
       });
+      desiredStoryIds.add(story.id);
       await tx.storyArticle.deleteMany({ where: { storyId: story.id } });
       await tx.storyArticle.createMany({
         data: storedIds.map((articleId) => ({ storyId: story.id, articleId })),
@@ -185,6 +203,14 @@ export async function persistStoryCandidates(
         await tx.storyTopic.create({ data: { storyId: story.id, topicId: topic.id } });
       }
     }
+
+    const obsoleteStoryIds = [...existingStoryIds].filter(
+      (storyId) => !desiredStoryIds.has(storyId),
+    );
+    if (obsoleteStoryIds.length > 0) {
+      await tx.story.deleteMany({ where: { id: { in: obsoleteStoryIds } } });
+    }
+    await tx.story.deleteMany({ where: { articles: { none: {} } } });
   });
   return { storedArticles: articleIds.size, storiesUpdated: candidates.length };
 }

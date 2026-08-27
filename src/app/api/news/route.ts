@@ -1,16 +1,10 @@
 import { getNews } from "@/lib/news/news-service.server";
+import { clientKey } from "@/lib/news/client-key";
 import { logNews } from "@/lib/news/logger";
 import { NewsQueryValidationError, parseNewsQuery } from "@/lib/news/query";
 import { checkRateLimit } from "@/lib/news/rate-limit";
 
 export const runtime = "nodejs";
-
-function clientKey(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const connecting = request.headers.get("cf-connecting-ip")?.trim();
-  const real = request.headers.get("x-real-ip")?.trim();
-  return (forwarded || connecting || real || "anonymous").slice(0, 64);
-}
 
 export async function GET(request: Request): Promise<Response> {
   const requestId = crypto.randomUUID();
