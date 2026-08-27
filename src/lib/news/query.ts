@@ -18,6 +18,7 @@ const perspectiveSchema = z.enum([
   "second-country",
 ]);
 const periodSchema = z.enum(["latest", "24h", "7d", "30d"]);
+const sortSchema = z.enum(["newest", "popular"]);
 const MIN_BILATERAL_RELEVANCE = 0.56;
 
 export class NewsQueryValidationError extends Error {
@@ -101,8 +102,9 @@ export function parseNewsQuery(searchParams: URLSearchParams): NewsQuery {
     searchParams.get("sourcePerspective") ?? "all",
   );
   const periodResult = periodSchema.safeParse(searchParams.get("period") ?? "latest");
-  if (!perspectiveResult.success || !periodResult.success) {
-    throw new NewsQueryValidationError(["Invalid sourcePerspective or period"]);
+  const sortResult = sortSchema.safeParse(searchParams.get("sort") ?? "newest");
+  if (!perspectiveResult.success || !periodResult.success || !sortResult.success) {
+    throw new NewsQueryValidationError(["Invalid sourcePerspective, period, or sort order"]);
   }
 
   const rawSearch = searchParams.get("search")?.trim();
@@ -122,6 +124,7 @@ export function parseNewsQuery(searchParams: URLSearchParams): NewsQuery {
       12,
     ),
     period: periodResult.data,
+    sort: sortResult.data,
     search: rawSearch || undefined,
     page: positiveInteger(searchParams.get("page"), 1, 100),
     pageSize: positiveInteger(searchParams.get("pageSize"), 12, 250),
@@ -261,6 +264,7 @@ export const DEFAULT_NEWS_QUERY: NewsQuery = {
   sourcePerspective: "all",
   sources: [],
   period: "latest",
+  sort: "newest",
   page: 1,
   pageSize: 12,
 };

@@ -63,7 +63,10 @@ export class GdeltProvider implements NewsProvider {
     url.searchParams.set("format", "json");
     url.searchParams.set("sort", "hybridrel");
     url.searchParams.set("maxrecords", String(Math.min(250, request.limit ?? 150)));
-    url.searchParams.set("timespan", "1d");
+    const rangeEnd = request.to ?? new Date();
+    const rangeStart = request.from ?? new Date(rangeEnd.getTime() - 24 * 3_600_000);
+    const rangeDays = Math.max(1, Math.min(90, Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / 86_400_000)));
+    url.searchParams.set("timespan", `${rangeDays}d`);
 
     let response: Response;
     try {

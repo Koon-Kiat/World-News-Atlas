@@ -12,7 +12,7 @@ import { StoryList } from "@/components/news/StoryList";
 import { getCountryName } from "@/lib/news/countries/metadata";
 import { newsPeriodLabel } from "@/lib/news/periods";
 import { useNewsPeriodPreference } from "@/hooks/useNewsPeriodPreference";
-import type { NewsPeriod, NewsResponse, SourcePerspective, StoryView } from "@/lib/news/types";
+import type { NewsPeriod, NewsResponse, NewsSort, SourcePerspective, StoryView } from "@/lib/news/types";
 
 const QUICK_COUNTRIES = ["JP", "SG", "US", "CN", "IN", "GB"];
 const INITIAL_STORY_COUNT = 12;
@@ -107,6 +107,7 @@ export function WorldNewsExplorer({
   const [language, setLanguage] = useState("all");
   const [sources, setSources] = useState<string[]>([]);
   const [period, setPeriod] = useNewsPeriodPreference();
+  const [sort, setSort] = useState<NewsSort>("newest");
   const [search, setSearch] = useState("");
   const [data, setData] = useState(initialData);
   const [settledRequest, setSettledRequest] = useState<string | null>(null);
@@ -147,6 +148,7 @@ export function WorldNewsExplorer({
     const parameters = new URLSearchParams({
       sourcePerspective: perspective,
       period,
+      sort,
       page: "1",
       pageSize: String(STORY_BATCH_SIZE),
     });
@@ -156,7 +158,7 @@ export function WorldNewsExplorer({
     for (const source of sources) parameters.append("source", source);
     if (deferredSearch) parameters.set("search", deferredSearch);
     return `/api/news?${parameters.toString()}`;
-  }, [deferredSearch, language, period, perspective, selectedCountries, sources, topic]);
+  }, [deferredSearch, language, period, perspective, selectedCountries, sort, sources, topic]);
   const isLoading = settledRequest !== requestUrl;
   const isInitialLiveLoad = isLoading && data.stories.length === 0;
 
@@ -366,11 +368,13 @@ export function WorldNewsExplorer({
             topic={topic}
             language={language}
             period={period}
+            sort={sort}
             sources={sources}
             availableSources={data.meta.sourceFacets}
             onTopicChange={setTopic}
             onLanguageChange={setLanguage}
             onPeriodChange={changePeriod}
+            onSortChange={setSort}
             onSourcesChange={setSources}
           />
           {isLoading && (
