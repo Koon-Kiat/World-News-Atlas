@@ -76,4 +76,22 @@ describe("publisher image relay", () => {
       }),
     );
   });
+
+  it("returns an editorial fallback when a reviewed publisher supplies no usable image", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      new Response("<html><head><title>No image</title></head></html>", {
+        status: 200,
+        headers: { "Content-Type": "text/html" },
+      }),
+    ));
+    const article = "https://www.japantimes.co.jp/commentary/example";
+
+    const response = await GET(
+      new Request(`https://example.test/api/image?article=${encodeURIComponent(article)}&topic=politics`),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("image/svg+xml");
+    expect(await response.text()).toContain("Politics briefing");
+  });
 });

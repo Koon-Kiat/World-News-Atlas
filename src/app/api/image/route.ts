@@ -1,69 +1,7 @@
+import { approvedArticleUrl, approvedImageUrl } from "@/lib/news/image-policy";
+
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 const MAX_ARTICLE_BYTES = 2 * 1024 * 1024;
-
-const APPROVED_ARTICLE_HOSTS = new Set([
-  "feeds.bbci.co.uk",
-  "news.sky.com",
-  "www.aljazeera.com",
-  "www.bbc.com",
-  "www.channelnewsasia.com",
-  "www.dw.com",
-  "www.euronews.com",
-  "www.france24.com",
-  "www.japantimes.co.jp",
-  "www.npr.org",
-  "www.straitstimes.com",
-  "www.theguardian.com",
-]);
-
-const APPROVED_IMAGE_HOSTS = new Set([
-  "cassette.sphdigital.com.sg",
-  "dam.mediacorp.sg",
-  "e3.365dm.com",
-  "i.guim.co.uk",
-  "ichef.bbci.co.uk",
-  "media.npr.org",
-  "npr.brightspotcdn.com",
-  "s.france24.com",
-  "static.dw.com",
-  "static.euronews.com",
-  "www.aljazeera.com",
-  "www.bing.com",
-  "www.japantimes.co.jp",
-]);
-
-function parsedHttpsUrl(value: string | null): URL | null {
-  if (!value || value.length > 2_000) return null;
-  try {
-    const url = new URL(value);
-    if (url.protocol !== "https:" || url.username || url.password) return null;
-    return url;
-  } catch {
-    return null;
-  }
-}
-
-function approvedArticleUrl(value: string | null): URL | null {
-  const url = parsedHttpsUrl(value);
-  return url && APPROVED_ARTICLE_HOSTS.has(url.hostname.toLowerCase()) ? url : null;
-}
-
-function approvedImageUrl(value: string | null): URL | null {
-  const url = parsedHttpsUrl(value);
-  if (!url || !APPROVED_IMAGE_HOSTS.has(url.hostname.toLowerCase())) return null;
-  const host = url.hostname.toLowerCase();
-  if (
-    host === "www.japantimes.co.jp" &&
-    !["/japantimes/uploads/images/", "/theme_japantimes/images/"].some((prefix) =>
-      url.pathname.startsWith(prefix),
-    )
-  ) {
-    return null;
-  }
-  if (host === "www.bing.com" && !url.pathname.startsWith("/th")) return null;
-  if (host === "cassette.sphdigital.com.sg" && !url.pathname.startsWith("/image/")) return null;
-  return url;
-}
 
 async function fetchWithReviewedRedirects(
   initialUrl: URL,
@@ -148,7 +86,7 @@ async function resolveArticleImage(articleUrl: URL): Promise<URL | null> {
   return articleImageUrl(new TextDecoder().decode(bytes), articleUrl);
 }
 
-async function imageResponse(imageUrl: URL): Promise<Response> {
+async function imageResponse(imageUrl: URL): Promise<Response | null> {
   const upstream = await fetchWithReviewedRedirects(
     imageUrl,
     approvedImageUrl,
@@ -162,10 +100,10 @@ async function imageResponse(imageUrl: URL): Promise<Response> {
     !contentType?.match(/^image\/(?:avif|gif|jpeg|png|webp)$/) ||
     declaredLength > MAX_IMAGE_BYTES
   ) {
-    return new Response("Not found", { status: 404 });
+    return null;
   }
   const bytes = await upstream.arrayBuffer();
-  if (bytes.byteLength > MAX_IMAGE_BYTES) return new Response("Not found", { status: 404 });
+  if (bytes.byteLength > MAX_IMAGE_BYTES) return null;
   return new Response(bytes, {
     headers: {
       "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000",
@@ -177,20 +115,41 @@ async function imageResponse(imageUrl: URL): Promise<Response> {
   });
 }
 
+function placeholderImageResponse(topicValue: string | null): Response {
+  const topic = topicValue?.trim().toLowerCase().match(/^[a-z0-9-]{1,24}$/)?.[0] ?? "world";
+  const label = `${topic[0]?.toUpperCase() ?? "W"}${topic.slice(1)} briefing`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-label="${label}">
+  <defs>
+    <radialGradient id="a" cx="0" cy="0" r="1" gradientTransform="translate(260 120) rotate(31) scale(520 410)"><stop stop-color="#f56f52" stop-opacity=".55"/><stop offset="1" stop-color="#f56f52" stop-opacity="0"/></radialGradient>
+    <radialGradient id="b" cx="0" cy="0" r="1" gradientTransform="translate(990 600) rotate(-142) scale(560 430)"><stop stop-color="#9fd1c6" stop-opacity=".34"/><stop offset="1" stop-color="#9fd1c6" stop-opacity="0"/></radialGradient>
+    <pattern id="grid" width="52" height="52" patternUnits="userSpaceOnUse"><path d="M52 0H0v52" fill="none" stroke="#d9e7e2" stroke-opacity=".07"/></pattern>
+  </defs>
+  <rect width="1200" height="675" fill="#0c3036"/><rect width="1200" height="675" fill="url(#a)"/><rect width="1200" height="675" fill="url(#b)"/><rect width="1200" height="675" fill="url(#grid)"/>
+  <g transform="translate(600 272)" fill="none" stroke="#d9e7e2" stroke-width="5" stroke-opacity=".8"><circle r="112"/><ellipse rx="52" ry="112"/><path d="M-108-35h216M-108 35h216M-112 0h224"/></g>
+  <circle cx="690" cy="192" r="18" fill="#f56f52"/><text x="600" y="470" text-anchor="middle" fill="#f7f1e8" font-family="Georgia,serif" font-size="54">${label}</text><text x="600" y="520" text-anchor="middle" fill="#b8ccc7" font-family="Arial,sans-serif" font-size="18" font-weight="700" letter-spacing="5">WORLD NEWS ATLAS</text>
+</svg>`;
+  return new Response(svg, {
+    headers: {
+      "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000",
+      "Content-Type": "image/svg+xml; charset=utf-8",
+      "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
+}
+
 export async function GET(request: Request): Promise<Response> {
   const parameters = new URL(request.url).searchParams;
   const directImage = approvedImageUrl(parameters.get("url"));
   const article = approvedArticleUrl(parameters.get("article"));
+  const topic = parameters.get("topic");
   if (!directImage && !article) return new Response("Not found", { status: 404 });
 
   try {
     const imageUrl = directImage ?? (article ? await resolveArticleImage(article) : null);
-    if (!imageUrl) return new Response("Not found", { status: 404 });
-    return await imageResponse(imageUrl);
+    if (!imageUrl) return placeholderImageResponse(topic);
+    return (await imageResponse(imageUrl)) ?? placeholderImageResponse(topic);
   } catch {
-    return new Response("Image temporarily unavailable", {
-      status: 502,
-      headers: { "Cache-Control": "no-store" },
-    });
+    return placeholderImageResponse(topic);
   }
 }
