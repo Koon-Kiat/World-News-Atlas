@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ExploreNavigation } from "./ExploreNavigation";
 import { NEWS_PERIOD_OPTIONS } from "@/lib/news/periods";
 import { useNewsPeriodPreference } from "@/hooks/useNewsPeriodPreference";
+import { ThemeControl } from "./ThemeControl";
 
 export function NewsSettings() {
   const [period, setPeriod] = useNewsPeriodPreference();
@@ -18,7 +19,10 @@ export function NewsSettings() {
           <span>WORLDLINE</span>
         </Link>
         <p>News preferences</p>
-        <Link className="latest-link" href="/country#stories">Back to news <span aria-hidden="true">→</span></Link>
+        <div className="header-actions">
+          <ThemeControl compact />
+          <Link className="latest-link" href="/country#stories">Back to news <span aria-hidden="true">→</span></Link>
+        </div>
       </header>
 
       <ExploreNavigation active="settings" />
@@ -64,6 +68,19 @@ export function NewsSettings() {
           <div className="settings-actions">
             <Link href="/country#stories">Return to the briefing</Link>
             <span role="status" aria-live="polite">{saved ? "Saved automatically. Your news pages will use this range." : "Choose a range to update your preference."}</span>
+          </div>
+        </section>
+
+        <section className="settings-panel theme-settings-panel" aria-labelledby="theme-title">
+          <div className="settings-panel-heading">
+            <div>
+              <p className="eyebrow">Appearance</p>
+              <h2 id="theme-title">Color theme</h2>
+            </div>
+            <span>System is the default. A manual choice stays on this device.</span>
+          </div>
+          <div className="settings-theme-control">
+            <ThemeControl />
           </div>
         </section>
       </main>

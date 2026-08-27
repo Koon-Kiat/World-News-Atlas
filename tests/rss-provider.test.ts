@@ -83,4 +83,52 @@ describe("RSS provider", () => {
       "singapore",
     ]);
   });
+
+  it("rejects items without a trustworthy publication time", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          `<?xml version="1.0"?><rss version="2.0"><channel><title>World</title><item><title>Missing date</title><link>https://www.bbc.com/news/articles/missing</link><guid>missing</guid></item><item><title>Invalid date</title><link>https://www.bbc.com/news/articles/invalid</link><guid>invalid</guid><pubDate>not-a-date</pubDate></item></channel></rss>`,
+          { status: 200, headers: { "Content-Type": "application/rss+xml" } },
+        ),
+      ),
+    );
+
+    const result = await new RssProvider([DEFAULT_RSS_FEEDS[0]]).fetchLatest();
+    expect(result.articles).toEqual([]);
+  });
+
+  it("rejects implausibly future-dated items", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          `<?xml version="1.0"?><rss version="2.0"><channel><title>World</title><item><title>Future item</title><link>https://www.bbc.com/news/articles/future</link><guid>future</guid><pubDate>Tue, 25 Aug 2099 12:00:00 GMT</pubDate></item></channel></rss>`,
+          { status: 200, headers: { "Content-Type": "application/rss+xml" } },
+        ),
+      ),
+    );
+
+    const result = await new RssProvider([DEFAULT_RSS_FEEDS[0]]).fetchLatest();
+    expect(result.articles).toEqual([]);
+  });
+
+  it("enforces the requested lower publication bound", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          `<?xml version="1.0"?><rss version="2.0"><channel><title>World</title><item><title>Too old</title><link>https://www.bbc.com/news/articles/old</link><guid>old</guid><pubDate>Tue, 25 Aug 2026 12:00:00 GMT</pubDate></item><item><title>In range</title><link>https://www.bbc.com/news/articles/current</link><guid>current</guid><pubDate>Wed, 26 Aug 2026 18:00:00 GMT</pubDate></item></channel></rss>`,
+          { status: 200, headers: { "Content-Type": "application/rss+xml" } },
+        ),
+      ),
+    );
+
+    const result = await new RssProvider([DEFAULT_RSS_FEEDS[0]]).fetchLatest({
+      from: new Date("2026-08-26T00:00:00Z"),
+    });
+    expect(result.articles.map((article) => article.providerArticleId)).toEqual(["current"]);
+    expect(result.articles[0].publishedAt).toBe("2026-08-26T18:00:00.000Z");
+  });
 });

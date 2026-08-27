@@ -2,6 +2,7 @@ import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import Parser from "rss-parser";
 import type { RssFeedConfig } from "@/config/news-sources";
+import { publicationDateInRange, trustedPublicationDate } from "../publication-date";
 import type { ProviderArticle, ProviderFetchRequest, ProviderFetchResult } from "../types";
 import { type NewsProvider, ProviderError } from "./provider";
 
@@ -151,22 +152,28 @@ export class RssProvider implements NewsProvider {
       this.feeds.map(async (feed) => {
         const xml = await fetchFeed(feed.feedUrl, this.timeoutMs);
         const parsed = await this.parser.parseString(xml);
-        return parsed.items.map<ProviderArticle>((item, index) => ({
-          provider: this.name,
-          providerArticleId: item.guid ?? item.id ?? item.link ?? `${feed.feedUrl}#${index}`,
-          title: item.title ?? "Untitled RSS item",
-          description: item.contentSnippet ?? item.summary ?? null,
-          url: item.link ?? feed.websiteUrl,
-          imageUrl: feedImage(item),
-          publishedAt: item.isoDate ?? item.pubDate ?? new Date().toISOString(),
-          language: feed.language,
-          sourceName: feed.name,
-          sourceIdentifier: feed.feedUrl,
-          sourceCountry: feed.countryCode,
-          sourceScope: feed.scope,
-          sourceRegion: feed.region,
-          coverageCountries: feed.coverageCountries,
-        }));
+        return parsed.items.flatMap<ProviderArticle>((item, index) => {
+          const publishedAt = trustedPublicationDate([item.isoDate, item.pubDate]);
+          if (!publishedAt || !publicationDateInRange(publishedAt, request.from, request.to)) {
+            return [];
+          }
+          return [{
+            provider: this.name,
+            providerArticleId: item.guid ?? item.id ?? item.link ?? `${feed.feedUrl}#${index}`,
+            title: item.title ?? "Untitled RSS item",
+            description: item.contentSnippet ?? item.summary ?? null,
+            url: item.link ?? feed.websiteUrl,
+            imageUrl: feedImage(item),
+            publishedAt,
+            language: feed.language,
+            sourceName: feed.name,
+            sourceIdentifier: feed.feedUrl,
+            sourceCountry: feed.countryCode,
+            sourceScope: feed.scope,
+            sourceRegion: feed.region,
+            coverageCountries: feed.coverageCountries,
+          }];
+        });
       }),
     );
     const articles = settled.flatMap((result) => (result.status === "fulfilled" ? result.value : []));

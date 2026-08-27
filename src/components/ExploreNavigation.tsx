@@ -28,7 +28,7 @@ const sections: Array<{
     href: "/settings",
     number: "⚙",
     title: "Settings",
-    description: "Choose time range",
+    description: "Time range and theme",
   },
 ];
 

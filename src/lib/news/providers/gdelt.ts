@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { countryNameToCode } from "../countries/metadata";
+import { publicationDateInRange, trustedPublicationDate } from "../publication-date";
 import type { ProviderArticle, ProviderFetchRequest, ProviderFetchResult } from "../types";
 import { fetchWithTimeout, type NewsProvider, ProviderError } from "./provider";
 
@@ -28,12 +29,12 @@ const LANGUAGE_CODES: Record<string, string> = {
   spanish: "es",
 };
 
-function gdeltDate(value?: string): string {
-  if (!value) return new Date().toISOString();
+function gdeltDate(value?: string): string | null {
+  if (!value) return null;
   const match = value.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?$/);
-  if (!match) return new Date(value).toISOString();
+  if (!match) return trustedPublicationDate([value]);
   const [, year, month, day, hour, minute, second] = match;
-  return `${year}-${month}-${day}T${hour}:${minute}:${second}Z`;
+  return trustedPublicationDate([`${year}-${month}-${day}T${hour}:${minute}:${second}Z`]);
 }
 
 function gdeltLanguage(value?: string): string | null {
@@ -81,18 +82,22 @@ export class GdeltProvider implements NewsProvider {
     if (!parsed.success) {
       throw new ProviderError(this.name, "INVALID_RESPONSE", "GDELT response was not usable");
     }
-    const articles: ProviderArticle[] = parsed.data.articles.map((article) => ({
-      provider: this.name,
-      providerArticleId: article.url,
-      title: article.title,
-      url: article.url,
-      imageUrl: article.socialimage ?? null,
-      publishedAt: gdeltDate(article.seendate),
-      language: gdeltLanguage(article.language),
-      sourceName: article.domain ?? "GDELT source",
-      sourceIdentifier: article.domain,
-      sourceCountry: countryNameToCode(article.sourcecountry),
-    }));
+    const articles: ProviderArticle[] = parsed.data.articles.flatMap((article) => {
+      const publishedAt = gdeltDate(article.seendate);
+      if (!publishedAt || !publicationDateInRange(publishedAt, request.from, request.to)) return [];
+      return [{
+        provider: this.name,
+        providerArticleId: article.url,
+        title: article.title,
+        url: article.url,
+        imageUrl: article.socialimage ?? null,
+        publishedAt,
+        language: gdeltLanguage(article.language),
+        sourceName: article.domain ?? "GDELT source",
+        sourceIdentifier: article.domain,
+        sourceCountry: countryNameToCode(article.sourcecountry),
+      }];
+    });
     return { provider: this.name, articles, receivedAt: new Date().toISOString() };
   }
 

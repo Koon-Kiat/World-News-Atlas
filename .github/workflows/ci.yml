@@ -19,9 +19,24 @@ jobs:
     name: Verify
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: world_news_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d world_news_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       NEXT_TELEMETRY_DISABLED: "1"
-      DATABASE_URL: postgresql://user:password@localhost:5432/world_news?schema=public
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/world_news_test?schema=public
+      NEWS_DB_TESTS: "true"
 
     steps:
       - name: Check out repository
@@ -30,7 +45,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: 24
+          node-version: 24.15.0
           cache: npm
 
       - name: Install dependencies
@@ -38,6 +53,9 @@ jobs:
 
       - name: Validate Prisma schema
         run: npx prisma validate
+
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
 
       - name: Run lint, type checks, and tests
         run: npm run check

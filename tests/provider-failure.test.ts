@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { fetchProviderArticlesGracefully } from "@/lib/news/providers";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  fetchProviderArticlesGracefully,
+  resetProviderRequestCacheForTesting,
+} from "@/lib/news/providers";
 import type { NewsProvider } from "@/lib/news/providers/provider";
 import { ProviderError } from "@/lib/news/providers/provider";
 import type { ProviderFetchResult } from "@/lib/news/types";
@@ -39,6 +42,10 @@ function fakeProvider(name: "NEWSAPI" | "GDELT", fails: boolean): NewsProvider {
   };
 }
 
+afterEach(() => {
+  resetProviderRequestCacheForTesting();
+});
+
 describe("provider failure handling", () => {
   it("continues with successful providers when another provider fails", async () => {
     const result = await fetchProviderArticlesGracefully([
@@ -47,5 +54,59 @@ describe("provider failure handling", () => {
     ]);
     expect(result.articles).toHaveLength(1);
     expect(result.failures).toEqual([{ provider: "NEWSAPI", code: "TEST_FAILURE" }]);
+  });
+
+  it("coalesces concurrent duplicate upstream requests and reuses the short cache", async () => {
+    const fetchLatest = vi.fn(async () => successResult);
+    const provider: NewsProvider = {
+      ...fakeProvider("GDELT", false),
+      fetchLatest,
+      search: fetchLatest,
+    };
+
+    await Promise.all([
+      fetchProviderArticlesGracefully([provider]),
+      fetchProviderArticlesGracefully([provider]),
+    ]);
+    await fetchProviderArticlesGracefully([provider]);
+
+    expect(fetchLatest).toHaveBeenCalledTimes(1);
+  });
+
+  it("short-caches provider failures to avoid retry amplification", async () => {
+    const fetchLatest = vi.fn(async () => {
+      throw new ProviderError("GDELT", "TEST_FAILURE", "simulated");
+    });
+    const provider: NewsProvider = {
+      ...fakeProvider("GDELT", false),
+      fetchLatest,
+      search: fetchLatest,
+    };
+
+    const first = await fetchProviderArticlesGracefully([provider]);
+    const second = await fetchProviderArticlesGracefully([provider]);
+
+    expect(fetchLatest).toHaveBeenCalledTimes(1);
+    expect(first.failures).toEqual(second.failures);
+  });
+
+  it("short-caches empty provider responses to avoid retry amplification", async () => {
+    const fetchLatest = vi.fn(async (): Promise<ProviderFetchResult> => ({
+      provider: "GDELT",
+      receivedAt: new Date().toISOString(),
+      articles: [],
+    }));
+    const provider: NewsProvider = {
+      ...fakeProvider("GDELT", false),
+      fetchLatest,
+      search: fetchLatest,
+    };
+
+    const first = await fetchProviderArticlesGracefully([provider]);
+    const second = await fetchProviderArticlesGracefully([provider]);
+
+    expect(fetchLatest).toHaveBeenCalledTimes(1);
+    expect(first.articles).toEqual([]);
+    expect(second.articles).toEqual([]);
   });
 });

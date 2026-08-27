@@ -48,7 +48,7 @@ describe("Bing News RSS provider", () => {
     expect(result.articles).toHaveLength(0);
   });
 
-  it("fans out country discovery topics and deduplicates publisher URLs", async () => {
+  it("uses a bounded discovery fan-out and deduplicates publisher URLs", async () => {
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       void input;
       return new Response(
@@ -63,7 +63,7 @@ describe("Bing News RSS provider", () => {
       from: new Date("2026-08-01T00:00:00Z"),
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(14);
+    expect(fetchMock).toHaveBeenCalledTimes(8);
     const requestedQueries = fetchMock.mock.calls.map(([input]) => new URL(String(input)).searchParams.get("q"));
     expect(requestedQueries).toContain('"Japan" site:reuters.com');
     expect(requestedQueries).toContain('"Japan" site:apnews.com');

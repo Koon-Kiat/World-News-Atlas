@@ -1,4 +1,5 @@
 import Parser from "rss-parser";
+import { publicationDateInRange, trustedPublicationDate } from "../publication-date";
 import type { ProviderArticle, ProviderFetchRequest, ProviderFetchResult } from "../types";
 import { fetchWithTimeout, type NewsProvider, ProviderError } from "./provider";
 
@@ -103,8 +104,8 @@ export class BingNewsProvider implements NewsProvider {
     const articles = parsed.items.flatMap<ProviderArticle>((item, index) => {
       const articleUrl = originalArticleUrl(item.link);
       if (!articleUrl || !item.title) return [];
-      const publishedAt = item.isoDate ?? item.pubDate ?? new Date().toISOString();
-      if (request.from && new Date(publishedAt).getTime() < request.from.getTime()) return [];
+      const publishedAt = trustedPublicationDate([item.isoDate, item.pubDate]);
+      if (!publishedAt || !publicationDateInRange(publishedAt, request.from, request.to)) return [];
       return [{
         provider: this.name,
         providerArticleId: item.guid ?? `${url}#${index}`,
@@ -140,12 +141,6 @@ export class BingNewsProvider implements NewsProvider {
             "technology",
             "society",
             "climate",
-            "transport",
-            "health",
-            "education",
-            "culture",
-            "science",
-            "sport",
           ].map((topic) => `${query} ${topic}`),
           `${query} site:reuters.com`,
           `${query} site:apnews.com`,
