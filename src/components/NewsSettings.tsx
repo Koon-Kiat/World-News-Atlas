@@ -13,19 +13,18 @@ export function NewsSettings() {
 
   return (
     <div className="site-frame" id="top">
+      <ExploreNavigation active="settings" />
+
       <header className="site-header settings-site-header">
-        <Link className="brand" href="/country#top" aria-label="Worldline home">
+        <Link className="brand" href="/" aria-label="Worldline home">
           <span className="brand-mark" aria-hidden="true"><span /></span>
           <span>WORLDLINE</span>
         </Link>
         <p>News preferences</p>
         <div className="header-actions">
-          <ThemeControl compact />
           <Link className="latest-link" href="/country#stories">Back to news <span aria-hidden="true">→</span></Link>
         </div>
       </header>
-
-      <ExploreNavigation active="settings" />
 
       <main className="settings-page">
         <section className="settings-intro" aria-labelledby="settings-title">

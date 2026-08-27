@@ -1,5 +1,10 @@
-import { WorldNewsPage } from "@/components/WorldNewsPage";
+import type { Metadata } from "next";
+import { LandingPage } from "@/components/LandingPage";
 
-export default function Home() {
-  return <WorldNewsPage mode="country" />;
+export const metadata: Metadata = {
+  description: "Explore current news through one country or compare the connections between two.",
+};
+
+export default function HomePage() {
+  return <LandingPage />;
 }

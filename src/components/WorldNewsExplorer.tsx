@@ -9,7 +9,6 @@ import { CountryPicker } from "@/components/map/CountryPicker";
 import { WorldMap } from "@/components/map/WorldMap";
 import { updateCountrySelection } from "@/components/map/selection";
 import { StoryList } from "@/components/news/StoryList";
-import { ThemeControl } from "@/components/ThemeControl";
 import { getCountryName } from "@/lib/news/countries/metadata";
 import { newsPeriodLabel } from "@/lib/news/periods";
 import { mergeNextPage, nextPageNumber, responseHasNextPage } from "@/lib/news/pagination";
@@ -272,8 +271,10 @@ export function WorldNewsExplorer({
 
   return (
     <div className="site-frame" id="top">
+      <ExploreNavigation active={mode} />
+
       <header className="site-header">
-        <Link className="brand" href="/country#top" aria-label="Worldline home">
+        <Link className="brand" href="/" aria-label="Worldline home">
           <span className="brand-mark" aria-hidden="true"><span /></span>
           <span>WORLDLINE</span>
         </Link>
@@ -290,12 +291,9 @@ export function WorldNewsExplorer({
           <input id="news-search" type="search" value={search} maxLength={120} placeholder="Search topics, people, places…" onChange={(event) => setSearch(event.target.value)} />
         </form>
         <div className="header-actions">
-          <ThemeControl compact />
           <a className="latest-link" href="#stories">Latest <span aria-hidden="true">↓</span></a>
         </div>
       </header>
-
-      <ExploreNavigation active={mode} />
 
       <main>
         <section className="hero-section" aria-labelledby="hero-title">
@@ -341,17 +339,22 @@ export function WorldNewsExplorer({
                 })}
               </div>
               <CountryPicker selectedCountries={selectedCountries} onSelect={selectCountry} />
-              <div>
-                <p className="quick-label">Quick jump</p>
-                <div className="quick-countries">
-                  {QUICK_COUNTRIES.map((code) => (
-                    <button type="button" key={code} aria-pressed={selectedCountries.includes(code)} onClick={() => selectCountry(code)}>
-                      <span aria-hidden="true">{flag(code)}</span> {code}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </aside>
+          </div>
+
+          <div className="quick-jump-panel" aria-label="Popular country shortcuts">
+            <div>
+              <p className="quick-label">Quick jump</p>
+              <strong>Choose a country instantly</strong>
+            </div>
+            <div className="quick-countries">
+              {QUICK_COUNTRIES.map((code) => (
+                <button type="button" key={code} aria-pressed={selectedCountries.includes(code)} onClick={() => selectCountry(code)}>
+                  <span aria-hidden="true">{flag(code)}</span>
+                  <span><strong>{getCountryName(code)}</strong><small>{code}</small></span>
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="selection-toolbar">

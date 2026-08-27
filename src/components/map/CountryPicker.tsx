@@ -37,7 +37,10 @@ export function CountryPicker({ selectedCountries, onSelect }: CountryPickerProp
 
   return (
     <div className="country-picker">
-      <label htmlFor="country-search">Find a country</label>
+      <label htmlFor="country-search">
+        <span>Choose a country</span>
+        <small>Search every country by name or code</small>
+      </label>
       <div className="country-search-field">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="m21 21-4.7-4.7m2.2-5.3a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" />
@@ -47,7 +50,7 @@ export function CountryPicker({ selectedCountries, onSelect }: CountryPickerProp
           type="search"
           value={query}
           autoComplete="off"
-          placeholder="Type a name or code"
+          placeholder="Start typing: Japan, SG, Canada…"
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={expanded && matches.length > 0}

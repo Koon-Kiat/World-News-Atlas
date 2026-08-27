@@ -3,6 +3,12 @@
 import { useThemePreference } from "@/hooks/useThemePreference";
 import { THEME_OPTIONS } from "@/lib/theme";
 
+const THEME_ICONS = {
+  system: "◐",
+  light: "☀",
+  dark: "☾",
+} as const;
+
 export function ThemeControl({ compact = false }: { compact?: boolean }) {
   const [theme, setTheme] = useThemePreference();
   return (
@@ -12,10 +18,12 @@ export function ThemeControl({ compact = false }: { compact?: boolean }) {
           type="button"
           key={option.value}
           aria-pressed={theme === option.value}
+          aria-label={option.label}
           title={option.description}
           onClick={() => setTheme(option.value)}
         >
-          {option.label}
+          <span className="theme-icon" aria-hidden="true">{THEME_ICONS[option.value]}</span>
+          {!compact && <span>{option.label}</span>}
         </button>
       ))}
     </div>

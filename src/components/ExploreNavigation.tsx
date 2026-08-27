@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { ThemeControl } from "@/components/ThemeControl";
 
-export type ExploreSection = "country" | "compare" | "settings";
+export type ExploreSection = "home" | "country" | "compare" | "settings";
 
 const sections: Array<{
-  id: ExploreSection;
+  id: "country" | "compare";
   href: string;
   number: string;
   title: string;
@@ -23,13 +24,6 @@ const sections: Array<{
     title: "Compare two",
     description: "Find shared stories",
   },
-  {
-    id: "settings",
-    href: "/settings",
-    number: "⚙",
-    title: "Settings",
-    description: "Time range and theme",
-  },
 ];
 
 export function ExploreNavigation({ active }: { active: ExploreSection }) {
@@ -38,7 +32,7 @@ export function ExploreNavigation({ active }: { active: ExploreSection }) {
       <div className="explore-navigation-inner">
         <p>
           <span>Explore mode</span>
-          Choose how you want to read the world
+          Read the world your way
         </p>
         <div className="explore-navigation-links">
           {sections.map((section) => (
@@ -55,6 +49,18 @@ export function ExploreNavigation({ active }: { active: ExploreSection }) {
               </span>
             </Link>
           ))}
+        </div>
+        <div className="explore-navigation-tools">
+          <Link
+            href="/settings"
+            className={active === "settings" ? "settings-link active" : "settings-link"}
+            aria-current={active === "settings" ? "page" : undefined}
+            aria-label="Open settings"
+            title="Settings"
+          >
+            <span aria-hidden="true">⚙</span>
+          </Link>
+          <ThemeControl compact />
         </div>
       </div>
     </nav>
