@@ -112,7 +112,7 @@ The command has no hosting-provider dependency. A later deployment can invoke it
 | --- | --- | --- |
 | GDELT | None | Opt in with `GDELT_ENABLED=true`. Availability and metadata quality can vary. |
 | RSS/Atom | None | Reviewed feeds from BBC News, The Guardian, Al Jazeera, CNA, The Straits Times, The Japan Times, DW, Euronews, France 24, Sky News, and NPR are enabled by default. Country-category feeds carry an explicit coverage signal instead of treating every story from a national publisher as domestic news. |
-| Bing News RSS | None | Adds targeted country and bilateral discovery, then extracts the original publisher URL, source name, excerpt, date, and available thumbnail. |
+| Bing News RSS | None | Adds targeted country and bilateral discovery—including focused Reuters and AP discovery—then extracts the original publisher URL, source name, excerpt, date, and available thumbnail. This is discovery, not a Reuters/AP content licence. |
 | NewsAPI | `NEWSAPI_KEY` | Disabled gracefully when the key is absent. |
 | Fixtures | None | Disabled by default. Available only as an explicit local development/testing fallback. |
 

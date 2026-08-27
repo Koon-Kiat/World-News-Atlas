@@ -131,24 +131,28 @@ export class BingNewsProvider implements NewsProvider {
   }
 
   async search(query: string, request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
-    const discoveryTopics = request.countries?.length
+    const discoveryQueries = request.countries?.length
       ? [
-          "",
-          "politics",
-          "business",
-          "technology",
-          "society",
-          "climate",
-          "transport",
-          "health",
-          "education",
-          "culture",
-          "science",
-          "sport",
+          query,
+          ...[
+            "politics",
+            "business",
+            "technology",
+            "society",
+            "climate",
+            "transport",
+            "health",
+            "education",
+            "culture",
+            "science",
+            "sport",
+          ].map((topic) => `${query} ${topic}`),
+          `${query} site:reuters.com`,
+          `${query} site:apnews.com`,
         ]
-      : [""];
+      : [query];
     const settled = await Promise.allSettled(
-      discoveryTopics.map((topic) => this.requestOnce(topic ? `${query} ${topic}` : query, request)),
+      discoveryQueries.map((discoveryQuery) => this.requestOnce(discoveryQuery, request)),
     );
     const successful = settled.flatMap((result) => result.status === "fulfilled" ? result.value.articles : []);
     if (successful.length === 0 && settled.every((result) => result.status === "rejected")) {
