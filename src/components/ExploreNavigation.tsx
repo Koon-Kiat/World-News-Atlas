@@ -6,21 +6,18 @@ export type ExploreSection = "country" | "compare" | "settings";
 const sections: Array<{
   id: "country" | "compare";
   href: string;
-  number: string;
   title: string;
   description: string;
 }> = [
   {
     id: "country",
     href: "/country#top",
-    number: "01",
     title: "One country",
     description: "Follow one place",
   },
   {
     id: "compare",
     href: "/compare#top",
-    number: "02",
     title: "Compare two",
     description: "Find shared stories",
   },
@@ -38,7 +35,6 @@ export function ExploreNavigation({ active }: { active: ExploreSection }) {
             aria-current={active === section.id ? "page" : undefined}
             title={section.description}
           >
-            <span aria-hidden="true">{section.number}</span>
             <strong>{section.title}</strong>
           </Link>
         ))}

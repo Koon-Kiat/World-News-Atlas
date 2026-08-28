@@ -143,6 +143,19 @@ describe("news matching", () => {
     expect(result.sourceFacets.some((source) => source.name === sourceName && source.storyCount > 0)).toBe(true);
   });
 
+  it("filters each story's coverage to articles that match the selected topic", () => {
+    const result = queryStories(getFixtureStories(), {
+      ...baseQuery,
+      topic: "business",
+    });
+
+    expect(result.stories.length).toBeGreaterThan(0);
+    expect(result.stories.every((story) => story.topics[0] === "business")).toBe(true);
+    expect(
+      result.stories.flatMap((story) => story.articles).every((article) => article.topics.includes("business")),
+    ).toBe(true);
+  });
+
   it("sorts newest by publication time and popular by coverage strength", () => {
     const template = getFixtureStories()[0];
     const newest = {

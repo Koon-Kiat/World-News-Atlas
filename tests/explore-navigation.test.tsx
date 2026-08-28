@@ -26,6 +26,8 @@ describe("explore navigation", () => {
 
     expect(screen.getByRole("link", { name: /One country/i })).toHaveAttribute("href", "/country#top");
     expect(screen.getByRole("link", { name: /Compare two/i })).toHaveAttribute("href", "/compare#top");
+    expect(screen.queryByText("01")).not.toBeInTheDocument();
+    expect(screen.queryByText("02")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open settings" })).toHaveAttribute("href", "/settings");
     expect(screen.getByRole("button", { name: "System" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Light" })).toBeInTheDocument();

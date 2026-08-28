@@ -178,6 +178,20 @@ function hasFocusedBilateralSignal(story: StoryView, countries: string[]): boole
   );
 }
 
+function articleMatchesTopicAndLanguage(article: ArticleView, query: NewsQuery): boolean {
+  return (
+    (!query.topic || article.topics.includes(query.topic)) &&
+    (!query.language || article.language === query.language)
+  );
+}
+
+function visibleStoryTopics(story: StoryView, articles: ArticleView[], selectedTopic?: string): string[] {
+  const articleTopics = [...new Set(articles.flatMap((article) => article.topics))];
+  const topics = articleTopics.length > 0 ? articleTopics : story.topics;
+  if (!selectedTopic) return topics;
+  return [selectedTopic, ...topics.filter((topic) => topic !== selectedTopic)];
+}
+
 export function queryStories(
   stories: StoryView[],
   query: NewsQuery,
@@ -200,16 +214,20 @@ export function queryStories(
         scoreTwoCountryRelevance(story, query.countries[0], query.countries[1]) >= MIN_BILATERAL_RELEVANCE
       );
     })
-    .filter((story) => !query.topic || story.topics.includes(query.topic))
-    .filter(
-      (story) =>
-        !query.language || story.articles.some((article) => article.language === query.language),
-    )
+    .filter((story) => story.articles.some((article) => articleMatchesTopicAndLanguage(article, query)))
     .filter((story) => !query.search || matchesSearch(story, query.search));
 
   const sourceCounts = new Map<string, number>();
   for (const story of candidates) {
-    const storySources = new Set(story.articles.map((article) => article.source.name));
+    const storySources = new Set(
+      story.articles
+        .filter(
+          (article) =>
+            articleMatchesTopicAndLanguage(article, query) &&
+            perspectiveMatches(article, query.sourcePerspective, query.countries),
+        )
+        .map((article) => article.source.name),
+    );
     for (const source of storySources) sourceCounts.set(source, (sourceCounts.get(source) ?? 0) + 1);
   }
   const sourceFacets = [...sourceCounts.entries()]
@@ -218,14 +236,19 @@ export function queryStories(
 
   const selectedSources = new Set(query.sources);
   const matching = candidates
-    .map((story) => ({
-      ...story,
-      articles: story.articles.filter(
+    .map((story) => {
+      const articles = story.articles.filter(
         (article) =>
+          articleMatchesTopicAndLanguage(article, query) &&
           perspectiveMatches(article, query.sourcePerspective, query.countries) &&
           (selectedSources.size === 0 || selectedSources.has(article.source.name)),
-      ),
-    }))
+      );
+      return {
+        ...story,
+        topics: visibleStoryTopics(story, articles, query.topic),
+        articles,
+      };
+    })
     .filter((story) => story.articles.length > 0);
 
   const ranked = rankStories(matching, query, now);
