@@ -1,7 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 
 const STORY_STEPS = [
@@ -116,12 +116,12 @@ export function LandingPage() {
           </div>
 
           <figure className="landing-globe">
-            <Image
+            <img
               src="/og.png"
               alt="A world globe with a route connecting news locations across borders"
-              fill
-              priority
-              sizes="(max-width: 1060px) 74vw, 42vw"
+              width="1536"
+              height="1024"
+              fetchPriority="high"
             />
             <figcaption>
               <span>Live world view</span>
