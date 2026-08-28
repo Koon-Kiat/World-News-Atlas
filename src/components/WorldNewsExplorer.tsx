@@ -2,7 +2,7 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ExploreNavigation } from "@/components/ExploreNavigation";
+import { ExploreNavigation, HeaderTools } from "@/components/ExploreNavigation";
 import { NewsFilters } from "@/components/filters/NewsFilters";
 import { PerspectiveFilter } from "@/components/filters/PerspectiveFilter";
 import { CountryPicker } from "@/components/map/CountryPicker";
@@ -289,9 +289,7 @@ export function WorldNewsExplorer({
           <label className="sr-only" htmlFor="news-search">Search news</label>
           <input id="news-search" type="search" value={search} maxLength={120} placeholder="Search topics, people, places…" onChange={(event) => setSearch(event.target.value)} />
         </form>
-        <div className="header-actions">
-          <a className="latest-link" href="#stories">Latest <span aria-hidden="true">↓</span></a>
-        </div>
+        <HeaderTools active={mode} />
       </header>
 
       <main>
@@ -300,68 +298,70 @@ export function WorldNewsExplorer({
             {mode === "country" ? "Explore news by country" : "Compare news between two countries"}
           </h1>
 
-          <div className="quick-jump-panel" aria-label="Popular country shortcuts">
-            <div>
-              <p className="quick-label">Quick jump</p>
-              <strong>Choose a major country instantly</strong>
-            </div>
-            <div className="quick-countries">
-              {QUICK_COUNTRIES.map((code) => (
-                <button type="button" key={code} aria-pressed={selectedCountries.includes(code)} onClick={() => selectCountry(code)}>
-                  <span aria-hidden="true">{flag(code)}</span>
-                  <span><strong>{getCountryName(code)}</strong><small>{code}</small></span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="map-layout">
-            <WorldMap
-              selectedCountries={selectedCountries}
-              selectionLimit={selectionLimit}
-              onSelectionChange={changeCountries}
-            />
-            <aside className="map-guide">
+          <div className="map-experience-frame">
+            <div className="quick-jump-panel" aria-label="Popular country shortcuts">
               <div>
-                <p className="eyebrow">Your lens</p>
-                <h2>{selectedCountries.length === 0 ? (mode === "country" ? "Choose your country." : "Build a comparison.") : selectionLimit === 1 ? "Country selected." : selectedCountries.length === 1 ? "Add the second country." : "Connection found."}</h2>
-                <p>
-                  {selectedCountries.length === 0
-                    ? `Choose ${selectionLimit === 1 ? "one country" : "up to two countries"} on the map or search by name below.`
-                    : selectionLimit === 1
-                      ? "Your briefing now focuses on stories involving this country. Choose another country to switch the lens."
-                      : selectedCountries.length === 1
-                      ? "Choose one more country to surface diplomacy, trade, technology, travel and other shared stories."
-                      : "Every result contains a direct reporting signal for both selected countries."}
-                </p>
+                <p className="quick-label">Quick jump</p>
+                <strong>Choose a major country instantly</strong>
               </div>
-              <CountryPicker selectedCountries={selectedCountries} onSelect={selectCountry} />
-              <div className="selection-slots" aria-label="Selected countries">
-                {Array.from({ length: selectionLimit }, (_, index) => {
-                  const code = selectedCountries[index];
-                  return (
-                    <div key={index} className={code ? "selection-slot filled" : "selection-slot"}>
-                      <span>{code ? flag(code) : index + 1}</span>
-                      <div>
-                        <strong>{code ? getCountryName(code) : index === 0 ? "First country" : "Add another"}</strong>
-                        <small>{code ? (index === 0 ? "Primary lens" : "Shared lens") : "Not selected"}</small>
-                      </div>
-                      {code && <button type="button" onClick={() => changeCountries(selectedCountries.filter((item) => item !== code))} aria-label={`Remove ${getCountryName(code)}`}>×</button>}
-                    </div>
-                  );
-                })}
+              <div className="quick-countries">
+                {QUICK_COUNTRIES.map((code) => (
+                  <button type="button" key={code} aria-pressed={selectedCountries.includes(code)} onClick={() => selectCountry(code)}>
+                    <span aria-hidden="true">{flag(code)}</span>
+                    <span><strong>{getCountryName(code)}</strong><small>{code}</small></span>
+                  </button>
+                ))}
               </div>
-            </aside>
-          </div>
-
-          <div className="selection-toolbar">
-            <div className="selection-title">
-              <span className="pulse-dot" />
-              <strong>{selectedCountries.length === 0 ? "Global view" : selectedCountries.map(getCountryName).join(" ↔ ")}</strong>
-              <span>{selectedCountries.length}/{selectionLimit} selected</span>
             </div>
-            <PerspectiveFilter countries={selectedCountries} value={perspective} onChange={setPerspective} />
-            {selectedCountries.length > 0 && <button type="button" className="clear-button" onClick={() => changeCountries([])}>Clear selection</button>}
+
+            <div className="map-layout">
+              <WorldMap
+                selectedCountries={selectedCountries}
+                selectionLimit={selectionLimit}
+                onSelectionChange={changeCountries}
+              />
+              <aside className="map-guide">
+                <div className="map-guide-intro">
+                  <p className="eyebrow">Your lens</p>
+                  <h2>{selectedCountries.length === 0 ? (mode === "country" ? "Choose your country." : "Build a comparison.") : selectionLimit === 1 ? "Country selected." : selectedCountries.length === 1 ? "Add the second country." : "Connection found."}</h2>
+                  <p>
+                    {selectedCountries.length === 0
+                      ? `Choose ${selectionLimit === 1 ? "one country" : "up to two countries"} on the map or search by name below.`
+                      : selectionLimit === 1
+                        ? "Your briefing now focuses on stories involving this country. Choose another country to switch the lens."
+                        : selectedCountries.length === 1
+                        ? "Choose one more country to surface diplomacy, trade, technology, travel and other shared stories."
+                        : "Every result contains a direct reporting signal for both selected countries."}
+                  </p>
+                </div>
+                <CountryPicker selectedCountries={selectedCountries} onSelect={selectCountry} />
+                <div className="selection-slots" aria-label="Selected countries">
+                  {Array.from({ length: selectionLimit }, (_, index) => {
+                    const code = selectedCountries[index];
+                    return (
+                      <div key={index} className={code ? "selection-slot filled" : "selection-slot"}>
+                        <span>{code ? flag(code) : index + 1}</span>
+                        <div>
+                          <strong>{code ? getCountryName(code) : index === 0 ? "First country" : "Add another"}</strong>
+                          <small>{code ? (index === 0 ? "Primary lens" : "Shared lens") : "Not selected"}</small>
+                        </div>
+                        {code && <button type="button" onClick={() => changeCountries(selectedCountries.filter((item) => item !== code))} aria-label={`Remove ${getCountryName(code)}`}>×</button>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </aside>
+            </div>
+
+            <div className="selection-toolbar">
+              <div className="selection-title">
+                <span className="pulse-dot" />
+                <strong>{selectedCountries.length === 0 ? "Global view" : selectedCountries.map(getCountryName).join(" ↔ ")}</strong>
+                <span>{selectedCountries.length}/{selectionLimit} selected</span>
+              </div>
+              <PerspectiveFilter countries={selectedCountries} value={perspective} onChange={setPerspective} />
+              {selectedCountries.length > 0 && <button type="button" className="clear-button" onClick={() => changeCountries([])}>Clear selection</button>}
+            </div>
           </div>
         </section>
 

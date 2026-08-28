@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ExploreNavigation } from "@/components/ExploreNavigation";
+import { ExploreNavigation, HeaderTools } from "@/components/ExploreNavigation";
 
 beforeEach(() => {
   vi.stubGlobal("matchMedia", vi.fn(() => ({
@@ -22,7 +22,7 @@ afterEach(() => {
 
 describe("explore navigation", () => {
   it("keeps both reading modes, settings, and appearance controls together", () => {
-    render(<ExploreNavigation active="country" />);
+    render(<><ExploreNavigation active="country" /><HeaderTools active="country" /></>);
 
     expect(screen.getByRole("link", { name: /One country/i })).toHaveAttribute("href", "/country#top");
     expect(screen.getByRole("link", { name: /Compare two/i })).toHaveAttribute("href", "/compare#top");
