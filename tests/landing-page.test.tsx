@@ -37,15 +37,12 @@ afterEach(() => {
 });
 
 describe("landing page", () => {
-  it("presents the two core journeys in the full-width navigation and page content", () => {
-    const { container } = render(<LandingPage />);
+  it("keeps the landing page focused while presenting both core journeys", () => {
+    render(<LandingPage />);
 
-    const navigation = screen.getByRole("navigation", { name: "World News Atlas sections" });
-    const utilityHeader = container.querySelector(".landing-utility-header");
-    expect(navigation.compareDocumentPosition(utilityHeader as Node) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole("navigation", { name: "World News Atlas sections" })).not.toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /One country/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: /Compare two/i }).length).toBeGreaterThan(0);
-    expect(screen.getByRole("link", { name: "Open settings" })).toBeInTheDocument();
   });
 
   it("contains all four scroll-story chapters and both destination calls to action", () => {
@@ -60,11 +57,9 @@ describe("landing page", () => {
     expect(screen.getByRole("link", { name: /Build a comparison/i })).toHaveAttribute("href", "/compare#top");
   });
 
-  it("uses icon controls with accessible theme labels", () => {
+  it("uses the branded world globe as the hero visual", () => {
     render(<LandingPage />);
 
-    expect(screen.getByRole("button", { name: "System" })).toHaveTextContent("◐");
-    expect(screen.getByRole("button", { name: "Light" })).toHaveTextContent("☀");
-    expect(screen.getByRole("button", { name: "Dark" })).toHaveTextContent("☾");
+    expect(screen.getByRole("img", { name: /world globe with a route/i }).getAttribute("src")).toContain("og.png");
   });
 });
