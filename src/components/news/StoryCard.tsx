@@ -1,12 +1,13 @@
 /* eslint-disable @next/next/no-img-element */
+"use client";
+
+import { useCallback, useState } from "react";
+import { CountryFlag } from "@/components/CountryFlag";
 import { getCountryName } from "@/lib/news/countries/metadata";
 import { approvedArticleUrl, approvedImageUrl } from "@/lib/news/image-policy";
 import type { ArticleView, StoryView } from "@/lib/news/types";
 import { isSafeHttpUrl } from "@/lib/news/url";
-
-function flag(code: string): string {
-  return String.fromCodePoint(...code.split("").map((character) => 127397 + character.charCodeAt(0)));
-}
+import { StoryReader } from "./StoryReader";
 
 function displayImageUrl(
   imageUrl: string | null | undefined,
@@ -44,26 +45,24 @@ function ArticleLink({ article }: { article: ArticleView }) {
 }
 
 export function StoryCard({ story, featured = false }: { story: StoryView; featured?: boolean }) {
+  const [readerOpen, setReaderOpen] = useState(false);
+  const closeReader = useCallback(() => setReaderOpen(false), []);
   const lead = story.articles[0];
   const imageArticle = story.articles.find((article) => isSafeHttpUrl(article.imageUrl));
   const primaryTopic = story.topics[0] ?? "world";
   const safeImage = displayImageUrl(imageArticle?.imageUrl, lead?.url, primaryTopic);
   const fallbackSource = imageArticle?.source.name ?? lead?.source.name ?? "World News Atlas";
   const sourceNames = [...new Set(story.articles.map((article) => article.source.name))];
-  const cardUrl = lead && !lead.isFixture && isSafeHttpUrl(lead.url) ? lead.url : null;
 
   return (
-    <article className={featured ? "story-card is-featured has-media" : "story-card has-media"}>
-      {cardUrl && (
-        <a
-          className="story-card-link"
-          href={cardUrl}
-          target="_blank"
-          rel="noopener noreferrer nofollow"
-          referrerPolicy="strict-origin-when-cross-origin"
-          aria-label={`Read ${story.title} at ${lead.source.name}`}
-        />
-      )}
+    <>
+      <article className={featured ? "story-card is-featured has-media" : "story-card has-media"}>
+      <button
+        className="story-card-link"
+        type="button"
+        onClick={() => setReaderOpen(true)}
+        aria-label={`Read ${story.title} in Worldline Reader`}
+      />
       <div className={safeImage ? "story-image-wrap" : "story-image-wrap is-placeholder"}>
         <div className="story-image-fallback" aria-hidden="true">
           <svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="29"/><ellipse cx="40" cy="40" rx="13" ry="29"/><path d="M12 40h56M18 27h44M18 53h44"/><circle className="story-image-fallback-dot" cx="60" cy="20" r="5"/></svg>
@@ -99,17 +98,23 @@ export function StoryCard({ story, featured = false }: { story: StoryView; featu
         <div className="story-tags">
           {story.countries.map((country) => (
             <span key={country.code} className="country-tag">
-              <span aria-hidden="true">{flag(country.code)}</span>
+              <CountryFlag code={country.code} />
               {getCountryName(country.code)}
             </span>
           ))}
+          {story.countries.length === 0 && (
+            <span className="country-tag is-global"><span aria-hidden="true">🌐</span>Global</span>
+          )}
         </div>
         <div className="coverage-row">
           <div>
             <p className="coverage-sources">{sourceNames.slice(0, 3).join(" · ")}</p>
             <p className="coverage-count">Covered by {story.articles.length} {story.articles.length === 1 ? "source" : "sources"}</p>
           </div>
-          {lead && <ArticleLink article={lead} />}
+          <div className="story-actions">
+            <button type="button" className="reader-link" onClick={() => setReaderOpen(true)}>Reader</button>
+            {lead && <ArticleLink article={lead} />}
+          </div>
         </div>
         {story.articles.length > 1 && (
           <details className="coverage-details">
@@ -128,6 +133,8 @@ export function StoryCard({ story, featured = false }: { story: StoryView; featu
           </details>
         )}
       </div>
-    </article>
+      </article>
+      {readerOpen && <StoryReader story={story} imageUrl={safeImage} onClose={closeReader} />}
+    </>
   );
 }

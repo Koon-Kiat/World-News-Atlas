@@ -21,6 +21,18 @@ function cleanProviderText(value: string): string {
     .trim();
 }
 
+function articleUrlLocationText(value: string): string {
+  try {
+    const url = new URL(value);
+    return decodeURIComponent(`${url.pathname} ${url.search}`)
+      .replace(/[-_+/=&?]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  } catch {
+    return "";
+  }
+}
+
 export function normalizeProviderArticle(article: ProviderArticle): NormalizedArticle {
   const title = cleanProviderText(article.title);
   if (!title) throw new Error("Provider article has no title");
@@ -40,12 +52,18 @@ export function normalizeProviderArticle(article: ProviderArticle): NormalizedAr
     language,
   });
   const description = article.description ? cleanProviderText(article.description) || null : null;
-  const countries = detectCountries(title, description);
+  const countries = detectCountries(title, description, articleUrlLocationText(article.url));
   for (const rawCode of article.coverageCountries ?? []) {
     const code = normalizeCountryCode(rawCode);
-    if (!code || countries.some((country) => country.code === code)) continue;
-    countries.push({ code, name: getCountryName(code), relevanceScore: 0.9 });
+    if (!code) continue;
+    const existing = countries.find((country) => country.code === code);
+    if (existing) {
+      existing.relevanceScore = Math.max(existing.relevanceScore, 0.9);
+    } else {
+      countries.push({ code, name: getCountryName(code), relevanceScore: 0.9 });
+    }
   }
+  countries.sort((first, second) => second.relevanceScore - first.relevanceScore);
   const topics = detectTopics(title, description);
 
   return {

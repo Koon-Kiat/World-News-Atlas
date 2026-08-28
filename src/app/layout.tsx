@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { THEME_BOOTSTRAP_SCRIPT } from "@/lib/theme";
+import "flag-icons/css/flag-icons.min.css";
 import "./globals.css";
 
 export const metadata: Metadata = {

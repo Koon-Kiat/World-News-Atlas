@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { detectCountries } from "@/lib/news/countries/detectCountries";
-import { countryNameToCode, listCountries } from "@/lib/news/countries/metadata";
+import { countryNameToCode, getCountryFlag, listCountries } from "@/lib/news/countries/metadata";
 import { COUNTRY_SIGNALS } from "@/lib/news/countries/aliases";
 import { normalizeProviderArticle } from "@/lib/news/normalize";
 
@@ -46,6 +46,25 @@ describe("country detection", () => {
     expect(detectCountries("Namibia hosts Timor-Leste delegation").map(({ code }) => code)).toEqual(
       expect.arrayContaining(["NA", "TL"]),
     );
+  });
+
+  it("uses article URL slugs as a supplemental geography signal", () => {
+    const article = normalizeProviderArticle({
+      provider: "RSS",
+      providerArticleId: "url-signal",
+      title: "New housing rules take effect next month",
+      description: "The measures apply nationwide.",
+      url: "https://example.com/asia/singapore/new-housing-rules",
+      publishedAt: new Date().toISOString(),
+      sourceName: "Example News",
+    });
+
+    expect(article.countries.map(({ code }) => code)).toContain("SG");
+  });
+
+  it("renders ISO country flags and a global fallback", () => {
+    expect(getCountryFlag("SG")).toBe("🇸🇬");
+    expect(getCountryFlag("invalid")).toBe("🌐");
   });
 });
 
