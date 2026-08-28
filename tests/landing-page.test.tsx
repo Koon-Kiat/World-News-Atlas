@@ -47,7 +47,7 @@ describe("landing page", () => {
   it("contains all four scroll-story chapters and both destination calls to action", () => {
     render(<LandingPage />);
 
-    expect(screen.getByRole("heading", { name: "Scroll through the anatomy of a story." })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Watch one signal become a world story." })).toBeInTheDocument();
     expect(screen.getByText("A headline starts somewhere.")).toBeInTheDocument();
     expect(screen.getByText("One place brings the story into focus.")).toBeInTheDocument();
     expect(screen.getByText("A second place reveals the relationship.")).toBeInTheDocument();

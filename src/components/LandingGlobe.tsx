@@ -119,29 +119,29 @@ export function LandingGlobe({ compact = false, activeStep }: { compact?: boolea
         .rotate(rotationRef.current);
       const path = geoPath(projection, context);
       const ocean = context.createRadialGradient(size * 0.36, size * 0.3, size * 0.03, size / 2, size / 2, size * 0.48);
-      ocean.addColorStop(0, "#1f5961");
-      ocean.addColorStop(0.58, "#0f3a42");
-      ocean.addColorStop(1, "#061e24");
+      ocean.addColorStop(0, "#242427");
+      ocean.addColorStop(0.58, "#111114");
+      ocean.addColorStop(1, "#030304");
 
       context.beginPath();
       context.arc(size / 2, size / 2, size * 0.435, 0, Math.PI * 2);
       context.fillStyle = ocean;
       context.fill();
-      context.strokeStyle = "rgba(218,239,233,.32)";
+      context.strokeStyle = "rgba(245,245,247,.26)";
       context.lineWidth = 1.2;
       context.stroke();
 
       context.beginPath();
       path(geoGraticule10());
-      context.strokeStyle = "rgba(218,239,233,.10)";
+      context.strokeStyle = "rgba(245,245,247,.1)";
       context.lineWidth = 0.75;
       context.stroke();
 
       context.beginPath();
       path(world);
-      context.fillStyle = "rgba(179,211,202,.72)";
+      context.fillStyle = "rgba(205,205,211,.74)";
       context.fill();
-      context.strokeStyle = "rgba(5,35,41,.72)";
+      context.strokeStyle = "rgba(0,0,0,.78)";
       context.lineWidth = 0.7;
       context.stroke();
 
@@ -157,9 +157,9 @@ export function LandingGlobe({ compact = false, activeStep }: { compact?: boolea
         const coordinates = Array.from({ length: 56 }, (_, index) => interpolate((index / 55) * Math.min(1, pulse * 1.35)));
         context.beginPath();
         path({ type: "LineString", coordinates });
-        context.strokeStyle = "rgba(245,111,82,.95)";
+        context.strokeStyle = "rgba(74,168,255,.98)";
         context.lineWidth = 2.3;
-        context.shadowColor = "rgba(245,111,82,.45)";
+        context.shadowColor = "rgba(74,168,255,.5)";
         context.shadowBlur = 10;
         context.stroke();
         context.shadowBlur = 0;
@@ -170,11 +170,11 @@ export function LandingGlobe({ compact = false, activeStep }: { compact?: boolea
           if (!point) continue;
           context.beginPath();
           context.arc(point[0], point[1], 10 + Math.sin(time / 260) * 1.5, 0, Math.PI * 2);
-          context.fillStyle = "rgba(245,111,82,.2)";
+          context.fillStyle = "rgba(74,168,255,.2)";
           context.fill();
           context.beginPath();
           context.arc(point[0], point[1], 5.5, 0, Math.PI * 2);
-          context.fillStyle = "#f56f52";
+          context.fillStyle = "#4aa8ff";
           context.fill();
           context.strokeStyle = "#fff7ef";
           context.lineWidth = 2;

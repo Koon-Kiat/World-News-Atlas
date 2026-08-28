@@ -37,12 +37,11 @@ afterEach(() => {
 });
 
 describe("theme preference", () => {
-  it("defaults to the current system theme", () => {
-    prefersDark = true;
+  it("defaults to the cinematic dark theme", () => {
     render(<ThemeControl />);
 
-    expect(screen.getByRole("button", { name: "System" })).toHaveAttribute("aria-pressed", "true");
-    expect(document.documentElement.dataset.themePreference).toBe("system");
+    expect(screen.getByRole("button", { name: "Dark" })).toHaveAttribute("aria-pressed", "true");
+    expect(document.documentElement.dataset.themePreference).toBe("dark");
     expect(document.documentElement.dataset.theme).toBe("dark");
   });
 
@@ -66,6 +65,7 @@ describe("theme preference", () => {
 
   it("tracks system changes while system mode is selected", () => {
     render(<ThemeControl />);
+    fireEvent.click(screen.getByRole("button", { name: "System" }));
     expect(document.documentElement.dataset.theme).toBe("light");
 
     prefersDark = true;

@@ -11,7 +11,7 @@ export const THEME_OPTIONS: ReadonlyArray<{
 }> = [
   { value: "system", label: "System", description: "Follow this device's appearance setting." },
   { value: "light", label: "Light", description: "Use the warm editorial paper palette." },
-  { value: "dark", label: "Dark", description: "Use a low-glare evening briefing palette." },
+  { value: "dark", label: "Dark", description: "Use the cinematic black briefing palette." },
 ];
 
 export function isThemePreference(value: string | null): value is ThemePreference {
@@ -24,7 +24,7 @@ export function resolveTheme(preference: ThemePreference, systemPrefersDark: boo
 
 export const THEME_BOOTSTRAP_SCRIPT = `(() => {
   const key = ${JSON.stringify(THEME_STORAGE_KEY)};
-  let preference = "system";
+  let preference = "dark";
   try {
     const stored = window.localStorage.getItem(key);
     if (stored === "light" || stored === "dark" || stored === "system") preference = stored;
