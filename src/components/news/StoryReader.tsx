@@ -1,7 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { CountryFlag } from "@/components/CountryFlag";
 import { getCountryName } from "@/lib/news/countries/metadata";
@@ -43,10 +43,36 @@ export function StoryReader({
   onClose: () => void;
 }) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const readerMountedRef = useRef(false);
+  const closeFallbackRef = useRef<number | null>(null);
+  const returnScrollRef = useRef(0);
+  const historyKeyRef = useRef(`reader-${story.id}`);
   const lead = story.articles[0];
   const sourceNames = [...new Set(story.articles.map((article) => article.source.name))];
 
+  const restoreArticlePosition = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => window.scrollTo(0, returnScrollRef.current));
+    });
+  }, []);
+
+  const requestClose = useCallback(() => {
+    if (window.history.state?.worldlineReader === historyKeyRef.current) {
+      window.history.back();
+      closeFallbackRef.current = window.setTimeout(() => {
+        if (!readerMountedRef.current) return;
+        onClose();
+        restoreArticlePosition();
+      }, 150);
+      return;
+    }
+    onClose();
+    restoreArticlePosition();
+  }, [onClose, restoreArticlePosition]);
+
   useEffect(() => {
+    readerMountedRef.current = true;
+    returnScrollRef.current = window.scrollY;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
     const siteFrame = document.querySelector<HTMLElement>(".site-frame");
@@ -54,19 +80,36 @@ export function StoryReader({
     document.body.style.overflow = "hidden";
     if (siteFrame) siteFrame.inert = true;
     closeButtonRef.current?.focus();
+    if (window.history.state?.worldlineReader !== historyKeyRef.current) {
+      window.history.pushState(
+        { ...(window.history.state ?? {}), worldlineReader: historyKeyRef.current },
+        "",
+        `${window.location.pathname}${window.location.search}#reader-${encodeURIComponent(story.id)}`,
+      );
+    }
 
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") requestClose();
+    }
+
+    function closeOnHistoryBack() {
+      if (closeFallbackRef.current !== null) window.clearTimeout(closeFallbackRef.current);
+      onClose();
+      restoreArticlePosition();
     }
 
     window.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("popstate", closeOnHistoryBack);
     return () => {
+      readerMountedRef.current = false;
+      if (closeFallbackRef.current !== null) window.clearTimeout(closeFallbackRef.current);
       window.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("popstate", closeOnHistoryBack);
       document.body.style.overflow = previousOverflow;
       if (siteFrame) siteFrame.inert = wasInert;
       previousFocus?.focus();
     };
-  }, [onClose]);
+  }, [onClose, requestClose, restoreArticlePosition, story.id]);
 
   if (typeof document === "undefined") return null;
 
@@ -74,7 +117,7 @@ export function StoryReader({
     <div
       className="reader-backdrop"
       onMouseDown={(event) => {
-        if (event.currentTarget === event.target) onClose();
+        if (event.currentTarget === event.target) requestClose();
       }}
     >
       <section className="story-reader" role="dialog" aria-modal="true" aria-labelledby={`reader-title-${story.id}`}>
@@ -87,7 +130,7 @@ export function StoryReader({
             <span aria-hidden="true">Aa</span>
             Reader view
           </div>
-          <button ref={closeButtonRef} type="button" className="reader-close" onClick={onClose} aria-label="Close reader">
+          <button ref={closeButtonRef} type="button" className="reader-close" onClick={requestClose} aria-label="Close reader">
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
           </button>
         </header>

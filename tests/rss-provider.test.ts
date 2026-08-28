@@ -47,6 +47,22 @@ describe("RSS provider", () => {
     expect(result.articles[0].imageUrl).toBe("https://i.guim.co.uk/example-700.jpg");
   });
 
+  it("retains full article text when a publisher includes it in content:encoded", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          `<?xml version="1.0"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>World</title><item><title>Full feed report</title><link>https://www.bbc.com/news/articles/full-feed</link><guid>full-feed</guid><pubDate>Tue, 25 Aug 2026 12:00:00 GMT</pubDate><description>Short summary.</description><content:encoded><![CDATA[<p>First full paragraph.</p><p>Second full paragraph.</p>]]></content:encoded></item></channel></rss>`,
+          { status: 200, headers: { "Content-Type": "application/rss+xml" } },
+        ),
+      ),
+    );
+
+    const result = await new RssProvider([DEFAULT_RSS_FEEDS[0]]).fetchLatest();
+    expect(result.articles[0].description).toContain("First full paragraph");
+    expect(result.articles[0].description).toContain("Second full paragraph");
+  });
+
   it("matches every quoted country term for bilateral searches", async () => {
     vi.stubGlobal(
       "fetch",

@@ -1,9 +1,16 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StoryCard } from "@/components/news/StoryCard";
 import type { StoryView } from "@/lib/news/types";
 
-afterEach(cleanup);
+beforeEach(() => {
+  vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+});
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 const story: StoryView = {
   id: "reader-story",
@@ -42,7 +49,7 @@ const story: StoryView = {
 };
 
 describe("Worldline Reader", () => {
-  it("opens from the entire story card and offers an explicit publisher choice", () => {
+  it("opens from the entire story card and offers an explicit publisher choice", async () => {
     render(<StoryCard story={story} />);
 
     expect(screen.getByText("Global")).toBeInTheDocument();
@@ -53,6 +60,7 @@ describe("Worldline Reader", () => {
     expect(screen.getByRole("link", { name: /Open Example News/i })).toHaveAttribute("href", "https://example.com/story");
 
     fireEvent.click(screen.getByRole("button", { name: "Close reader" }));
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(window.scrollTo).toHaveBeenCalled());
   });
 });
