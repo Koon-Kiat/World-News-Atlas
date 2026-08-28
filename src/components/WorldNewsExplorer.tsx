@@ -16,7 +16,7 @@ import { mergeNextPage, nextPageNumber, responseHasNextPage } from "@/lib/news/p
 import { useNewsPeriodPreference } from "@/hooks/useNewsPeriodPreference";
 import type { NewsPeriod, NewsResponse, NewsSort, SourcePerspective, StoryView } from "@/lib/news/types";
 
-const QUICK_COUNTRIES = ["US", "CN", "IN", "JP", "DE", "GB", "FR", "BR", "CA", "AU", "KR", "ID", "MX", "ZA", "SG"];
+const QUICK_COUNTRIES = ["US", "CN", "JP", "GB", "FR", "DE", "SG"];
 const INITIAL_STORY_COUNT = 12;
 const STORY_BATCH_SIZE = 12;
 

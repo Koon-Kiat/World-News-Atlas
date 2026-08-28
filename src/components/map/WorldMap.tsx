@@ -5,7 +5,7 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import { geoNaturalEarth1, geoPath } from "d3-geo";
 import type { Feature, Geometry, GeoJsonProperties } from "geojson";
 import { feature } from "topojson-client";
-import countriesTopology from "world-atlas/countries-110m.json";
+import countriesTopology from "world-atlas/countries-50m.json";
 import {
   getCountryName,
   numericCountryIdToCode,
@@ -51,8 +51,6 @@ export function WorldMap({
 }: WorldMapProps) {
   const [hoveredCountry, setHoveredCountry] = useState<Pick<MapCountry, "code" | "name"> | null>(null);
   const [view, setView] = useState<MapView>({ scale: 1, x: 0, y: 0 });
-  const [activeTopology, setActiveTopology] = useState(countriesTopology);
-  const highResolutionRequestedRef = useRef(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<{
     pointerId: number;
@@ -64,13 +62,13 @@ export function WorldMap({
   } | null>(null);
   const suppressClickRef = useRef(false);
   const countries = useMemo(() => {
-    const collection = feature(activeTopology, activeTopology.objects.countries);
+    const collection = feature(countriesTopology, countriesTopology.objects.countries);
     return collection.features.flatMap<MapCountry>((country) => {
       const code = numericCountryIdToCode(country.id ?? "");
       if (!code) return [];
       return [{ code, name: getCountryName(code), feature: country }];
     });
-  }, [activeTopology]);
+  }, []);
   const path = useMemo(() => {
     const projection = geoNaturalEarth1().fitExtent(
       [[18, 18], [WIDTH - 18, HEIGHT - 18]],
@@ -102,16 +100,6 @@ export function WorldMap({
     mapElement.addEventListener("wheel", handleWheel, { passive: false });
     return () => mapElement.removeEventListener("wheel", handleWheel);
   }, []);
-
-  useEffect(() => {
-    if (view.scale <= 1 || highResolutionRequestedRef.current) return;
-    highResolutionRequestedRef.current = true;
-    import("world-atlas/countries-50m.json")
-      .then(({ default: highResolutionTopology }) => setActiveTopology(highResolutionTopology))
-      .catch(() => {
-        highResolutionRequestedRef.current = false;
-      });
-  }, [view.scale]);
 
   function select(code: string) {
     if (suppressClickRef.current) {

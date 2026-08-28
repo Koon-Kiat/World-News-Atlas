@@ -161,7 +161,7 @@ export class RssProvider implements NewsProvider {
             provider: this.name,
             providerArticleId: item.guid ?? item.id ?? item.link ?? `${feed.feedUrl}#${index}`,
             title: item.title ?? "Untitled RSS item",
-            description: item.contentSnippet ?? item.summary ?? null,
+            description: item.contentEncoded ?? item.contentSnippet ?? item.summary ?? item.content ?? null,
             url: item.link ?? feed.websiteUrl,
             imageUrl: feedImage(item),
             publishedAt,
