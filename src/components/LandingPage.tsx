@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { ExploreNavigation } from "@/components/ExploreNavigation";
 
 const STORY_STEPS = [
   {
@@ -89,8 +89,6 @@ export function LandingPage() {
 
   return (
     <div ref={pageRef} className="site-frame landing-page" id="top">
-      <ExploreNavigation active="home" />
-
       <header className="site-header landing-utility-header">
         <Link className="brand" href="/" aria-label="World News Atlas home">
           <span className="brand-mark" aria-hidden="true"><span /></span>
@@ -117,18 +115,19 @@ export function LandingPage() {
             </div>
           </div>
 
-          <div className="landing-orbit" aria-hidden="true">
-            <span className="orbit-ring orbit-ring-one" />
-            <span className="orbit-ring orbit-ring-two" />
-            <span className="orbit-globe">
-              <i className="orbit-meridian" />
-              <i className="orbit-latitude" />
-              <b className="orbit-point orbit-point-one" />
-              <b className="orbit-point orbit-point-two" />
-            </span>
-            <span className="orbit-label orbit-label-one">TOKYO · 35.7° N</span>
-            <span className="orbit-label orbit-label-two">SINGAPORE · 1.3° N</span>
-          </div>
+          <figure className="landing-globe">
+            <Image
+              src="/og.png"
+              alt="A world globe with a route connecting news locations across borders"
+              fill
+              priority
+              sizes="(max-width: 1060px) 74vw, 42vw"
+            />
+            <figcaption>
+              <span>Live world view</span>
+              <strong>Follow the story across borders.</strong>
+            </figcaption>
+          </figure>
 
           <a className="scroll-cue" href="#story">
             <span>Scroll to trace the signal</span>
@@ -178,6 +177,14 @@ export function LandingPage() {
                   </article>
                 ))}
               </div>
+              <ol className="story-step-index" aria-label="Story journey progress">
+                {STORY_STEPS.map((step, index) => (
+                  <li key={step.number} className={activeStep === index ? "active" : ""}>
+                    <span>{step.number}</span>
+                    {step.eyebrow}
+                  </li>
+                ))}
+              </ol>
             </div>
           </div>
         </section>
@@ -194,9 +201,23 @@ export function LandingPage() {
             </p>
           </div>
           <div className="depth-card depth-card-local" data-reveal>
+            <div className="depth-card-visual depth-local-visual" aria-hidden="true">
+              <span className="depth-city">TOKYO</span>
+              <article><i>01</i><strong>Policy announced</strong><small>Tokyo desk · 08:40</small></article>
+              <article><i>02</i><strong>Local impact explained</strong><small>Osaka bureau · 09:15</small></article>
+              <span className="depth-route" />
+            </div>
             <span>LOCAL</span><strong>What it means here</strong><small>Country-based publishers</small>
           </div>
           <div className="depth-card depth-card-global" data-reveal>
+            <div className="depth-card-visual depth-global-visual" aria-hidden="true">
+              <span className="depth-node node-jp">JP</span>
+              <span className="depth-node node-sg">SG</span>
+              <span className="depth-node node-us">US</span>
+              <span className="depth-connection connection-one" />
+              <span className="depth-connection connection-two" />
+              <p><b>6</b> independent perspectives</p>
+            </div>
             <span>GLOBAL</span><strong>How the world reads it</strong><small>International perspective</small>
           </div>
         </section>

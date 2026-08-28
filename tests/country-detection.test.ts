@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { detectCountries } from "@/lib/news/countries/detectCountries";
-import { countryNameToCode } from "@/lib/news/countries/metadata";
+import { countryNameToCode, listCountries } from "@/lib/news/countries/metadata";
+import { COUNTRY_SIGNALS } from "@/lib/news/countries/aliases";
 import { normalizeProviderArticle } from "@/lib/news/normalize";
 
 describe("country detection", () => {
@@ -32,6 +33,19 @@ describe("country detection", () => {
   it("normalizes provider source-country names and codes", () => {
     expect(countryNameToCode("United States of America")).toBe("US");
     expect(countryNameToCode("sg")).toBe("SG");
+  });
+
+  it("can tag every selectable ISO country by its official name", () => {
+    const selectableCodes = listCountries().map(({ code }) => code);
+    const taggableCodes = new Set(COUNTRY_SIGNALS.map(({ code }) => code));
+
+    expect(selectableCodes.every((code) => taggableCodes.has(code))).toBe(true);
+    expect(detectCountries("Bhutan and Uruguay expand cultural ties").map(({ code }) => code)).toEqual(
+      expect.arrayContaining(["BT", "UY"]),
+    );
+    expect(detectCountries("Namibia hosts Timor-Leste delegation").map(({ code }) => code)).toEqual(
+      expect.arrayContaining(["NA", "TL"]),
+    );
   });
 });
 

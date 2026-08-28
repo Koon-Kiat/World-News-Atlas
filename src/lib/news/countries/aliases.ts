@@ -1,3 +1,5 @@
+import { getCountryNameVariants, listCountries } from "./metadata";
+
 export interface CountrySignals {
   code: string;
   names: string[];
@@ -6,7 +8,7 @@ export interface CountrySignals {
   ambiguous?: boolean;
 }
 
-export const COUNTRY_SIGNALS: CountrySignals[] = [
+const CURATED_COUNTRY_SIGNALS: CountrySignals[] = [
   { code: "JP", names: ["Japan", "Japanese"], locations: ["Tokyo", "Osaka", "Kyoto"], isoCodes: ["JP", "JPN"] },
   { code: "SG", names: ["Singapore", "Singaporean", "S'pore", "S’pore"], locations: ["Singapore City"], isoCodes: ["SG", "SGP"] },
   { code: "US", names: ["United States", "United States of America", "American", "U.S."], locations: ["Washington, D.C.", "New York City"], isoCodes: ["US", "USA"] },
@@ -40,4 +42,24 @@ export const COUNTRY_SIGNALS: CountrySignals[] = [
   { code: "TR", names: ["Türkiye", "Turkish"], locations: ["Ankara", "Istanbul"], isoCodes: ["TR", "TUR"], ambiguous: true },
   { code: "GE", names: ["Georgia's government", "Georgian government", "Republic of Georgia"], locations: ["Tbilisi", "Caucasus"], isoCodes: ["GE", "GEO"], ambiguous: true },
   { code: "JO", names: ["Jordanian"], locations: ["Amman"], isoCodes: ["JO", "JOR"], ambiguous: true },
+];
+
+const curatedCodes = new Set(CURATED_COUNTRY_SIGNALS.map(({ code }) => code));
+
+/**
+ * Every ISO country is eligible for article tagging by its official English
+ * name. Frequently covered countries retain richer hand-curated demonyms,
+ * cities and safe abbreviations above.
+ */
+const GENERATED_COUNTRY_SIGNALS: CountrySignals[] = listCountries()
+  .filter(({ code }) => !curatedCodes.has(code))
+  .map(({ code, name }) => ({
+    code,
+    names: getCountryNameVariants(code).length > 0 ? getCountryNameVariants(code) : [name],
+    locations: [],
+  }));
+
+export const COUNTRY_SIGNALS: CountrySignals[] = [
+  ...CURATED_COUNTRY_SIGNALS,
+  ...GENERATED_COUNTRY_SIGNALS,
 ];

@@ -34,6 +34,12 @@ export function getCountryName(code: string): string {
   return (Array.isArray(names) ? names[0] : names) ?? normalized;
 }
 
+export function getCountryNameVariants(code: string): string[] {
+  const names = countryNames[code.toUpperCase()];
+  if (!names) return [];
+  return Array.isArray(names) ? names : [names];
+}
+
 export function listCountries(): Array<{ code: string; name: string }> {
   return codeRows
     .map(([code]) => ({ code, name: getCountryName(code) }))

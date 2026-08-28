@@ -15,7 +15,7 @@ import { mergeNextPage, nextPageNumber, responseHasNextPage } from "@/lib/news/p
 import { useNewsPeriodPreference } from "@/hooks/useNewsPeriodPreference";
 import type { NewsPeriod, NewsResponse, NewsSort, SourcePerspective, StoryView } from "@/lib/news/types";
 
-const QUICK_COUNTRIES = ["JP", "SG", "US", "CN", "IN", "GB"];
+const QUICK_COUNTRIES = ["US", "CN", "IN", "JP", "DE", "GB", "FR", "BR", "CA", "AU", "KR", "ID", "MX", "ZA", "SG"];
 const INITIAL_STORY_COUNT = 12;
 const STORY_BATCH_SIZE = 12;
 
@@ -271,13 +271,12 @@ export function WorldNewsExplorer({
 
   return (
     <div className="site-frame" id="top">
-      <ExploreNavigation active={mode} />
-
       <header className="site-header">
         <Link className="brand" href="/" aria-label="Worldline home">
           <span className="brand-mark" aria-hidden="true"><span /></span>
           <span>WORLDLINE</span>
         </Link>
+        <ExploreNavigation active={mode} />
         <form
           className="header-search"
           role="search"
@@ -297,10 +296,23 @@ export function WorldNewsExplorer({
 
       <main>
         <section className="hero-section" aria-labelledby="hero-title">
-          <div className="hero-copy">
-            <p className="eyebrow">{mode === "country" ? "Single-country briefing" : "Two-country comparison"}</p>
-            <h1 id="hero-title">See where the <em>story meets.</em></h1>
-            <p>{mode === "country" ? "Explore current reporting through one country at a time." : "Compare two countries through direct links and cross-border reporting."}</p>
+          <h1 id="hero-title" className="sr-only">
+            {mode === "country" ? "Explore news by country" : "Compare news between two countries"}
+          </h1>
+
+          <div className="quick-jump-panel" aria-label="Popular country shortcuts">
+            <div>
+              <p className="quick-label">Quick jump</p>
+              <strong>Choose a major country instantly</strong>
+            </div>
+            <div className="quick-countries">
+              {QUICK_COUNTRIES.map((code) => (
+                <button type="button" key={code} aria-pressed={selectedCountries.includes(code)} onClick={() => selectCountry(code)}>
+                  <span aria-hidden="true">{flag(code)}</span>
+                  <span><strong>{getCountryName(code)}</strong><small>{code}</small></span>
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="map-layout">
@@ -323,6 +335,7 @@ export function WorldNewsExplorer({
                       : "Every result contains a direct reporting signal for both selected countries."}
                 </p>
               </div>
+              <CountryPicker selectedCountries={selectedCountries} onSelect={selectCountry} />
               <div className="selection-slots" aria-label="Selected countries">
                 {Array.from({ length: selectionLimit }, (_, index) => {
                   const code = selectedCountries[index];
@@ -338,23 +351,7 @@ export function WorldNewsExplorer({
                   );
                 })}
               </div>
-              <CountryPicker selectedCountries={selectedCountries} onSelect={selectCountry} />
             </aside>
-          </div>
-
-          <div className="quick-jump-panel" aria-label="Popular country shortcuts">
-            <div>
-              <p className="quick-label">Quick jump</p>
-              <strong>Choose a country instantly</strong>
-            </div>
-            <div className="quick-countries">
-              {QUICK_COUNTRIES.map((code) => (
-                <button type="button" key={code} aria-pressed={selectedCountries.includes(code)} onClick={() => selectCountry(code)}>
-                  <span aria-hidden="true">{flag(code)}</span>
-                  <span><strong>{getCountryName(code)}</strong><small>{code}</small></span>
-                </button>
-              ))}
-            </div>
           </div>
 
           <div className="selection-toolbar">
