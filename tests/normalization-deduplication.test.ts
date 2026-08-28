@@ -35,6 +35,21 @@ describe("provider normalization", () => {
     expect(result.topics).toEqual(expect.arrayContaining(["technology", "business"]));
   });
 
+  it("matches topic terms as words instead of fragments inside unrelated words", () => {
+    const result = normalizeProviderArticle({
+      provider: "RSS",
+      providerArticleId: "word-boundaries",
+      title: "Officials said the report is ready",
+      description: "The latest update contains no specialist subject matter.",
+      url: "https://example.com/word-boundaries",
+      publishedAt: new Date().toISOString(),
+      sourceName: "Example News",
+    });
+
+    expect(result.topics).toEqual(["world"]);
+    expect(result.topics).not.toEqual(expect.arrayContaining(["technology", "transport", "sports"]));
+  });
+
   it("removes feed markup from provider text", () => {
     const result = normalizeProviderArticle({
       provider: "NEWSAPI",

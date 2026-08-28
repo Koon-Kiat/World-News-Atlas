@@ -61,5 +61,16 @@ describe("landing page", () => {
 
     expect(screen.getAllByLabelText(/Interactive rotating world globe/i)).toHaveLength(2);
     expect(screen.getByText(/Drag to rotate 360°/i)).toBeInTheDocument();
+    expect(screen.getByText("6 random live routes")).toBeInTheDocument();
+  });
+
+  it("previews the real country and comparison interfaces and uses an icon-only top link", () => {
+    const { container } = render(<LandingPage />);
+
+    expect(container.querySelectorAll(".depth-story-preview .story-card")).toHaveLength(2);
+    expect(screen.getByText("New port rules reshape work along the waterfront")).toBeInTheDocument();
+    expect(screen.getByText("Japan and Singapore align on a cross-border port standard")).toBeInTheDocument();
+    expect(screen.getByText(/The Japan Times · CNA · Reuters/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to top" })).not.toHaveTextContent("Back to top");
   });
 });

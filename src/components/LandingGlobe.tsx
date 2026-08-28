@@ -15,14 +15,67 @@ interface GlobeCountry {
   centroid: [number, number];
 }
 
-const CONNECTION_CODES: Array<[string, string]> = [
-  ["JP", "SG"],
-  ["US", "GB"],
-  ["BR", "ZA"],
-  ["IN", "AU"],
-  ["FR", "CA"],
-  ["KR", "DE"],
+interface LiveConnection {
+  from: string;
+  to: string;
+  duration: number;
+  delay: number;
+  color: readonly [number, number, number];
+}
+
+const ROUTE_COUNTRY_CODES = [
+  "JP", "SG", "US", "GB", "BR", "ZA", "IN", "AU", "FR", "CA", "KR", "DE",
+  "CN", "ID", "MX", "NG", "EG", "AR", "NZ", "IT", "ES", "SE",
+] as const;
+const ROUTE_COLORS = [
+  [74, 168, 255],
+  [255, 112, 79],
+  [139, 211, 255],
+  [255, 151, 126],
+  [101, 181, 255],
+  [255, 129, 99],
+] as const;
+const LIVE_ROUTE_COUNT = 6;
+const STORY_CONNECTIONS: readonly LiveConnection[] = [
+  { from: "JP", to: "SG", duration: 3800, delay: 0, color: ROUTE_COLORS[1] },
 ];
+
+function routeKey(first: string, second: string): string {
+  return [first, second].sort().join("-");
+}
+
+function createRandomConnection(usedPairs = new Set<string>()): LiveConnection {
+  let from = ROUTE_COUNTRY_CODES[Math.floor(Math.random() * ROUTE_COUNTRY_CODES.length)];
+  let to = ROUTE_COUNTRY_CODES[Math.floor(Math.random() * ROUTE_COUNTRY_CODES.length)];
+  for (let attempt = 0; attempt < 40 && (from === to || usedPairs.has(routeKey(from, to))); attempt += 1) {
+    from = ROUTE_COUNTRY_CODES[Math.floor(Math.random() * ROUTE_COUNTRY_CODES.length)];
+    to = ROUTE_COUNTRY_CODES[Math.floor(Math.random() * ROUTE_COUNTRY_CODES.length)];
+  }
+  if (from === to || usedPairs.has(routeKey(from, to))) {
+    const availablePair = ROUTE_COUNTRY_CODES.flatMap((first, firstIndex) =>
+      ROUTE_COUNTRY_CODES.slice(firstIndex + 1).map((second) => [first, second] as const),
+    ).find(([first, second]) => !usedPairs.has(routeKey(first, second)));
+    if (availablePair) [from, to] = availablePair;
+  }
+  return {
+    from,
+    to,
+    duration: 3200 + Math.random() * 4000,
+    delay: Math.random() * 2800,
+    color: ROUTE_COLORS[Math.floor(Math.random() * ROUTE_COLORS.length)],
+  };
+}
+
+function createRandomConnections(count: number): LiveConnection[] {
+  const connections: LiveConnection[] = [];
+  const usedPairs = new Set<string>();
+  while (connections.length < count) {
+    const connection = createRandomConnection(usedPairs);
+    usedPairs.add(routeKey(connection.from, connection.to));
+    connections.push(connection);
+  }
+  return connections;
+}
 
 const GLOBE_SIZE = 640;
 
@@ -45,14 +98,14 @@ const GLOBE_COUNTRIES = countryCollection.features.flatMap<GlobeCountry>((countr
 export function LandingGlobe({ compact = false, activeStep }: { compact?: boolean; activeStep?: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rotationRef = useRef<[number, number, number]>([-18, -12, 0]);
-  const connectionRef = useRef(0);
   const draggingRef = useRef<{
     pointerId: number;
     x: number;
     y: number;
     rotation: [number, number, number];
   } | null>(null);
-  const [connectionLabel, setConnectionLabel] = useState("Japan ↔ Singapore");
+  const connectionsRef = useRef<LiveConnection[]>([]);
+  const [statusConnection, setStatusConnection] = useState<LiveConnection | null>(null);
 
   useEffect(() => {
     if (activeStep !== undefined) {
@@ -62,19 +115,26 @@ export function LandingGlobe({ compact = false, activeStep }: { compact?: boolea
         [-120, -18, 0],
         [-114, -14, 0],
       ];
-      connectionRef.current = 0;
       rotationRef.current = storyRotations[activeStep % storyRotations.length];
+      connectionsRef.current = [...STORY_CONNECTIONS];
       return;
     }
+    const initialConnections = createRandomConnections(LIVE_ROUTE_COUNT);
+    connectionsRef.current = initialConnections;
     const interval = window.setInterval(() => {
-      let next = connectionRef.current;
-      while (next === connectionRef.current) {
-        next = Math.floor(Math.random() * CONNECTION_CODES.length);
-      }
-      connectionRef.current = next;
-      const [firstCode, secondCode] = CONNECTION_CODES[next];
-      setConnectionLabel(`${getCountryName(firstCode)} ↔ ${getCountryName(secondCode)}`);
-    }, 3200);
+      const current = connectionsRef.current;
+      const replaceIndex = Math.floor(Math.random() * current.length);
+      const usedPairs = new Set(
+        current
+          .filter((_, index) => index !== replaceIndex)
+          .map((connection) => routeKey(connection.from, connection.to)),
+      );
+      const replacement = createRandomConnection(usedPairs);
+      connectionsRef.current = current.map((connection, index) =>
+        index === replaceIndex ? replacement : connection,
+      );
+      setStatusConnection(replacement);
+    }, 2200);
     return () => window.clearInterval(interval);
   }, [activeStep]);
 
@@ -145,22 +205,37 @@ export function LandingGlobe({ compact = false, activeStep }: { compact?: boolea
       context.lineWidth = 0.7;
       context.stroke();
 
-      const [firstCode, secondCode] = CONNECTION_CODES[connectionRef.current];
-      const first = countryByCode.get(firstCode);
-      const second = countryByCode.get(secondCode);
-      if (first && second) {
+      const visibleConnections = activeStep === undefined
+        ? connectionsRef.current
+        : STORY_CONNECTIONS;
+
+      visibleConnections.forEach((connection, index) => {
+        const first = countryByCode.get(connection.from);
+        const second = countryByCode.get(connection.to);
+        if (!first || !second) return;
         const center: [number, number] = [-rotationRef.current[0], -rotationRef.current[1]];
         const firstVisible = geoDistance(first.centroid, center) < Math.PI / 2;
         const secondVisible = geoDistance(second.centroid, center) < Math.PI / 2;
         const interpolate = geoInterpolate(first.centroid, second.centroid);
-        const pulse = (time % 2600) / 2600;
-        const coordinates = Array.from({ length: 56 }, (_, index) => interpolate((index / 55) * Math.min(1, pulse * 1.35)));
+        const cycle = ((time + connection.delay) % connection.duration) / connection.duration;
+        const progress = Math.min(1, cycle / 0.72);
+        const fade = cycle > 0.78 ? Math.max(0, 1 - ((cycle - 0.78) / 0.22)) : 1;
+        const [red, green, blue] = connection.color;
+
+        const fullCoordinates = Array.from({ length: 72 }, (_, pointIndex) => interpolate(pointIndex / 71));
+        context.beginPath();
+        path({ type: "LineString", coordinates: fullCoordinates });
+        context.strokeStyle = `rgba(${red},${green},${blue},.13)`;
+        context.lineWidth = 1;
+        context.stroke();
+
+        const coordinates = Array.from({ length: 72 }, (_, pointIndex) => interpolate((pointIndex / 71) * progress));
         context.beginPath();
         path({ type: "LineString", coordinates });
-        context.strokeStyle = "rgba(74,168,255,.98)";
-        context.lineWidth = 2.3;
-        context.shadowColor = "rgba(74,168,255,.5)";
-        context.shadowBlur = 10;
+        context.strokeStyle = `rgba(${red},${green},${blue},${0.38 + (fade * 0.56)})`;
+        context.lineWidth = index % 2 === 0 ? 2.2 : 1.7;
+        context.shadowColor = `rgba(${red},${green},${blue},.48)`;
+        context.shadowBlur = 7 + (index % 3) * 2;
         context.stroke();
         context.shadowBlur = 0;
 
@@ -169,25 +244,25 @@ export function LandingGlobe({ compact = false, activeStep }: { compact?: boolea
           const point = projection(country.centroid);
           if (!point) continue;
           context.beginPath();
-          context.arc(point[0], point[1], 10 + Math.sin(time / 260) * 1.5, 0, Math.PI * 2);
-          context.fillStyle = "rgba(74,168,255,.2)";
+          context.arc(point[0], point[1], 7 + Math.sin((time + connection.delay) / (240 + index * 18)) * 1.4, 0, Math.PI * 2);
+          context.fillStyle = `rgba(${red},${green},${blue},.16)`;
           context.fill();
           context.beginPath();
-          context.arc(point[0], point[1], 5.5, 0, Math.PI * 2);
-          context.fillStyle = "#4aa8ff";
+          context.arc(point[0], point[1], 3.8, 0, Math.PI * 2);
+          context.fillStyle = `rgb(${red},${green},${blue})`;
           context.fill();
           context.strokeStyle = "#fff7ef";
-          context.lineWidth = 2;
+          context.lineWidth = 1.25;
           context.stroke();
         }
-      }
+      });
 
       frame = window.requestAnimationFrame(draw);
     }
 
     frame = window.requestAnimationFrame(draw);
     return () => window.cancelAnimationFrame(frame);
-  }, []);
+  }, [activeStep]);
 
   function startDrag(event: ReactPointerEvent<HTMLCanvasElement>) {
     draggingRef.current = {
@@ -237,10 +312,16 @@ export function LandingGlobe({ compact = false, activeStep }: { compact?: boolea
         }}
       />
       <div className="landing-globe-status" aria-live="polite">
-        <span>Live connection</span>
-        <strong>{activeStep === undefined ? connectionLabel : "Japan ↔ Singapore"}</strong>
+        <span>{activeStep === undefined ? `${LIVE_ROUTE_COUNT} random live routes` : "Live connection"}</span>
+        <strong>
+          {activeStep === undefined && statusConnection
+            ? `${getCountryName(statusConnection.from)} ↔ ${getCountryName(statusConnection.to)}`
+            : activeStep === undefined
+              ? "Global routes updating"
+            : "Japan ↔ Singapore"}
+        </strong>
       </div>
-      <figcaption>{compact ? "Live geographic signal" : "Drag to rotate 360° · Connections update automatically"}</figcaption>
+      <figcaption>{compact ? "Live geographic signal" : "Drag to rotate 360° · Routes move at independent speeds"}</figcaption>
     </figure>
   );
 }

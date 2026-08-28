@@ -42,13 +42,27 @@ export function StoryReader({
   imageUrl: string | null;
   onClose: () => void;
 }) {
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const backButtonRef = useRef<HTMLButtonElement>(null);
+  const readerScrollRef = useRef<HTMLDivElement>(null);
+  const reportsSectionRef = useRef<HTMLElement>(null);
   const readerMountedRef = useRef(false);
   const closeFallbackRef = useRef<number | null>(null);
   const returnScrollRef = useRef(0);
   const historyKeyRef = useRef(`reader-${story.id}`);
   const lead = story.articles[0];
   const sourceNames = [...new Set(story.articles.map((article) => article.source.name))];
+
+  const showCoverage = useCallback(() => {
+    const scroller = readerScrollRef.current;
+    const reports = reportsSectionRef.current;
+    if (!scroller || !reports) return;
+    const top = reports.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+    scroller.scrollTo({
+      top: Math.max(0, top - 24),
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    });
+    reports.focus({ preventScroll: true });
+  }, []);
 
   const restoreArticlePosition = useCallback(() => {
     window.requestAnimationFrame(() => {
@@ -79,7 +93,7 @@ export function StoryReader({
     const wasInert = siteFrame?.inert ?? false;
     document.body.style.overflow = "hidden";
     if (siteFrame) siteFrame.inert = true;
-    closeButtonRef.current?.focus();
+    backButtonRef.current?.focus();
     if (window.history.state?.worldlineReader !== historyKeyRef.current) {
       window.history.pushState(
         { ...(window.history.state ?? {}), worldlineReader: historyKeyRef.current },
@@ -122,20 +136,26 @@ export function StoryReader({
     >
       <section className="story-reader" role="dialog" aria-modal="true" aria-labelledby={`reader-title-${story.id}`}>
         <header className="reader-chrome">
-          <div className="reader-brand">
-            <span className="brand-mark" aria-hidden="true"><span /></span>
-            <span>WORLDLINE READER</span>
+          <div className="reader-chrome-start">
+            <button ref={backButtonRef} type="button" className="reader-back" onClick={requestClose} aria-label="Back to stories">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m11.5 4.5-5.5 5.5 5.5 5.5M6.5 10H16" /></svg>
+              <span>Back</span>
+            </button>
+            <div className="reader-brand">
+              <span className="brand-mark" aria-hidden="true"><span /></span>
+              <span>WORLDLINE READER</span>
+            </div>
           </div>
           <div className="reader-mode" aria-label="Current reading mode">
             <span aria-hidden="true">Aa</span>
             Reader view
           </div>
-          <button ref={closeButtonRef} type="button" className="reader-close" onClick={requestClose} aria-label="Close reader">
+          <button type="button" className="reader-close" onClick={requestClose} aria-label="Close reader">
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
           </button>
         </header>
 
-        <div className="reader-scroll">
+        <div ref={readerScrollRef} className="reader-scroll">
           <div className="reader-hero">
             {imageUrl ? (
               <img src={imageUrl} alt="" referrerPolicy="no-referrer" />
@@ -171,15 +191,12 @@ export function StoryReader({
                 {story.summary ?? lead?.description ?? "This developing story is being tracked across the available publisher coverage."}
               </p>
 
-              <section className="reader-section" aria-labelledby={`coverage-title-${story.id}`}>
-                <p className="reader-eyebrow">Coverage at a glance</p>
-                <h3 id={`coverage-title-${story.id}`}>Reporting from {sourceNames.join(", ")}</h3>
-                <p>
-                  Worldline groups reports that describe the same event so you can compare the framing, location signals and publication timing without losing the original source.
-                </p>
-              </section>
-
-              <section className="reader-section" aria-labelledby={`reports-title-${story.id}`}>
+              <section
+                ref={reportsSectionRef}
+                className="reader-section"
+                aria-labelledby={`reports-title-${story.id}`}
+                tabIndex={-1}
+              >
                 <p className="reader-eyebrow">Source-by-source</p>
                 <h3 id={`reports-title-${story.id}`}>{story.articles.length === 1 ? "Original report" : `${story.articles.length} reports in this story`}</h3>
                 <div className="reader-source-list">
@@ -216,7 +233,7 @@ export function StoryReader({
                   This reader presents publisher-supplied headlines, excerpts and source comparisons. The full original reporting remains with the publisher.
                 </p>
                 {lead && <PublisherLink article={lead} prominent />}
-                <button type="button" className="reader-stay-button" onClick={() => document.querySelector(".reader-source-list")?.scrollIntoView({ behavior: "smooth" })}>
+                <button type="button" className="reader-stay-button" onClick={showCoverage}>
                   Compare coverage here
                 </button>
               </div>

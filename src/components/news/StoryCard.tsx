@@ -38,8 +38,13 @@ function ArticleLink({ article }: { article: ArticleView }) {
       target="_blank"
       rel="noopener noreferrer nofollow"
       referrerPolicy="strict-origin-when-cross-origin"
+      aria-label={`Read at ${article.source.name}`}
+      title={`Read at ${article.source.name}`}
     >
-      Read at {article.source.name} <span aria-hidden="true">↗</span>
+      <span>Read source</span>
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <path d="M7 4h9v9M16 4 8.5 11.5M14 10v5H5V6h5" />
+      </svg>
     </a>
   );
 }

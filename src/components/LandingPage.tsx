@@ -3,6 +3,24 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { LandingGlobe } from "@/components/LandingGlobe";
+import { StoryCard } from "@/components/news/StoryCard";
+import type { ArticleView, CountryReference, StoryView } from "@/lib/news/types";
+
+function ArrowUpRightIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>;
+}
+
+function CompareIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14M15 4l4 4-4 4M19 16H5M9 12l-4 4 4 4" /></svg>;
+}
+
+function ArrowRightIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M14 7l5 5-5 5" /></svg>;
+}
+
+function SettingsIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19 12a7 7 0 0 0-.12-1.3l2-1.55-2-3.46-2.45 1A7 7 0 0 0 14.2 5.4L13.85 3h-4l-.35 2.4a7 7 0 0 0-2.23 1.29l-2.45-1-2 3.46 2 1.55A7 7 0 0 0 4.7 12c0 .45.04.88.12 1.3l-2 1.55 2 3.46 2.45-1A7 7 0 0 0 9.5 18.6l.35 2.4h4l.35-2.4a7 7 0 0 0 2.23-1.29l2.45 1 2-3.46-2-1.55c.08-.42.12-.85.12-1.3Z" /></svg>;
+}
 
 const STORY_STEPS = [
   {
@@ -57,6 +75,74 @@ const STORY_EVIDENCE = [
     metric: "3 perspectives grouped",
   },
 ] as const;
+
+const previewCountries: Record<"JP" | "SG", CountryReference> = {
+  JP: { code: "JP", name: "Japan", relevanceScore: 0.98 },
+  SG: { code: "SG", name: "Singapore", relevanceScore: 0.96 },
+};
+
+function previewArticle(
+  id: string,
+  sourceName: string,
+  sourceCountry: "JP" | "SG" | null,
+  title: string,
+  countries: CountryReference[],
+): ArticleView {
+  return {
+    id,
+    provider: "FIXTURE",
+    providerArticleId: id,
+    title,
+    description: "Local reporting adds context, consequences and the voices closest to the development.",
+    url: `https://example.com/${id}`,
+    canonicalUrl: `https://example.com/${id}`,
+    imageUrl: null,
+    publishedAt: "2026-08-29T01:30:00.000Z",
+    language: "en",
+    source: {
+      name: sourceName,
+      domain: null,
+      countryCode: sourceCountry,
+      region: sourceCountry === "SG" ? "Southeast Asia" : sourceCountry === "JP" ? "East Asia" : null,
+      language: "en",
+      scope: sourceCountry ? "NATIONAL" : "INTERNATIONAL",
+      qualityScore: 0.9,
+    },
+    countries,
+    topics: ["transport"],
+    importanceScore: 0.82,
+    relevanceScore: 0.9,
+    isFixture: true,
+  };
+}
+
+const LOCAL_PREVIEW_STORY: StoryView = {
+  id: "landing-local-preview",
+  title: "New port rules reshape work along the waterfront",
+  summary: "Operators and local officials explain the immediate changes for people working at the port.",
+  firstPublishedAt: "2026-08-29T01:30:00.000Z",
+  lastUpdatedAt: "2026-08-29T01:30:00.000Z",
+  countries: [previewCountries.JP],
+  topics: ["transport"],
+  importanceScore: 0.82,
+  articles: [previewArticle("local-preview", "The Japan Times", "JP", "New port rules reshape work along the waterfront", [previewCountries.JP])],
+};
+
+const GLOBAL_PREVIEW_STORY: StoryView = {
+  id: "landing-global-preview",
+  title: "Japan and Singapore align on a cross-border port standard",
+  summary: "Independent publishers connect the domestic policy change to a wider regional shipping corridor.",
+  firstPublishedAt: "2026-08-29T01:30:00.000Z",
+  lastUpdatedAt: "2026-08-29T02:15:00.000Z",
+  countries: [previewCountries.JP, previewCountries.SG],
+  topics: ["transport"],
+  importanceScore: 0.9,
+  articles: [
+    previewArticle("global-preview-jp", "The Japan Times", "JP", "Japan publishes a new port data standard", [previewCountries.JP, previewCountries.SG]),
+    previewArticle("global-preview-sg", "CNA", "SG", "Singapore operators prepare for the shared standard", [previewCountries.JP, previewCountries.SG]),
+    previewArticle("global-preview-world", "Reuters", null, "Regional ports move toward shared data rules", [previewCountries.JP, previewCountries.SG]),
+  ],
+};
 
 export function LandingPage() {
   const pageRef = useRef<HTMLDivElement>(null);
@@ -137,8 +223,8 @@ export function LandingPage() {
               publishers and perspectives.
             </p>
             <div className="landing-actions">
-              <Link href="/country#top">Explore one country <span aria-hidden="true">↗</span></Link>
-              <Link href="/compare#top">Compare two countries <span aria-hidden="true">↔</span></Link>
+              <Link href="/country#top">Explore one country <ArrowUpRightIcon /></Link>
+              <Link href="/compare#top">Compare two countries <CompareIcon /></Link>
             </div>
           </div>
 
@@ -211,23 +297,14 @@ export function LandingPage() {
             </p>
           </div>
           <div className="depth-card depth-card-local" data-reveal>
-            <div className="depth-card-visual depth-local-visual" aria-hidden="true">
-              <span className="depth-visual-label">GROUND-LEVEL REPORTING</span>
-              <article>
-                <span>JP · LOCAL DESK</span>
-                <strong>How the new port rules change work on the waterfront</strong>
-                <small>Voices from operators, residents and local officials</small>
-              </article>
-              <div className="depth-impact-row"><span>Daily life</span><span>Public policy</span><span>Local voices</span></div>
+            <div className="depth-card-visual depth-story-preview depth-local-visual" aria-hidden="true" inert>
+              <StoryCard story={LOCAL_PREVIEW_STORY} />
             </div>
             <span>LOCAL PERSPECTIVE</span><strong>Understand what changes on the ground.</strong><small>Reporting from inside the country explains the direct human and policy impact.</small>
           </div>
           <div className="depth-card depth-card-global" data-reveal>
-            <div className="depth-card-visual depth-global-visual" aria-hidden="true">
-              <span className="depth-visual-label">THE SAME EVENT, VIEWED ABROAD</span>
-              <article><i>JP</i><span><b>The Japan Times</b><small>Domestic context</small></span></article>
-              <span className="depth-story-link">ONE SHARED STORY</span>
-              <article><i>SG</i><span><b>CNA</b><small>Regional response</small></span></article>
+            <div className="depth-card-visual depth-story-preview depth-global-visual" aria-hidden="true" inert>
+              <StoryCard story={GLOBAL_PREVIEW_STORY} />
             </div>
             <span>GLOBAL PERSPECTIVE</span><strong>Compare how the same event travels.</strong><small>International coverage reveals different priorities, framing and consequences.</small>
           </div>
@@ -244,13 +321,13 @@ export function LandingPage() {
               <span>01 · ONE COUNTRY</span>
               <h3>Follow one place.</h3>
               <p>Choose a country and see reporting that involves it, wherever the story was published.</p>
-              <strong>Open the country map <i aria-hidden="true">↗</i></strong>
+              <strong>Open the country map <ArrowUpRightIcon /></strong>
             </Link>
             <Link href="/compare#top" className="journey-card journey-compare" data-reveal>
               <span>02 · COMPARE TWO</span>
               <h3>Find the shared story.</h3>
               <p>Select two countries and surface the reporting signals that connect them directly.</p>
-              <strong>Build a comparison <i aria-hidden="true">↔</i></strong>
+              <strong>Build a comparison <CompareIcon /></strong>
             </Link>
           </div>
         </section>
@@ -259,8 +336,8 @@ export function LandingPage() {
           <p className="eyebrow">News without borders</p>
           <h2>See where the <em>story meets.</em></h2>
           <div className="landing-actions">
-            <Link href="/country#top">Enter World News Atlas <span aria-hidden="true">→</span></Link>
-            <Link href="/settings">Set your reading range <span aria-hidden="true">⚙</span></Link>
+            <Link href="/country#top">Enter World News Atlas <ArrowRightIcon /></Link>
+            <Link href="/settings">Set your reading range <SettingsIcon /></Link>
           </div>
         </section>
       </main>
@@ -268,7 +345,9 @@ export function LandingPage() {
       <footer className="site-footer landing-footer">
         <div className="brand footer-brand"><span className="brand-mark" aria-hidden="true"><span /></span><span>WORLDLINE</span></div>
         <p>Headlines, permitted excerpts and metadata only. Every live article links to its original publisher.</p>
-        <a href="#top">Back to top ↑</a>
+        <a className="back-to-top-link" href="#top" aria-label="Back to top" title="Back to top">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M7 10l5-5 5 5" /></svg>
+        </a>
       </footer>
     </div>
   );
