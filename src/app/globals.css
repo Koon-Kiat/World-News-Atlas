@@ -118,7 +118,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .landing-actions a:first-child { color: var(--action-foreground); background: var(--action-background); border-color: transparent; }
 .landing-globe { position: relative; width: min(43vw, 620px); aspect-ratio: 1; justify-self: center; margin: 0; overflow: hidden; border-radius: 50%; background: var(--ocean); box-shadow: 0 50px 100px rgba(12,43,49,.25); isolation: isolate; }
 .landing-globe::after { content: ""; position: absolute; inset: 0; border: 1px solid rgba(19,40,45,.2); border-radius: inherit; box-shadow: inset 0 0 0 18px rgba(255,254,249,.08); pointer-events: none; }
-.landing-globe img { width: 172% !important; max-width: none !important; left: auto !important; right: -3% !important; object-fit: cover; object-position: right center; }
+.landing-globe img { position: absolute; top: 0; right: -3%; width: 172%; max-width: none; height: 100%; object-fit: cover; object-position: right center; }
 .landing-globe figcaption { position: absolute; z-index: 2; left: 8%; right: 8%; bottom: 7%; padding: 14px 18px; color: #f3f6f2; background: rgba(6,30,35,.76); border: 1px solid rgba(255,255,255,.15); border-radius: 14px; backdrop-filter: blur(14px); }
 .landing-globe figcaption span, .landing-globe figcaption strong { display: block; }
 .landing-globe figcaption span { color: var(--coral); font-size: .58rem; font-weight: 850; letter-spacing: .15em; text-transform: uppercase; }
