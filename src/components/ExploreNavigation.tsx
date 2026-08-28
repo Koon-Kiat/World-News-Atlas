@@ -43,6 +43,13 @@ export function ExploreNavigation({ active }: { active: ExploreSection }) {
           </Link>
         ))}
       </div>
+    </nav>
+  );
+}
+
+export function HeaderTools({ active }: { active: ExploreSection }) {
+  return (
+    <div className="header-tools" aria-label="Settings and appearance">
       <Link
         href="/settings"
         className={active === "settings" ? "settings-link active" : "settings-link"}
@@ -53,6 +60,6 @@ export function ExploreNavigation({ active }: { active: ExploreSection }) {
         <span aria-hidden="true">⚙</span>
       </Link>
       <ThemeControl compact />
-    </nav>
+    </div>
   );
 }

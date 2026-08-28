@@ -1,8 +1,8 @@
-/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { LandingGlobe } from "@/components/LandingGlobe";
 
 const STORY_STEPS = [
   {
@@ -28,6 +28,33 @@ const STORY_STEPS = [
     eyebrow: "Read the event",
     title: "Many reports become one coherent story.",
     copy: "Related articles are clustered into a briefing, giving you source diversity without making you read the same event repeatedly.",
+  },
+] as const;
+
+const STORY_EVIDENCE = [
+  {
+    label: "Geographic signal",
+    headline: "Japan announces a cross-border port data standard",
+    source: "Tokyo bureau · Location verified",
+    metric: "1 place identified",
+  },
+  {
+    label: "Local context",
+    headline: "Singapore operators explain what the standard changes at the port",
+    source: "2 local desks · Primary reporting",
+    metric: "Local impact added",
+  },
+  {
+    label: "Bilateral connection",
+    headline: "Japan and Singapore align the same shipping corridor",
+    source: "Trade · Technology · Transport",
+    metric: "2 countries connected",
+  },
+  {
+    label: "Source cluster",
+    headline: "One development, compared across independent publishers",
+    source: "The Japan Times · CNA · Reuters",
+    metric: "3 perspectives grouped",
   },
 ] as const;
 
@@ -115,19 +142,7 @@ export function LandingPage() {
             </div>
           </div>
 
-          <figure className="landing-globe">
-            <img
-              src="/og.png"
-              alt="A world globe with a route connecting news locations across borders"
-              width="1536"
-              height="1024"
-              fetchPriority="high"
-            />
-            <figcaption>
-              <span>Live world view</span>
-              <strong>Follow the story across borders.</strong>
-            </figcaption>
-          </figure>
+          <LandingGlobe />
 
           <a className="scroll-cue" href="#story">
             <span>Scroll to trace the signal</span>
@@ -141,25 +156,14 @@ export function LandingPage() {
               <span style={{ transform: `scaleY(${(activeStep + 1) / STORY_STEPS.length})` }} />
             </div>
 
-            <div className={`story-visual story-visual-step-${activeStep + 1}`} aria-hidden="true">
-              <div className="story-visual-grid" />
-              <div className="story-world">
-                <span className="story-world-latitude latitude-one" />
-                <span className="story-world-latitude latitude-two" />
-                <span className="story-world-meridian" />
-                <i className="story-location location-tokyo"><b />Tokyo</i>
-                <i className="story-location location-singapore"><b />Singapore</i>
-                <span className="story-connection" />
-              </div>
-              <div className="story-coverage-cluster">
-                <article><span>01</span><strong>Trade corridor expands</strong><small>Tokyo · Singapore</small></article>
-                <article><span>02</span><strong>Ports align on new standard</strong><small>3 independent sources</small></article>
-                <article><span>03</span><strong>Regional impact explained</strong><small>Local + international</small></article>
-              </div>
-              <div className="story-signal-label">
-                <span>Live signal</span>
-                <strong>{["Detected", "Focused", "Connected", "Clustered"][activeStep]}</strong>
-              </div>
+            <div className={`story-visual story-visual-step-${activeStep + 1}`}>
+              <LandingGlobe compact activeStep={activeStep} />
+              <article className="story-evidence-card" key={STORY_EVIDENCE[activeStep].label}>
+                <span>{STORY_EVIDENCE[activeStep].label}</span>
+                <strong>{STORY_EVIDENCE[activeStep].headline}</strong>
+                <small>{STORY_EVIDENCE[activeStep].source}</small>
+                <b>{STORY_EVIDENCE[activeStep].metric}</b>
+              </article>
             </div>
 
             <div className="story-copy-stack">
@@ -169,7 +173,7 @@ export function LandingPage() {
               </div>
               <div className="story-steps" aria-live="polite">
                 {STORY_STEPS.map((step, index) => (
-                  <article key={step.number} className={activeStep === index ? "active" : ""} aria-hidden={activeStep !== index}>
+                  <article key={step.number} className={activeStep === index ? "active" : ""}>
                     <span>{step.number}</span>
                     <p className="eyebrow">{step.eyebrow}</p>
                     <h3>{step.title}</h3>
@@ -202,23 +206,24 @@ export function LandingPage() {
           </div>
           <div className="depth-card depth-card-local" data-reveal>
             <div className="depth-card-visual depth-local-visual" aria-hidden="true">
-              <span className="depth-city">TOKYO</span>
-              <article><i>01</i><strong>Policy announced</strong><small>Tokyo desk · 08:40</small></article>
-              <article><i>02</i><strong>Local impact explained</strong><small>Osaka bureau · 09:15</small></article>
-              <span className="depth-route" />
+              <span className="depth-visual-label">GROUND-LEVEL REPORTING</span>
+              <article>
+                <span>JP · LOCAL DESK</span>
+                <strong>How the new port rules change work on the waterfront</strong>
+                <small>Voices from operators, residents and local officials</small>
+              </article>
+              <div className="depth-impact-row"><span>Daily life</span><span>Public policy</span><span>Local voices</span></div>
             </div>
-            <span>LOCAL</span><strong>What it means here</strong><small>Country-based publishers</small>
+            <span>LOCAL PERSPECTIVE</span><strong>Understand what changes on the ground.</strong><small>Reporting from inside the country explains the direct human and policy impact.</small>
           </div>
           <div className="depth-card depth-card-global" data-reveal>
             <div className="depth-card-visual depth-global-visual" aria-hidden="true">
-              <span className="depth-node node-jp">JP</span>
-              <span className="depth-node node-sg">SG</span>
-              <span className="depth-node node-us">US</span>
-              <span className="depth-connection connection-one" />
-              <span className="depth-connection connection-two" />
-              <p><b>6</b> independent perspectives</p>
+              <span className="depth-visual-label">THE SAME EVENT, VIEWED ABROAD</span>
+              <article><i>JP</i><span><b>The Japan Times</b><small>Domestic context</small></span></article>
+              <span className="depth-story-link">ONE SHARED STORY</span>
+              <article><i>SG</i><span><b>CNA</b><small>Regional response</small></span></article>
             </div>
-            <span>GLOBAL</span><strong>How the world reads it</strong><small>International perspective</small>
+            <span>GLOBAL PERSPECTIVE</span><strong>Compare how the same event travels.</strong><small>International coverage reveals different priorities, framing and consequences.</small>
           </div>
         </section>
 

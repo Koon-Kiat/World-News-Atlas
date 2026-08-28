@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ExploreNavigation } from "./ExploreNavigation";
+import { ExploreNavigation, HeaderTools } from "./ExploreNavigation";
 import { NEWS_PERIOD_OPTIONS } from "@/lib/news/periods";
 import { useNewsPeriodPreference } from "@/hooks/useNewsPeriodPreference";
 import { ThemeControl } from "./ThemeControl";
@@ -20,9 +20,7 @@ export function NewsSettings() {
         </Link>
         <ExploreNavigation active="settings" />
         <p>News preferences</p>
-        <div className="header-actions">
-          <Link className="latest-link" href="/country#stories">Back to news <span aria-hidden="true">→</span></Link>
-        </div>
+        <HeaderTools active="settings" />
       </header>
 
       <main className="settings-page">

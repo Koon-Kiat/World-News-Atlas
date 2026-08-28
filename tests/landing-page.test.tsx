@@ -14,11 +14,9 @@ class TestIntersectionObserver {
 
 beforeEach(() => {
   vi.stubGlobal("IntersectionObserver", TestIntersectionObserver);
-  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
-    callback(0);
-    return 1;
-  });
+  vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
   vi.stubGlobal("cancelAnimationFrame", vi.fn());
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({} as CanvasRenderingContext2D);
   vi.stubGlobal("matchMedia", vi.fn(() => ({
     matches: false,
     media: "",
@@ -33,6 +31,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -57,9 +56,10 @@ describe("landing page", () => {
     expect(screen.getByRole("link", { name: /Build a comparison/i })).toHaveAttribute("href", "/compare#top");
   });
 
-  it("uses the branded world globe as the hero visual", () => {
+  it("uses interactive world globes for the hero and scroll narrative", () => {
     render(<LandingPage />);
 
-    expect(screen.getByRole("img", { name: /world globe with a route/i }).getAttribute("src")).toContain("og.png");
+    expect(screen.getAllByLabelText(/Interactive rotating world globe/i)).toHaveLength(2);
+    expect(screen.getByText(/Drag to rotate 360°/i)).toBeInTheDocument();
   });
 });
