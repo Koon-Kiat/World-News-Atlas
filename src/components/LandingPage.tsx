@@ -151,12 +151,14 @@ export function LandingPage() {
         </section>
 
         <section ref={storyRef} id="story" className="landing-story" aria-labelledby="story-title">
-          <div className="landing-story-stage">
+          <div className={`landing-story-stage is-step-${activeStep + 1}`}>
             <div className="story-progress-rail" aria-hidden="true">
-              <span style={{ transform: `scaleY(${(activeStep + 1) / STORY_STEPS.length})` }} />
+              <span style={{ transform: `scaleX(${(activeStep + 1) / STORY_STEPS.length})` }} />
             </div>
 
             <div className={`story-visual story-visual-step-${activeStep + 1}`}>
+              <div className="story-orbit story-orbit-one" aria-hidden="true" />
+              <div className="story-orbit story-orbit-two" aria-hidden="true" />
               <LandingGlobe compact activeStep={activeStep} />
               <article className="story-evidence-card" key={STORY_EVIDENCE[activeStep].label}>
                 <span>{STORY_EVIDENCE[activeStep].label}</span>
@@ -168,8 +170,8 @@ export function LandingPage() {
 
             <div className="story-copy-stack">
               <div className="story-copy-intro">
-                <p className="eyebrow">A connected briefing</p>
-                <h2 id="story-title">Scroll through the anatomy of a story.</h2>
+                <p className="eyebrow">A connected briefing · Scroll to explore</p>
+                <h2 id="story-title">Watch one signal become a world story.</h2>
               </div>
               <div className="story-steps" aria-live="polite">
                 {STORY_STEPS.map((step, index) => (
@@ -190,6 +192,10 @@ export function LandingPage() {
                 ))}
               </ol>
             </div>
+
+            <p className="story-scroll-hint" aria-hidden="true">
+              <span>{activeStep + 1}</span> / {STORY_STEPS.length}
+            </p>
           </div>
         </section>
 

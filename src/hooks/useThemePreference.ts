@@ -9,7 +9,7 @@ import {
   type ThemePreference,
 } from "@/lib/theme";
 
-let memoryTheme: ThemePreference = "system";
+let memoryTheme: ThemePreference = "dark";
 
 function getSnapshot(): ThemePreference {
   try {
@@ -21,12 +21,12 @@ function getSnapshot(): ThemePreference {
   } catch {
     return memoryTheme;
   }
-  memoryTheme = "system";
+  memoryTheme = "dark";
   return memoryTheme;
 }
 
 function getServerSnapshot(): ThemePreference {
-  return "system";
+  return "dark";
 }
 
 function subscribe(onStoreChange: () => void): () => void {
