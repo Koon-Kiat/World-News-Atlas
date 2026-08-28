@@ -34,6 +34,14 @@ export function getCountryName(code: string): string {
   return (Array.isArray(names) ? names[0] : names) ?? normalized;
 }
 
+export function getCountryFlag(code: string): string {
+  const normalized = normalizeCountryCode(code);
+  if (!normalized) return "🌐";
+  return String.fromCodePoint(
+    ...normalized.split("").map((character) => 127397 + character.charCodeAt(0)),
+  );
+}
+
 export function getCountryNameVariants(code: string): string[] {
   const names = countryNames[code.toUpperCase()];
   if (!names) return [];

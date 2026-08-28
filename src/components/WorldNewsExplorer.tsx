@@ -2,6 +2,7 @@
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { CountryFlag } from "@/components/CountryFlag";
 import { ExploreNavigation, HeaderTools } from "@/components/ExploreNavigation";
 import { NewsFilters } from "@/components/filters/NewsFilters";
 import { PerspectiveFilter } from "@/components/filters/PerspectiveFilter";
@@ -18,10 +19,6 @@ import type { NewsPeriod, NewsResponse, NewsSort, SourcePerspective, StoryView }
 const QUICK_COUNTRIES = ["US", "CN", "IN", "JP", "DE", "GB", "FR", "BR", "CA", "AU", "KR", "ID", "MX", "ZA", "SG"];
 const INITIAL_STORY_COUNT = 12;
 const STORY_BATCH_SIZE = 12;
-
-function flag(code: string): string {
-  return String.fromCodePoint(...code.split("").map((character) => 127397 + character.charCodeAt(0)));
-}
 
 export type ExplorerMode = "country" | "compare";
 
@@ -307,8 +304,8 @@ export function WorldNewsExplorer({
               <div className="quick-countries">
                 {QUICK_COUNTRIES.map((code) => (
                   <button type="button" key={code} aria-pressed={selectedCountries.includes(code)} onClick={() => selectCountry(code)}>
-                    <span aria-hidden="true">{flag(code)}</span>
-                    <span><strong>{getCountryName(code)}</strong><small>{code}</small></span>
+                    <CountryFlag code={code} />
+                    <strong>{getCountryName(code)}</strong>
                   </button>
                 ))}
               </div>
@@ -340,7 +337,7 @@ export function WorldNewsExplorer({
                     const code = selectedCountries[index];
                     return (
                       <div key={index} className={code ? "selection-slot filled" : "selection-slot"}>
-                        <span>{code ? flag(code) : index + 1}</span>
+                        <span>{code ? <CountryFlag code={code} /> : index + 1}</span>
                         <div>
                           <strong>{code ? getCountryName(code) : index === 0 ? "First country" : "Add another"}</strong>
                           <small>{code ? (index === 0 ? "Primary lens" : "Shared lens") : "Not selected"}</small>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { CountryFlag } from "@/components/CountryFlag";
 import { getCountryName, listCountries } from "@/lib/news/countries/metadata";
 
 const COUNTRIES = listCountries();
@@ -8,12 +9,6 @@ const COUNTRIES = listCountries();
 interface CountryPickerProps {
   selectedCountries: string[];
   onSelect: (code: string) => void;
-}
-
-function flag(code: string): string {
-  return String.fromCodePoint(
-    ...code.split("").map((character) => 127397 + character.charCodeAt(0)),
-  );
 }
 
 export function CountryPicker({ selectedCountries, onSelect }: CountryPickerProps) {
@@ -81,7 +76,7 @@ export function CountryPicker({ selectedCountries, onSelect }: CountryPickerProp
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(country.code)}
               >
-                <span aria-hidden="true">{flag(country.code)}</span>
+                <CountryFlag code={country.code} />
                 <strong>{country.name}</strong>
                 <small>{country.code}</small>
               </button>

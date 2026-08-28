@@ -33,7 +33,7 @@ interface MapView {
 const WIDTH = 960;
 const HEIGHT = 500;
 const MIN_ZOOM = 1;
-const MAX_ZOOM = 4;
+const MAX_ZOOM = 8;
 
 function clampView(scale: number, x: number, y: number): MapView {
   const nextScale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale));
@@ -49,8 +49,10 @@ export function WorldMap({
   selectionLimit,
   onSelectionChange,
 }: WorldMapProps) {
-  const [hoveredCountry, setHoveredCountry] = useState<MapCountry | null>(null);
+  const [hoveredCountry, setHoveredCountry] = useState<Pick<MapCountry, "code" | "name"> | null>(null);
   const [view, setView] = useState<MapView>({ scale: 1, x: 0, y: 0 });
+  const [activeTopology, setActiveTopology] = useState(countriesTopology);
+  const highResolutionRequestedRef = useRef(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<{
     pointerId: number;
@@ -62,13 +64,13 @@ export function WorldMap({
   } | null>(null);
   const suppressClickRef = useRef(false);
   const countries = useMemo(() => {
-    const collection = feature(countriesTopology, countriesTopology.objects.countries);
+    const collection = feature(activeTopology, activeTopology.objects.countries);
     return collection.features.flatMap<MapCountry>((country) => {
       const code = numericCountryIdToCode(country.id ?? "");
       if (!code) return [];
       return [{ code, name: getCountryName(code), feature: country }];
     });
-  }, []);
+  }, [activeTopology]);
   const path = useMemo(() => {
     const projection = geoNaturalEarth1().fitExtent(
       [[18, 18], [WIDTH - 18, HEIGHT - 18]],
@@ -100,6 +102,16 @@ export function WorldMap({
     mapElement.addEventListener("wheel", handleWheel, { passive: false });
     return () => mapElement.removeEventListener("wheel", handleWheel);
   }, []);
+
+  useEffect(() => {
+    if (view.scale <= 1 || highResolutionRequestedRef.current) return;
+    highResolutionRequestedRef.current = true;
+    import("world-atlas/countries-50m.json")
+      .then(({ default: highResolutionTopology }) => setActiveTopology(highResolutionTopology))
+      .catch(() => {
+        highResolutionRequestedRef.current = false;
+      });
+  }, [view.scale]);
 
   function select(code: string) {
     if (suppressClickRef.current) {
@@ -165,8 +177,8 @@ export function WorldMap({
             : selectedCountries.map(getCountryName).join(" + ")}
       </div>
       <div className="map-zoom-controls" aria-label="Map zoom controls">
-        <button type="button" onClick={() => zoomFromCenter(1)} disabled={view.scale >= MAX_ZOOM} aria-label="Zoom in">+</button>
-        <button type="button" onClick={() => zoomFromCenter(-1)} disabled={view.scale <= MIN_ZOOM} aria-label="Zoom out">−</button>
+        <button type="button" onClick={() => zoomFromCenter(1)} disabled={view.scale >= MAX_ZOOM} aria-label="Zoom in"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" /></svg></button>
+        <button type="button" onClick={() => zoomFromCenter(-1)} disabled={view.scale <= MIN_ZOOM} aria-label="Zoom out"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12" /></svg></button>
         <button type="button" className="map-reset" onClick={() => setView({ scale: 1, x: 0, y: 0 })} disabled={view.scale === 1} aria-label="Reset map zoom">Reset</button>
       </div>
       <svg
@@ -182,22 +194,22 @@ export function WorldMap({
       >
         <defs>
           <radialGradient id="ocean-glow" cx="48%" cy="43%" r="66%">
-            <stop offset="0%" stopColor="#173d43" />
-            <stop offset="100%" stopColor="#0b242a" />
+            <stop offset="0%" stopColor="#111113" />
+            <stop offset="100%" stopColor="#000000" />
           </radialGradient>
           <pattern id="map-grid" width="34" height="34" patternUnits="userSpaceOnUse">
-            <path d="M 34 0 L 0 0 0 34" fill="none" stroke="#d8eee8" strokeOpacity="0.045" strokeWidth="1" />
+            <path d="M 34 0 L 0 0 0 34" fill="none" stroke="#ffffff" strokeOpacity="0.035" strokeWidth="1" />
           </pattern>
         </defs>
         <rect width={WIDTH} height={HEIGHT} rx="26" fill="url(#ocean-glow)" />
         <rect width={WIDTH} height={HEIGHT} rx="26" fill="url(#map-grid)" />
         <g transform={`translate(${view.x} ${view.y}) scale(${view.scale})`}>
-          {countries.map((country) => {
+          {countries.map((country, countryIndex) => {
             const selectedIndex = selectedCountries.indexOf(country.code);
             const isSelected = selectedIndex >= 0;
             return (
               <path
-                key={country.code}
+                key={`${country.code}-${countryIndex}`}
                 d={path(country.feature) ?? undefined}
                 className={`map-country${isSelected ? " is-selected" : ""}`}
                 data-selection-order={isSelected ? selectedIndex + 1 : undefined}
