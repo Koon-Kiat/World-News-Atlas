@@ -9,7 +9,7 @@ export function headlineTokens(headline: string): Set<string> {
     headline
       .toLowerCase()
       .normalize("NFKD")
-      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
       .split(/\s+/)
       .filter((token) => token.length > 1 && !STOP_WORDS.has(token)),
   );

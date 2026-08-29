@@ -1,4 +1,4 @@
-import { clusterArticles } from "./cluster";
+import { clusterArticlesHybrid } from "./cluster";
 import { deduplicateArticles } from "./deduplicate";
 import { logNews } from "./logger";
 import { normalizeProviderArticles } from "./normalize";
@@ -15,6 +15,8 @@ export interface IngestionSummary {
   providersFailed: number;
   received: number;
   normalized: number;
+  articlesWithCountries: number;
+  countryDetectionRate: number;
   rejected: number;
   duplicatesRemoved: number;
   stored: number;
@@ -60,7 +62,7 @@ export async function runNewsIngestion(options: {
     });
   });
   const deduplicated = deduplicateArticles(normalized);
-  const stories = clusterArticles(deduplicated.articles);
+  const stories = await clusterArticlesHybrid(deduplicated.articles);
   const shouldPersist = options.persist ?? Boolean(process.env.DATABASE_URL);
   let stored = 0;
   let storiesUpdated = 0;
@@ -78,6 +80,10 @@ export async function runNewsIngestion(options: {
     providersFailed: batch.failures.length,
     received: batch.articles.length,
     normalized: normalized.length,
+    articlesWithCountries: normalized.filter((article) => article.countries.length > 0).length,
+    countryDetectionRate: normalized.length === 0
+      ? 0
+      : Number((normalized.filter((article) => article.countries.length > 0).length / normalized.length).toFixed(3)),
     rejected,
     duplicatesRemoved: deduplicated.duplicateCount,
     stored,

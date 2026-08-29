@@ -1,21 +1,193 @@
 import { createHash } from "node:crypto";
+import { MemoryTtlCache } from "./bounded-cache";
 import { headlineTokens, tokenSimilarity } from "./deduplicate";
+import { configuredTextEmbeddingProvider, type TextEmbeddingProvider } from "./embeddings";
+import { logNews } from "./logger";
 import type { CountryReference, NormalizedArticle, StoryCandidate } from "./types";
 
-function countriesOverlap(first: NormalizedArticle, second: NormalizedArticle): boolean {
-  const codes = new Set(second.countries.map((country) => country.code));
-  return first.countries.some((country) => codes.has(country.code));
+const CLUSTER_WINDOW_HOURS = 72;
+const EMBEDDING_CACHE_TTL_MS = 24 * 60 * 60_000;
+const embeddingCache = new MemoryTtlCache<number[]>(5_000);
+const articleFeatureCache = new WeakMap<NormalizedArticle, {
+  countries: Set<string>;
+  entities: Set<string>;
+  topics: Set<string>;
+}>();
+
+interface PairFeatures {
+  semantic: number;
+  entities: number;
+  countries: number;
+  lexical: number;
+  topics: number;
+  temporal: number;
+  hybrid: number;
 }
 
-function canCluster(first: NormalizedArticle, second: NormalizedArticle): boolean {
-  const hoursApart =
-    Math.abs(new Date(first.publishedAt).getTime() - new Date(second.publishedAt).getTime()) /
-    3_600_000;
+export interface HybridClusteringOptions {
+  embeddingProvider?: TextEmbeddingProvider | null;
+}
+
+function hoursBetween(first: NormalizedArticle, second: NormalizedArticle): number {
+  return Math.abs(new Date(first.publishedAt).getTime() - new Date(second.publishedAt).getTime()) / 3_600_000;
+}
+
+function setSimilarity(first: Set<string>, second: Set<string>): number {
+  if (first.size === 0 || second.size === 0) return 0;
+  const intersection = [...first].filter((value) => second.has(value)).length;
+  return intersection / new Set([...first, ...second]).size;
+}
+
+function articleCountries(article: NormalizedArticle): Set<string> {
+  return new Set(article.countries.map(({ code }) => code));
+}
+
+function articleTopics(article: NormalizedArticle): Set<string> {
+  return new Set(article.topics.filter((topic) => topic !== "world"));
+}
+
+function entityHints(article: NormalizedArticle): Set<string> {
+  const text = `${article.title}\n${article.description ?? ""}`.normalize("NFKC");
+  const countryNames = new Set(article.countries.map(({ name }) => name.toLocaleLowerCase("en")));
+  const matches = [...text.matchAll(/(?:^|[^\p{L}\p{N}])([\p{Lu}][\p{L}\p{M}\p{N}'’-]{2,}(?:\s+[\p{Lu}][\p{L}\p{M}\p{N}'’-]{2,}){0,3})/gu)];
+  return new Set(
+    matches
+      .map((match) => match[1].toLocaleLowerCase("en"))
+      .filter((value) => !countryNames.has(value)),
+  );
+}
+
+function articleFeatures(article: NormalizedArticle): {
+  countries: Set<string>;
+  entities: Set<string>;
+  topics: Set<string>;
+} {
+  const cached = articleFeatureCache.get(article);
+  if (cached) return cached;
+  const features = {
+    countries: articleCountries(article),
+    entities: entityHints(article),
+    topics: articleTopics(article),
+  };
+  articleFeatureCache.set(article, features);
+  return features;
+}
+
+function candidateFeatures(first: NormalizedArticle, second: NormalizedArticle): Omit<PairFeatures, "semantic" | "hybrid"> {
+  const hours = hoursBetween(first, second);
+  const firstFeatures = articleFeatures(first);
+  const secondFeatures = articleFeatures(second);
+  return {
+    entities: setSimilarity(firstFeatures.entities, secondFeatures.entities),
+    countries: setSimilarity(firstFeatures.countries, secondFeatures.countries),
+    lexical: tokenSimilarity(first.title, second.title),
+    topics: setSimilarity(firstFeatures.topics, secondFeatures.topics),
+    temporal: Math.max(0, 1 - hours / CLUSTER_WINDOW_HOURS),
+  };
+}
+
+function isCheapCandidate(first: NormalizedArticle, second: NormalizedArticle): boolean {
+  if (hoursBetween(first, second) > CLUSTER_WINDOW_HOURS) return false;
+  const features = candidateFeatures(first, second);
+  return features.countries > 0 || features.entities > 0 || features.topics > 0 || features.lexical >= 0.25;
+}
+
+function canClusterLexically(first: NormalizedArticle, second: NormalizedArticle): boolean {
   return (
-    hoursApart <= 72 &&
-    countriesOverlap(first, second) &&
+    hoursBetween(first, second) <= CLUSTER_WINDOW_HOURS &&
+    setSimilarity(articleCountries(first), articleCountries(second)) > 0 &&
     tokenSimilarity(first.title, second.title) >= 0.42
   );
+}
+
+function semanticInput(article: NormalizedArticle): string {
+  return [
+    article.title,
+    article.description?.slice(0, 1_000) ?? "",
+    `Countries: ${article.countries.map(({ code }) => code).sort().join(", ")}`,
+    `Topics: ${[...article.topics].sort().join(", ")}`,
+  ]
+    .join("\n")
+    .normalize("NFKC")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function semanticContentHash(article: NormalizedArticle): string {
+  return createHash("sha256").update(semanticInput(article)).digest("hex");
+}
+
+function cosineSimilarity(first: number[], second: number[]): number {
+  if (first.length === 0 || first.length !== second.length) return 0;
+  let dot = 0;
+  let firstMagnitude = 0;
+  let secondMagnitude = 0;
+  for (let index = 0; index < first.length; index += 1) {
+    dot += first[index] * second[index];
+    firstMagnitude += first[index] ** 2;
+    secondMagnitude += second[index] ** 2;
+  }
+  if (firstMagnitude === 0 || secondMagnitude === 0) return 0;
+  return Math.max(0, Math.min(1, dot / Math.sqrt(firstMagnitude * secondMagnitude)));
+}
+
+function hybridFeatures(
+  first: NormalizedArticle,
+  second: NormalizedArticle,
+  firstEmbedding: number[],
+  secondEmbedding: number[],
+): PairFeatures {
+  const cheap = candidateFeatures(first, second);
+  const semantic = cosineSimilarity(firstEmbedding, secondEmbedding);
+  const hybrid =
+    semantic * 0.45 +
+    cheap.entities * 0.18 +
+    cheap.countries * 0.15 +
+    cheap.lexical * 0.1 +
+    cheap.topics * 0.05 +
+    cheap.temporal * 0.07;
+  return { semantic, ...cheap, hybrid };
+}
+
+function canClusterSemantically(features: PairFeatures): boolean {
+  const support = Math.max(features.entities, features.countries, features.topics, features.lexical);
+  return (
+    (features.hybrid >= 0.58 && features.semantic >= 0.72 && support > 0) ||
+    (features.lexical >= 0.62 && features.countries > 0 && features.semantic >= 0.45)
+  );
+}
+
+async function embeddingsFor(
+  articles: NormalizedArticle[],
+  provider: TextEmbeddingProvider,
+): Promise<{ vectors: Map<string, number[]>; cacheHits: number; computed: number }> {
+  const vectors = new Map<string, number[]>();
+  const missing: Array<{ article: NormalizedArticle; hash: string; text: string }> = [];
+  let cacheHits = 0;
+  for (const article of articles) {
+    const hash = `${provider.id}:${semanticContentHash(article)}`;
+    const cached = embeddingCache.get(hash);
+    if (cached) {
+      cacheHits += 1;
+      vectors.set(article.canonicalUrl, cached);
+    } else {
+      missing.push({ article, hash, text: semanticInput(article) });
+    }
+  }
+  if (missing.length > 0) {
+    const embedded = await provider.embed(missing.map(({ text }) => text));
+    if (embedded.length !== missing.length) throw new Error("Embedding count did not match the request");
+    const dimension = embedded[0]?.length;
+    if (!dimension || embedded.some((vector) => vector.length !== dimension || vector.some((value) => !Number.isFinite(value)))) {
+      throw new Error("Embedding vectors were invalid");
+    }
+    embedded.forEach((vector, index) => {
+      const item = missing[index];
+      embeddingCache.set(item.hash, vector, EMBEDDING_CACHE_TTL_MS);
+      vectors.set(item.article.canonicalUrl, vector);
+    });
+  }
+  return { vectors, cacheHits, computed: missing.length };
 }
 
 function aggregateCountries(articles: NormalizedArticle[]): CountryReference[] {
@@ -26,7 +198,7 @@ function aggregateCountries(articles: NormalizedArticle[]): CountryReference[] {
       if (!current || country.relevanceScore > current.relevanceScore) countries.set(country.code, country);
     }
   }
-  return [...countries.values()].sort((a, b) => b.relevanceScore - a.relevanceScore);
+  return [...countries.values()].sort((first, second) => second.relevanceScore - first.relevanceScore);
 }
 
 function fingerprintFor(article: NormalizedArticle, countries: CountryReference[]): string {
@@ -35,17 +207,21 @@ function fingerprintFor(article: NormalizedArticle, countries: CountryReference[
   return createHash("sha256").update(`${tokens}|${codes}`).digest("hex").slice(0, 32);
 }
 
-function toCandidate(articles: NormalizedArticle[]): StoryCandidate {
+function pairKey(first: NormalizedArticle, second: NormalizedArticle): string {
+  return [first.canonicalUrl, second.canonicalUrl].sort().join("|");
+}
+
+function toCandidate(articles: NormalizedArticle[], pairScores = new Map<string, number>()): StoryCandidate {
   const ordered = [...articles].sort(
-    (a, b) =>
-      b.importanceScore - a.importanceScore ||
-      new Date(a.publishedAt).getTime() - new Date(b.publishedAt).getTime(),
+    (first, second) =>
+      second.importanceScore - first.importanceScore ||
+      new Date(first.publishedAt).getTime() - new Date(second.publishedAt).getTime(),
   );
   const representative = ordered[0];
   const dates = articles.map((article) => new Date(article.publishedAt).getTime());
   const countries = aggregateCountries(articles);
-  const pairScores = articles.slice(1).map((article) =>
-    tokenSimilarity(representative.title, article.title),
+  const scores = articles.slice(1).map((article) =>
+    pairScores.get(pairKey(representative, article)) ?? tokenSimilarity(representative.title, article.title),
   );
   return {
     fingerprint: fingerprintFor(representative, countries),
@@ -56,22 +232,117 @@ function toCandidate(articles: NormalizedArticle[]): StoryCandidate {
     countries,
     topics: [...new Set(articles.flatMap((article) => article.topics))],
     importanceScore: Math.min(1, Math.max(...articles.map((article) => article.importanceScore)) + Math.min(0.18, articles.length * 0.04)),
-    clusterScore:
-      pairScores.length === 0
-        ? 1
-        : pairScores.reduce((sum, score) => sum + score, 0) / pairScores.length,
+    clusterScore: scores.length === 0 ? 1 : scores.reduce((sum, score) => sum + score, 0) / scores.length,
     articles,
   };
 }
 
-export function clusterArticles(articles: NormalizedArticle[]): StoryCandidate[] {
+function buildClusters(
+  articles: NormalizedArticle[],
+  canCluster: (first: NormalizedArticle, second: NormalizedArticle) => boolean,
+  pairScores?: Map<string, number>,
+): StoryCandidate[] {
   const clusters: NormalizedArticle[][] = [];
   for (const article of articles) {
-    const cluster = clusters.find((candidate) =>
-      candidate.some((existing) => canCluster(existing, article)),
-    );
+    const cluster = clusters.find((candidate) => candidate.some((existing) => canCluster(existing, article)));
     if (cluster) cluster.push(article);
     else clusters.push([article]);
   }
-  return clusters.map(toCandidate);
+  return clusters.map((cluster) => toCandidate(cluster, pairScores));
+}
+
+export function clusterArticles(articles: NormalizedArticle[]): StoryCandidate[] {
+  return buildClusters(articles, canClusterLexically);
+}
+
+export async function clusterArticlesHybrid(
+  articles: NormalizedArticle[],
+  options: HybridClusteringOptions = {},
+): Promise<StoryCandidate[]> {
+  const provider = options.embeddingProvider === undefined
+    ? configuredTextEmbeddingProvider()
+    : options.embeddingProvider;
+  if (!provider) {
+    const fallback = clusterArticles(articles);
+    logNews("info", "story_clustering_completed", {
+      semanticEnabled: false,
+      lexicalFallbackCount: articles.length,
+      storyClusterCount: fallback.length,
+    });
+    return fallback;
+  }
+
+  const candidatePairs: Array<[NormalizedArticle, NormalizedArticle]> = [];
+  const candidatesForEmbedding = new Map<string, NormalizedArticle>();
+  for (let firstIndex = 0; firstIndex < articles.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < articles.length; secondIndex += 1) {
+      const first = articles[firstIndex];
+      const second = articles[secondIndex];
+      if (!isCheapCandidate(first, second)) continue;
+      candidatePairs.push([first, second]);
+      candidatesForEmbedding.set(first.canonicalUrl, first);
+      candidatesForEmbedding.set(second.canonicalUrl, second);
+    }
+  }
+
+  if (candidatePairs.length === 0) {
+    const singles = articles.map((article) => toCandidate([article]));
+    logNews("info", "story_clustering_completed", {
+      semanticEnabled: true,
+      embeddingProvider: provider.id,
+      candidatePairCount: 0,
+      lexicalFallbackCount: 0,
+      storyClusterCount: singles.length,
+    });
+    return singles;
+  }
+
+  let embedded: Awaited<ReturnType<typeof embeddingsFor>>;
+  try {
+    embedded = await embeddingsFor([...candidatesForEmbedding.values()], provider);
+  } catch (error) {
+    const fallback = clusterArticles(articles);
+    logNews("warn", "embedding_batch_failed", {
+      embeddingProvider: provider.id,
+      code: error instanceof Error ? error.name : "UNEXPECTED_FAILURE",
+      lexicalFallbackCount: candidatePairs.length,
+    });
+    logNews("info", "story_clustering_completed", {
+      semanticEnabled: false,
+      lexicalFallbackCount: candidatePairs.length,
+      storyClusterCount: fallback.length,
+    });
+    return fallback;
+  }
+
+  const pairScores = new Map<string, number>();
+  const pairDecisions = new Map<string, boolean>();
+  for (const [first, second] of candidatePairs) {
+    const firstEmbedding = embedded.vectors.get(first.canonicalUrl);
+    const secondEmbedding = embedded.vectors.get(second.canonicalUrl);
+    if (!firstEmbedding || !secondEmbedding) continue;
+    const features = hybridFeatures(first, second, firstEmbedding, secondEmbedding);
+    const key = pairKey(first, second);
+    pairScores.set(key, features.hybrid);
+    pairDecisions.set(key, canClusterSemantically(features));
+  }
+  const clusters = buildClusters(
+    articles,
+    (first, second) => pairDecisions.get(pairKey(first, second)) ?? false,
+    pairScores,
+  );
+  logNews("info", "story_clustering_completed", {
+    semanticEnabled: true,
+    embeddingProvider: provider.id,
+    candidatePairCount: candidatePairs.length,
+    embeddingCacheHits: embedded.cacheHits,
+    embeddingsComputed: embedded.computed,
+    lexicalFallbackCount: 0,
+    storyClusterCount: clusters.length,
+  });
+  return clusters;
+}
+
+export function resetEmbeddingCacheForTesting(): void {
+  embeddingCache.clear();
 }

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import { detectCountries } from "./countries/detectCountries";
-import { getCountryName, normalizeCountryCode } from "./countries/metadata";
-import { resolveSource } from "./sources/registry";
+import { detectCountrySignals } from "./countries/detectCountries";
+import { logNews } from "./logger";
+import { resolveSourceDetailed } from "./sources/registry";
 import { detectTopics } from "./topics";
 import type { NormalizedArticle, ProviderArticle } from "./types";
 import { canonicalizeArticleUrl, isSafeHttpUrl } from "./url";
@@ -41,7 +41,7 @@ export function normalizeProviderArticle(article: ProviderArticle): NormalizedAr
 
   const canonicalUrl = canonicalizeArticleUrl(article.url);
   const language = normalizeLanguage(article.language);
-  const source = resolveSource({
+  const resolvedSource = resolveSourceDetailed({
     provider: article.provider,
     sourceName: article.sourceName,
     sourceIdentifier: article.sourceIdentifier,
@@ -50,20 +50,36 @@ export function normalizeProviderArticle(article: ProviderArticle): NormalizedAr
     sourceScope: article.sourceScope,
     sourceRegion: article.sourceRegion,
     language,
+    metadataOrigin: article.sourceMetadataOrigin,
   });
+  const source = resolvedSource.source;
   const description = article.description ? cleanProviderText(article.description) || null : null;
-  const countries = detectCountries(title, description, articleUrlLocationText(article.url));
-  for (const rawCode of article.coverageCountries ?? []) {
-    const code = normalizeCountryCode(rawCode);
-    if (!code) continue;
-    const existing = countries.find((country) => country.code === code);
-    if (existing) {
-      existing.relevanceScore = Math.max(existing.relevanceScore, 0.9);
-    } else {
-      countries.push({ code, name: getCountryName(code), relevanceScore: 0.9 });
-    }
-  }
-  countries.sort((first, second) => second.relevanceScore - first.relevanceScore);
+  const countrySignals = detectCountrySignals({
+    title,
+    description,
+    supplementalText: articleUrlLocationText(article.url),
+    coverageCountries: article.coverageCountries,
+    structuredCountryCodes: article.structuredCountryCodes,
+    structuredLocations: article.structuredLocations,
+  });
+  const countries = countrySignals.map(({ code, name, relevanceScore }) => ({ code, name, relevanceScore }));
+  const articleRef = createHash("sha256")
+    .update(`${article.provider}:${article.providerArticleId}`)
+    .digest("hex")
+    .slice(0, 12);
+  logNews("info", "source_country_resolved", {
+    provider: article.provider,
+    articleRef,
+    method: resolvedSource.resolution.method,
+    confidence: resolvedSource.resolution.confidence,
+    countryCode: source.countryCode,
+  });
+  logNews("info", "country_detection_completed", {
+    provider: article.provider,
+    articleRef,
+    countryCodes: countrySignals.map(({ code }) => code),
+    methods: [...new Set(countrySignals.flatMap(({ methods }) => methods))],
+  });
   const topics = detectTopics(title, description);
 
   return {

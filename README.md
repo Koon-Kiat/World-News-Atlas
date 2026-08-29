@@ -14,7 +14,7 @@ Fixture mode is an explicit development option only. Production returns live sto
 - Story-first results with grouped publisher coverage and links to original live articles.
 - Provider adapters for NewsAPI, GDELT, publisher RSS/Atom feeds, and Bing News RSS discovery with original-publisher URL extraction.
 - Provider-independent source registry and many-to-one provider identifier mapping.
-- Deterministic country detection, topic classification, URL canonicalization, deduplication, story clustering, and ranking.
+- Layered multilingual country detection, deterministic topic classification, URL canonicalization, deduplication, hybrid semantic/lexical story clustering, and ranking.
 - PostgreSQL schema, Prisma migration, database seed, manual ingestion command, structured logs, caching, rate limiting, response validation, provider timeouts, and RSS SSRF controls.
 - Device-local Light, Dark, and System themes with a pre-hydration theme bootstrap to prevent a wrong-theme flash.
 - Opt-in fixtures for local development and tests; disabled by default and never required by the production UI.
@@ -28,9 +28,9 @@ NewsAPI       GDELT       Bing News RSS       trusted publisher feeds
                 |
           normalization
                 |
-  country detection + source registry
+  multilingual country/entity signals + layered source resolution
                 |
-    URL deduplication + clustering
+ URL deduplication + hybrid semantic/lexical clustering
                 |
              ranking
                 |
@@ -86,6 +86,10 @@ The current ChatGPT Sites deployment uses live HTTP providers because hosted Sit
 | `GDELT_ENABLED` | No | Enables credential-free GDELT ingestion; defaults to `false`. |
 | `NEWS_FIXTURES_ENABLED` | No | Opts into fixture fallback for local development or ingestion tests; defaults to `false`. |
 | `NEWS_PROVIDER_TIMEOUT_MS` | No | External request timeout, clamped to 2–30 seconds; defaults to 8 seconds. |
+| `NEWS_SEMANTIC_CLUSTERING_ENABLED` | No | Enables the semantic stage when set to `true` and an embedding credential is present. Defaults to deterministic lexical clustering. |
+| `NEWS_EMBEDDING_API_KEY` | When semantic clustering is enabled | Server-only credential for the configured OpenAI embedding adapter. |
+| `NEWS_EMBEDDING_MODEL` | No | Embedding model name; defaults to `text-embedding-3-small`. |
+| `NEWS_EMBEDDING_TIMEOUT_MS` | No | Embedding request timeout, clamped to 1–15 seconds; defaults to 5 seconds. |
 | `RSS_FEEDS_JSON` | No | JSON array of server-controlled, rights-reviewed RSS/Atom feed definitions. |
 
 There are intentionally no `NEXT_PUBLIC_` provider variables.
@@ -105,7 +109,7 @@ The command:
 3. Normalizes provider-specific responses.
 4. separates publisher country from mentioned countries.
 5. Removes canonical URL and strong headline duplicates.
-6. Builds deterministic story clusters.
+6. Builds hybrid semantic/lexical story clusters when configured, or deterministic lexical clusters otherwise.
 7. Persists articles, provider references, country/topic relations, and stories when `DATABASE_URL` is set.
 8. Logs received, normalized, rejected, duplicate, stored, and story counts without logging secrets.
 
@@ -124,6 +128,8 @@ The command has no hosting-provider dependency. A later deployment can invoke it
 | Fixtures | None | Disabled by default. Available only as an explicit local development/testing fallback. |
 
 Publisher availability is never assumed. Entries such as BBC, Reuters, AP, NHK, and CNA in the source registry are identity mappings only; they do not claim that a current provider or subscription returns those publishers.
+
+Publisher identity and country resolution is layered. Maintained registry identities and provider-specific identifiers take precedence, followed by canonical registrable-domain matching, provider metadata, reviewed RSS configuration, and reliable ccTLD signals. Generic domains such as `.com`, `.org`, and `.net` never create a country assignment. Resolution method and confidence are retained internally for logs and tests, while the public API continues to expose the same source shape.
 
 RSS items are accepted only when the publisher supplies a parseable publication time. Missing, invalid, implausibly future, or out-of-range dates are rejected rather than being relabelled as newly published.
 
@@ -194,7 +200,9 @@ The Settings page and every news-page header provide Light, Dark, and System con
 
 Ranking is deterministic and politically neutral. Newest sorting uses publication time. Popularity is an explicit coverage proxy—not readership data—and prioritizes story importance, independent-source count, source-country diversity, geographic relevance, and modest recency. Two-country results require both countries through direct article or reviewed country-category signals, reward balanced country relevance and bilateral headline focus, and penalize long incidental country lists. A publisher's home country alone never creates a bilateral match.
 
-These modules are intentionally replaceable. Future entity extraction, embeddings, or human editorial signals can be added without changing provider adapters or UI contracts.
+Country detection is provider-independent and combines explicit coverage metadata, structured locations, names from twelve language datasets, curated aliases/demonyms/cities, conservative ISO handling, and lower-confidence URL path hints. Publisher origin remains strictly separate from article subject geography.
+
+Clustering keeps lexical comparison as a cheap deterministic signal and adds a provider-independent `TextEmbeddingProvider` boundary. The configured OpenAI adapter batches requests, validates vector responses, enforces a timeout, and sends only normalized headline, short description, detected country codes, and topic labels. Candidate generation narrows semantic comparisons by time, country, topic, entity, and lexical overlap. Embeddings use a stable semantic-content hash in a bounded 24-hour process-local cache. Story fingerprints remain based on stable headline/country attributes rather than model vectors. Missing configuration, invalid responses, timeouts, and provider failures all fall back to lexical clustering without interrupting ingestion.
 
 ## Security and content handling
 
@@ -219,9 +227,9 @@ Review the current official terms for every selected provider and publisher befo
 
 ## Current MVP limitations
 
-- Country detection is conservative and primarily optimized for English metadata.
-- Lexical clustering is effective for close headline variants but is not semantic clustering.
-- Source-country discovery for unknown domains depends on provider/config metadata and will need an expanded maintained registry.
+- Multilingual country detection now combines structured metadata, aliases, demonyms, cities, ISO codes, and geographic URL hints, but ambiguous geopolitical references and locations outside the curated major-city set remain best-effort.
+- Story clustering uses hybrid semantic and lexical similarity when semantic embeddings are explicitly configured and gracefully falls back to deterministic lexical clustering otherwise. The embedding cache is process-local rather than shared or database-backed.
+- Publisher-country resolution uses a structured registry, provider identifiers, RSS metadata, registrable domains, and reliable ccTLD signals; truly unknown, globally hosted, or internationally repurposed country-code domains may remain unclassified.
 - Cache and rate-limit state are process-local; multi-instance deployments should use a shared implementation.
 - Live-provider browsing is finite for the chosen time range and provider result windows. Infinite scroll paginates the complete candidate set; it does not crawl publisher sites or bypass provider/API limits.
 - No automatic translation, accounts, saved stories, admin UI, or full-content storage is implemented.
@@ -238,4 +246,4 @@ npx prisma validate
 npm audit
 ```
 
-The test suite covers selection limits and deselection, one- and two-country matching, source-country perspectives, country/source distinction, ambiguous country terms, provider normalization, canonical URLs, deduplication, clustering, two-country relevance, provider failure isolation and coalescing, RSS publication dates, API validation, bounded rate limiting, progressive pagination, and theme persistence. GitHub Actions starts PostgreSQL 17, applies the real migration, and runs integration tests for persistence, repeated ingestion, reclustering, stale-story cleanup, database filtering, newest ordering, two-country results, and pagination beyond 250 stories.
+The test suite covers selection limits and deselection, one- and two-country matching, source-country perspectives, multilingual country/entity signals, ambiguous country terms and ISO false positives, layered publisher/domain/ccTLD resolution, provider normalization, canonical URLs, deduplication, hybrid semantic clustering, embedding batching/caching/timeouts/fallback, two-country relevance, provider failure isolation and coalescing, RSS publication dates, API validation, bounded rate limiting, progressive pagination, and theme persistence. GitHub Actions starts PostgreSQL 17, applies the real migration, and runs integration tests for persistence, repeated ingestion, reclustering, stale-story cleanup, database filtering, newest ordering, two-country results, and pagination beyond 250 stories.

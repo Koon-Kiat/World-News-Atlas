@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectCountries } from "@/lib/news/countries/detectCountries";
+import { detectCountries, detectCountrySignals } from "@/lib/news/countries/detectCountries";
 import { countryNameToCode, getCountryFlag, listCountries } from "@/lib/news/countries/metadata";
 import { COUNTRY_SIGNALS } from "@/lib/news/countries/aliases";
 import { normalizeProviderArticle } from "@/lib/news/normalize";
@@ -60,6 +60,55 @@ describe("country detection", () => {
     });
 
     expect(article.countries.map(({ code }) => code)).toContain("SG");
+  });
+
+  it.each([
+    ["日本政府が新政策を発表", "JP"],
+    ["中国経済の成長率", "CN"],
+    ["대한민국 대통령이 회담을 발표", "KR"],
+    ["Deutschland kündigt neue Maßnahmen an", "DE"],
+    ["La France annonce de nouvelles mesures", "FR"],
+  ])("recognizes multilingual country text: %s", (headline, code) => {
+    expect(detectCountries(headline).map((country) => country.code)).toContain(code);
+  });
+
+  it("recognizes multilingual aliases and mixed-language headlines", () => {
+    expect(detectCountries("日本と Estados Unidos firman un acuerdo").map(({ code }) => code)).toEqual(
+      expect.arrayContaining(["JP", "US"]),
+    );
+    expect(detectCountries("Россия and Deutschland reopen talks").map(({ code }) => code)).toEqual(
+      expect.arrayContaining(["RU", "DE"]),
+    );
+  });
+
+  it("uses capitals and major cities as medium-high confidence signals", () => {
+    const countries = detectCountrySignals({ title: "Leaders meet in 서울 before talks move to Berlin" });
+    expect(countries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "KR", relevanceScore: expect.any(Number), methods: expect.arrayContaining(["city"]) }),
+        expect.objectContaining({ code: "DE", relevanceScore: expect.any(Number), methods: expect.arrayContaining(["city"]) }),
+      ]),
+    );
+    expect(countries.find(({ code }) => code === "KR")!.relevanceScore).toBeGreaterThanOrEqual(0.79);
+  });
+
+  it("rejects ambiguous country words and unsafe ISO-code false positives", () => {
+    expect(detectCountries("Jordan scores for the Chicago team").map(({ code }) => code)).not.toContain("JO");
+    expect(detectCountries("IT teams meet IN the main office").map(({ code }) => code)).not.toEqual(
+      expect.arrayContaining(["IT", "IN"]),
+    );
+  });
+
+  it("prioritizes provider coverage and structured metadata over weaker inference", () => {
+    const countries = detectCountrySignals({
+      title: "La France annonce une réforme",
+      coverageCountries: ["JP"],
+      structuredCountryCodes: ["DE"],
+      structuredLocations: ["Seoul"],
+    });
+    expect(countries[0]).toMatchObject({ code: "JP", relevanceScore: 1 });
+    expect(countries.find(({ code }) => code === "DE")).toMatchObject({ relevanceScore: 0.98 });
+    expect(countries.find(({ code }) => code === "KR")?.methods).toContain("structured_location");
   });
 
   it("renders ISO country flags and a global fallback", () => {

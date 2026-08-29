@@ -107,7 +107,10 @@ export interface ProviderArticle {
   sourceCountry?: string | null;
   sourceScope?: SourceScope | null;
   sourceRegion?: string | null;
+  sourceMetadataOrigin?: "provider" | "rss-config";
   coverageCountries?: string[];
+  structuredCountryCodes?: string[];
+  structuredLocations?: string[];
 }
 
 export interface ProviderFetchRequest {

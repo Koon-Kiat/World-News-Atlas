@@ -97,7 +97,7 @@ describe("provider normalization", () => {
     });
 
     expect(result.countries).toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: "SG", relevanceScore: 0.9 })]),
+      expect.arrayContaining([expect.objectContaining({ code: "SG", relevanceScore: 1 })]),
     );
   });
 });

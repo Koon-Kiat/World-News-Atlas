@@ -1,7 +1,13 @@
-import { describe, expect, it } from "vitest";
-import { clusterArticles } from "@/lib/news/cluster";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  clusterArticles,
+  clusterArticlesHybrid,
+  resetEmbeddingCacheForTesting,
+  semanticContentHash,
+} from "@/lib/news/cluster";
 import { normalizeProviderArticle } from "@/lib/news/normalize";
 import { scoreTwoCountryRelevance } from "@/lib/news/ranking";
+import type { TextEmbeddingProvider } from "@/lib/news/embeddings";
 import type { StoryView } from "@/lib/news/types";
 
 function normalized(id: string, title: string) {
@@ -19,6 +25,8 @@ function normalized(id: string, title: string) {
 }
 
 describe("story clustering", () => {
+  beforeEach(() => resetEmbeddingCacheForTesting());
+
   it("groups similar coverage but leaves a different event separate", () => {
     const clusters = clusterArticles([
       normalized("one", "Japan and Singapore launch digital shipping corridor"),
@@ -27,6 +35,94 @@ describe("story clustering", () => {
     ]);
     expect(clusters).toHaveLength(2);
     expect(clusters.map((cluster) => cluster.articles.length).sort()).toEqual([1, 2]);
+  });
+
+  it("clusters semantic headline variants without merging a different event", async () => {
+    const articles = [
+      normalized("lunar", "Japan launches new lunar spacecraft"),
+      normalized("moon", "Tokyo sends its latest probe toward the Moon"),
+      normalized("chips", "Japan announces new semiconductor subsidies"),
+    ];
+    const embed = vi.fn(async (texts: string[]) => texts.map((text) => {
+      if (text.includes("lunar")) return [1, 0, 0];
+      if (text.includes("probe")) return [0.995, 0.1, 0];
+      return [0, 1, 0];
+    }));
+    const provider: TextEmbeddingProvider = { id: "test:semantic", embed };
+
+    const clusters = await clusterArticlesHybrid(articles, { embeddingProvider: provider });
+
+    expect(clusters).toHaveLength(2);
+    expect(clusters.map((cluster) => cluster.articles.length).sort()).toEqual([1, 2]);
+    expect(clusters.find((cluster) => cluster.articles.length === 2)?.articles.map(({ providerArticleId }) => providerArticleId)).toEqual(
+      expect.arrayContaining(["lunar", "moon"]),
+    );
+    expect(embed).toHaveBeenCalledTimes(1);
+    expect(embed.mock.calls[0][0]).toHaveLength(3);
+  });
+
+  it("reuses cached embeddings by stable semantic content hash", async () => {
+    const articles = [
+      normalized("cache-one", "Japan and Singapore launch a lunar project"),
+      normalized("cache-two", "Singapore and Japan start a Moon project"),
+    ];
+    const embed = vi.fn(async (texts: string[]) => texts.map(() => [1, 0]));
+    const provider: TextEmbeddingProvider = { id: "test:cache", embed };
+
+    await clusterArticlesHybrid(articles, { embeddingProvider: provider });
+    await clusterArticlesHybrid(articles, { embeddingProvider: provider });
+
+    expect(embed).toHaveBeenCalledTimes(1);
+    expect(semanticContentHash(articles[0])).toBe(semanticContentHash({ ...articles[0] }));
+    expect(semanticContentHash(articles[0])).not.toBe(semanticContentHash({ ...articles[0], title: `${articles[0].title} updated` }));
+  });
+
+  it("degrades to deterministic lexical clustering when embeddings fail", async () => {
+    const articles = [
+      normalized("fallback-one", "Japan and Singapore launch digital shipping corridor"),
+      normalized("fallback-two", "Singapore and Japan launch digital corridor for shipping"),
+    ];
+    const provider: TextEmbeddingProvider = {
+      id: "test:failing",
+      embed: vi.fn(async () => { throw new Error("simulated outage"); }),
+    };
+
+    const clusters = await clusterArticlesHybrid(articles, { embeddingProvider: provider });
+
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].articles).toHaveLength(2);
+  });
+
+  it("uses lexical-only clustering when no embedding provider is configured", async () => {
+    const articles = [
+      normalized("no-key-one", "Japan and Singapore launch digital shipping corridor"),
+      normalized("no-key-two", "Singapore and Japan launch digital corridor for shipping"),
+    ];
+    await expect(clusterArticlesHybrid(articles, { embeddingProvider: null })).resolves.toHaveLength(1);
+  });
+
+  it("embeds only articles that survive cheap candidate generation", async () => {
+    const related = [
+      normalized("candidate-one", "Japan and Singapore launch digital shipping corridor"),
+      normalized("candidate-two", "Singapore and Japan start a digital shipping corridor"),
+    ];
+    const unrelated = normalizeProviderArticle({
+      provider: "RSS",
+      providerArticleId: "unrelated-weather",
+      title: "Municipal weather office records overnight rainfall",
+      description: null,
+      url: "https://weather.example/unrelated",
+      publishedAt: new Date().toISOString(),
+      sourceName: "Weather Desk",
+    });
+    const embed = vi.fn(async (texts: string[]) => texts.map(() => [1, 0]));
+
+    await clusterArticlesHybrid([...related, unrelated], {
+      embeddingProvider: { id: "test:candidates", embed },
+    });
+
+    expect(embed).toHaveBeenCalledTimes(1);
+    expect(embed.mock.calls[0][0]).toHaveLength(2);
   });
 });
 

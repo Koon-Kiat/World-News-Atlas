@@ -1,0 +1,156 @@
+[
+  {
+    "name": "BBC",
+    "domain": "bbc.com",
+    "alternateDomains": ["bbc.co.uk"],
+    "countryCode": "GB",
+    "region": null,
+    "language": "en",
+    "scope": "INTERNATIONAL",
+    "qualityScore": 0.9,
+    "providerIdentifiers": { "NEWSAPI": ["bbc-news"], "GDELT": ["bbc.com", "bbc.co.uk"] }
+  },
+  {
+    "name": "Reuters",
+    "domain": "reuters.com",
+    "alternateDomains": [],
+    "countryCode": "GB",
+    "region": null,
+    "language": "en",
+    "scope": "INTERNATIONAL",
+    "qualityScore": 0.92,
+    "providerIdentifiers": { "GDELT": ["reuters.com"] }
+  },
+  {
+    "name": "Associated Press",
+    "domain": "apnews.com",
+    "alternateDomains": [],
+    "countryCode": "US",
+    "region": null,
+    "language": "en",
+    "scope": "INTERNATIONAL",
+    "qualityScore": 0.92,
+    "providerIdentifiers": { "GDELT": ["apnews.com"], "NEWSAPI": ["associated-press"] }
+  },
+  {
+    "name": "NHK",
+    "domain": "nhk.or.jp",
+    "alternateDomains": ["www3.nhk.or.jp"],
+    "countryCode": "JP",
+    "region": null,
+    "language": "ja",
+    "scope": "NATIONAL",
+    "qualityScore": 0.88,
+    "providerIdentifiers": { "GDELT": ["nhk.or.jp"] }
+  },
+  {
+    "name": "CNA",
+    "domain": "channelnewsasia.com",
+    "alternateDomains": [],
+    "countryCode": "SG",
+    "region": "Asia",
+    "language": "en",
+    "scope": "NATIONAL",
+    "qualityScore": 0.88,
+    "providerIdentifiers": { "GDELT": ["channelnewsasia.com"] }
+  },
+  {
+    "name": "The Straits Times",
+    "domain": "straitstimes.com",
+    "alternateDomains": [],
+    "countryCode": "SG",
+    "region": "Asia",
+    "language": "en",
+    "scope": "NATIONAL",
+    "qualityScore": 0.84,
+    "providerIdentifiers": { "GDELT": ["straitstimes.com"] }
+  },
+  {
+    "name": "The Japan Times",
+    "domain": "japantimes.co.jp",
+    "alternateDomains": [],
+    "countryCode": "JP",
+    "region": "Asia",
+    "language": "en",
+    "scope": "NATIONAL",
+    "qualityScore": 0.84,
+    "providerIdentifiers": { "GDELT": ["japantimes.co.jp"] }
+  },
+  {
+    "name": "The Guardian",
+    "domain": "theguardian.com",
+    "alternateDomains": [],
+    "countryCode": "GB",
+    "region": null,
+    "language": "en",
+    "scope": "INTERNATIONAL",
+    "qualityScore": 0.9,
+    "providerIdentifiers": { "GDELT": ["theguardian.com"] }
+  },
+  {
+    "name": "Al Jazeera",
+    "domain": "aljazeera.com",
+    "alternateDomains": [],
+    "countryCode": "QA",
+    "region": "Middle East",
+    "language": "en",
+    "scope": "INTERNATIONAL",
+    "qualityScore": 0.88,
+    "providerIdentifiers": { "GDELT": ["aljazeera.com"] }
+  },
+  {
+    "name": "DW",
+    "domain": "dw.com",
+    "alternateDomains": [],
+    "countryCode": "DE",
+    "region": "Europe",
+    "language": "en",
+    "scope": "INTERNATIONAL",
+    "qualityScore": 0.87,
+    "providerIdentifiers": { "GDELT": ["dw.com"] }
+  },
+  {
+    "name": "France 24",
+    "domain": "france24.com",
+    "alternateDomains": [],
+    "countryCode": "FR",
+    "region": "Europe",
+    "language": "en",
+    "scope": "INTERNATIONAL",
+    "qualityScore": 0.86,
+    "providerIdentifiers": { "GDELT": ["france24.com"] }
+  },
+  {
+    "name": "Euronews",
+    "domain": "euronews.com",
+    "alternateDomains": [],
+    "countryCode": "FR",
+    "region": "Europe",
+    "language": "en",
+    "scope": "INTERNATIONAL",
+    "qualityScore": 0.82,
+    "providerIdentifiers": { "GDELT": ["euronews.com"] }
+  },
+  {
+    "name": "Sky News",
+    "domain": "sky.com",
+    "alternateDomains": ["news.sky.com", "skynews.com"],
+    "countryCode": "GB",
+    "region": "Europe",
+    "language": "en",
+    "scope": "INTERNATIONAL",
+    "qualityScore": 0.84,
+    "providerIdentifiers": { "NEWSAPI": ["sky-news"], "GDELT": ["news.sky.com"] }
+  },
+  {
+    "name": "NPR",
+    "domain": "npr.org",
+    "alternateDomains": [],
+    "countryCode": "US",
+    "region": "North America",
+    "language": "en",
+    "scope": "INTERNATIONAL",
+    "qualityScore": 0.88,
+    "providerIdentifiers": { "NEWSAPI": ["national-public-radio"], "GDELT": ["npr.org"] }
+  }
+]
