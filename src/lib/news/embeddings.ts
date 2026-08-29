@@ -72,7 +72,7 @@ export function configuredTextEmbeddingProvider(
   environment: Record<string, string | undefined> = process.env,
 ): TextEmbeddingProvider | null {
   if (environment.NEWS_SEMANTIC_CLUSTERING_ENABLED?.toLocaleLowerCase("en") !== "true") return null;
-  const apiKey = environment.NEWS_EMBEDDING_API_KEY?.trim();
+  const apiKey = environment.NEWS_EMBEDDING_API_KEY?.trim() || environment.OPENAI_API_KEY?.trim();
   if (!apiKey) return null;
   const model = environment.NEWS_EMBEDDING_MODEL?.trim() || "text-embedding-3-small";
   return new OpenAiTextEmbeddingProvider(apiKey, model, boundedTimeout(environment.NEWS_EMBEDDING_TIMEOUT_MS));
