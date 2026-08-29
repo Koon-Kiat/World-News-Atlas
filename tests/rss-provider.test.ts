@@ -47,6 +47,30 @@ describe("RSS provider", () => {
     expect(result.articles[0].imageUrl).toBe("https://i.guim.co.uk/example-700.jpg");
   });
 
+  it("samples a bounded result across feeds instead of exhausting the first feed", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const isGuardian = url.includes("theguardian.com");
+        const prefix = isGuardian ? "guardian" : "bbc";
+        return new Response(
+          `<?xml version="1.0"?><rss version="2.0"><channel><title>World</title><item><title>${prefix} one</title><link>https://example.com/${prefix}-one</link><guid>${prefix}-one</guid><pubDate>Tue, 25 Aug 2026 12:00:00 GMT</pubDate></item><item><title>${prefix} two</title><link>https://example.com/${prefix}-two</link><guid>${prefix}-two</guid><pubDate>Tue, 25 Aug 2026 12:01:00 GMT</pubDate></item></channel></rss>`,
+          { status: 200, headers: { "Content-Type": "application/rss+xml" } },
+        );
+      }),
+    );
+
+    const provider = new RssProvider(DEFAULT_RSS_FEEDS.slice(0, 2));
+    const result = await provider.fetchLatest({ limit: 3 });
+
+    expect(result.articles.map((article) => article.providerArticleId)).toEqual([
+      "bbc-one",
+      "guardian-one",
+      "bbc-two",
+    ]);
+  });
+
   it("retains full article text when a publisher includes it in content:encoded", async () => {
     vi.stubGlobal(
       "fetch",

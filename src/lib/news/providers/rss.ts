@@ -34,6 +34,22 @@ interface RssMediaFields {
   mediaThumbnail?: RssMediaNode[];
 }
 
+export function takeRoundRobin<T>(batches: T[][], limit: number): T[] {
+  const selected: T[] = [];
+  const maximum = Math.max(0, Math.floor(limit));
+  for (let index = 0; selected.length < maximum; index += 1) {
+    let added = false;
+    for (const batch of batches) {
+      if (index >= batch.length) continue;
+      selected.push(batch[index]);
+      added = true;
+      if (selected.length >= maximum) break;
+    }
+    if (!added) break;
+  }
+  return selected;
+}
+
 function feedImage(item: Parser.Item & RssMediaFields): string | null {
   const mediaCandidates = [
     ...(item.mediaContent ?? []),
@@ -177,13 +193,14 @@ export class RssProvider implements NewsProvider {
         });
       }),
     );
-    const articles = settled.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
+    const articleBatches = settled.map((result) => (result.status === "fulfilled" ? result.value : []));
+    const articles = takeRoundRobin(articleBatches, request.limit ?? 250);
     if (this.feeds.length > 0 && articles.length === 0 && settled.every((result) => result.status === "rejected")) {
       throw new ProviderError(this.name, "ALL_FEEDS_FAILED", "All configured RSS feeds failed");
     }
     return {
       provider: this.name,
-      articles: articles.slice(0, request.limit ?? 250),
+      articles,
       receivedAt: new Date().toISOString(),
     };
   }
