@@ -11,6 +11,7 @@ import type { NewsQuery, StoryView } from "./types";
 
 const LIVE_CACHE_TTL_MS = 60 * 60_000;
 const MAX_LIVE_CACHE_ENTRIES = 40;
+const DEFAULT_LIVE_ARTICLE_LIMIT = 96;
 const liveCaches = new Map<string, { expiresAt: number; stories: StoryView[] }>();
 const PROVIDER_COUNTRY_NAMES: Record<string, string> = {
   CN: "China",
@@ -178,6 +179,28 @@ function providerSearchQuery(query: NewsQuery): string | undefined {
   return terms.map((term) => `"${term}"`).join(" AND ");
 }
 
+function liveArticleLimit(): number {
+  const configured = Number(process.env.NEWS_LIVE_ARTICLE_LIMIT ?? DEFAULT_LIVE_ARTICLE_LIMIT);
+  return Number.isFinite(configured)
+    ? Math.max(24, Math.min(150, Math.floor(configured)))
+    : DEFAULT_LIVE_ARTICLE_LIMIT;
+}
+
+function takeDiverseArticles<T>(batches: T[][], limit: number): T[] {
+  const selected: T[] = [];
+  for (let index = 0; selected.length < limit; index += 1) {
+    let added = false;
+    for (const batch of batches) {
+      if (index >= batch.length) continue;
+      selected.push(batch[index]);
+      added = true;
+      if (selected.length >= limit) break;
+    }
+    if (!added) break;
+  }
+  return selected;
+}
+
 async function loadLiveStories(query: NewsQuery): Promise<StoryView[]> {
   const searchQuery = providerSearchQuery(query);
   const cacheKey = `${query.period}|${searchQuery ?? "latest"}`;
@@ -187,27 +210,27 @@ async function loadLiveStories(query: NewsQuery): Promise<StoryView[]> {
   try {
     const providers = createConfiguredProviders();
     if (providers.length === 0) return [];
+    const limit = liveArticleLimit();
     const request = {
       from: new Date(Date.now() - newsPeriodHours(query.period) * 3_600_000),
       countries: query.countries,
-      limit: 250,
+      limit,
     };
-    const results = searchQuery
-      ? await Promise.all([
-          fetchProviderArticlesGracefully(
-            providers.filter((provider) => provider.name !== "RSS"),
-            { ...request, query: searchQuery },
-          ),
-          // Publisher feeds are already a bounded, reviewed candidate set.
-          // Keep the complete feed pool so direct mentions and reviewed
-          // country-category signals remain available to the final query.
-          fetchProviderArticlesGracefully(
-            providers.filter((provider) => provider.name === "RSS"),
-            request,
-          ),
-        ])
-      : [await fetchProviderArticlesGracefully(providers, request)];
-    const normalized = normalizeProviderArticles(results.flatMap((result) => result.articles));
+    const results = await Promise.all(
+      providers.map((provider) =>
+        fetchProviderArticlesGracefully(
+          [provider],
+          searchQuery && provider.name !== "RSS" ? { ...request, query: searchQuery } : request,
+        ),
+      ),
+    );
+    // Keep cold requests within hosted worker budgets while sampling every
+    // configured provider instead of letting the first large feed dominate.
+    const providerArticles = takeDiverseArticles(
+      results.map((result) => result.articles),
+      limit,
+    );
+    const normalized = normalizeProviderArticles(providerArticles);
     const deduplicated = deduplicateArticles(normalized);
     const stories = (await clusterArticlesHybrid(deduplicated.articles)).map<StoryView>((story) => ({
       id: story.fingerprint,

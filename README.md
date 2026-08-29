@@ -86,6 +86,7 @@ The current ChatGPT Sites deployment uses live HTTP providers because hosted Sit
 | `GDELT_ENABLED` | No | Enables credential-free GDELT ingestion; defaults to `false`. |
 | `NEWS_FIXTURES_ENABLED` | No | Opts into fixture fallback for local development or ingestion tests; defaults to `false`. |
 | `NEWS_PROVIDER_TIMEOUT_MS` | No | External request timeout, clamped to 2–30 seconds; defaults to 8 seconds. |
+| `NEWS_LIVE_ARTICLE_LIMIT` | No | Maximum live articles normalized on a cold request, clamped to 24–150; defaults to 96 and samples providers/feeds round-robin. |
 | `NEWS_SEMANTIC_CLUSTERING_ENABLED` | No | Enables the semantic stage when set to `true` and an embedding credential is present. Defaults to deterministic lexical clustering. |
 | `NEWS_EMBEDDING_API_KEY` or `OPENAI_API_KEY` | When semantic clustering is enabled | Server-only credential for the configured OpenAI embedding adapter. The project-specific variable takes precedence when both are set. |
 | `NEWS_EMBEDDING_MODEL` | No | Embedding model name; defaults to `text-embedding-3-small`. |
