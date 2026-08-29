@@ -1,8 +1,10 @@
+import sourceRegistry from "@/data/source-registry.json";
 import type { ProviderName, SourceScope } from "@/lib/news/types";
 
 export interface SourceSeed {
   name: string;
   domain: string;
+  alternateDomains: string[];
   countryCode: string | null;
   region: string | null;
   language: string | null;
@@ -11,80 +13,23 @@ export interface SourceSeed {
   providerIdentifiers: Partial<Record<ProviderName, string[]>>;
 }
 
-// This is a provider-independent identity registry, not a promise that any
-// provider currently distributes every listed publisher.
-export const KNOWN_SOURCE_SEEDS: SourceSeed[] = [
-  {
-    name: "BBC",
-    domain: "bbc.com",
-    countryCode: "GB",
-    region: null,
-    language: "en",
-    scope: "INTERNATIONAL",
-    qualityScore: 0.9,
-    providerIdentifiers: { NEWSAPI: ["bbc-news"], GDELT: ["bbc.com"] },
-  },
-  {
-    name: "Reuters",
-    domain: "reuters.com",
-    countryCode: "GB",
-    region: null,
-    language: "en",
-    scope: "INTERNATIONAL",
-    qualityScore: 0.92,
-    providerIdentifiers: { GDELT: ["reuters.com"] },
-  },
-  {
-    name: "Associated Press",
-    domain: "apnews.com",
-    countryCode: "US",
-    region: null,
-    language: "en",
-    scope: "INTERNATIONAL",
-    qualityScore: 0.92,
-    providerIdentifiers: { GDELT: ["apnews.com"] },
-  },
-  {
-    name: "NHK",
-    domain: "nhk.or.jp",
-    countryCode: "JP",
-    region: null,
-    language: "ja",
-    scope: "NATIONAL",
-    qualityScore: 0.88,
-    providerIdentifiers: { GDELT: ["nhk.or.jp"] },
-  },
-  {
-    name: "CNA",
-    domain: "channelnewsasia.com",
-    countryCode: "SG",
-    region: null,
-    language: "en",
-    scope: "NATIONAL",
-    qualityScore: 0.88,
-    providerIdentifiers: { GDELT: ["channelnewsasia.com"] },
-  },
-  {
-    name: "The Straits Times",
-    domain: "straitstimes.com",
-    countryCode: "SG",
-    region: null,
-    language: "en",
-    scope: "NATIONAL",
-    qualityScore: 0.84,
-    providerIdentifiers: { GDELT: ["straitstimes.com"] },
-  },
-  {
-    name: "The Japan Times",
-    domain: "japantimes.co.jp",
-    countryCode: "JP",
-    region: null,
-    language: "en",
-    scope: "NATIONAL",
-    qualityScore: 0.84,
-    providerIdentifiers: { GDELT: ["japantimes.co.jp"] },
-  },
-];
+// Publisher identity data is kept in a structured registry so it can grow
+// independently from provider and RSS configuration code.
+export const KNOWN_SOURCE_SEEDS: SourceSeed[] = (sourceRegistry as Array<{
+  name: string;
+  domain: string;
+  alternateDomains?: string[];
+  countryCode: string | null;
+  region: string | null;
+  language: string | null;
+  scope: SourceScope;
+  qualityScore: number;
+  providerIdentifiers?: Partial<Record<ProviderName, string[]>>;
+}>).map((source) => ({
+  ...source,
+  alternateDomains: source.alternateDomains ?? [],
+  providerIdentifiers: source.providerIdentifiers ?? {},
+}));
 
 export interface RssFeedConfig {
   name: string;

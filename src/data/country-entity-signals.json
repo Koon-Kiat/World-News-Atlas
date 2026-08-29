@@ -1,0 +1,128 @@
+[
+  {
+    "code": "JP",
+    "aliases": ["日本", "日本国", "Nippon", "Nihon"],
+    "demonyms": ["Japanese", "日本人"],
+    "cities": ["Tokyo", "Osaka", "Kyoto", "東京", "大阪", "京都"]
+  },
+  {
+    "code": "CN",
+    "aliases": ["中国", "中國", "中华人民共和国", "中華人民共和國"],
+    "demonyms": ["Chinese", "中国人", "中國人"],
+    "cities": ["Beijing", "Shanghai", "Shenzhen", "北京", "上海", "深圳"]
+  },
+  {
+    "code": "KR",
+    "aliases": ["South Korea", "Republic of Korea", "대한민국", "한국"],
+    "demonyms": ["South Korean", "Korean", "한국인"],
+    "cities": ["Seoul", "Busan", "서울", "부산"]
+  },
+  {
+    "code": "KP",
+    "aliases": ["North Korea", "DPRK", "조선민주주의인민공화국", "북한"],
+    "demonyms": ["North Korean"],
+    "cities": ["Pyongyang", "평양"]
+  },
+  {
+    "code": "DE",
+    "aliases": ["Deutschland", "Bundesrepublik Deutschland"],
+    "demonyms": ["German", "Deutsche", "Deutscher", "deutsch"],
+    "cities": ["Berlin", "Frankfurt", "Munich", "München", "Hamburg"]
+  },
+  {
+    "code": "FR",
+    "aliases": ["France", "République française"],
+    "demonyms": ["French", "français", "française"],
+    "cities": ["Paris", "Marseille", "Lyon"]
+  },
+  {
+    "code": "ES",
+    "aliases": ["España", "Reino de España"],
+    "demonyms": ["Spanish", "español", "española"],
+    "cities": ["Madrid", "Barcelona", "Valencia"]
+  },
+  {
+    "code": "PT",
+    "aliases": ["Portugal", "República Portuguesa"],
+    "demonyms": ["Portuguese", "português", "portuguesa"],
+    "cities": ["Lisbon", "Lisboa", "Porto"]
+  },
+  {
+    "code": "BR",
+    "aliases": ["Brazil", "Brasil", "República Federativa do Brasil"],
+    "demonyms": ["Brazilian", "brasileiro", "brasileira"],
+    "cities": ["Brasilia", "Brasília", "Sao Paulo", "São Paulo", "Rio de Janeiro"]
+  },
+  {
+    "code": "IT",
+    "aliases": ["Italia", "Repubblica Italiana"],
+    "demonyms": ["Italian", "italiano", "italiana"],
+    "cities": ["Rome", "Roma", "Milan", "Milano", "Naples", "Napoli"]
+  },
+  {
+    "code": "NL",
+    "aliases": ["Nederland", "Koninkrijk der Nederlanden"],
+    "demonyms": ["Dutch", "Nederlands", "Nederlandse"],
+    "cities": ["Amsterdam", "Rotterdam", "The Hague", "Den Haag"]
+  },
+  {
+    "code": "RU",
+    "aliases": ["Russia", "Россия", "Российская Федерация"],
+    "demonyms": ["Russian", "российский", "русский"],
+    "cities": ["Moscow", "Moskva", "Москва", "St Petersburg", "Saint Petersburg", "Санкт-Петербург"]
+  },
+  {
+    "code": "SA",
+    "aliases": ["Saudi Arabia", "السعودية", "المملكة العربية السعودية"],
+    "demonyms": ["Saudi", "سعودي", "سعودية"],
+    "cities": ["Riyadh", "Jeddah", "الرياض", "جدة"]
+  },
+  {
+    "code": "AE",
+    "aliases": ["United Arab Emirates", "UAE", "الإمارات العربية المتحدة"],
+    "demonyms": ["Emirati", "إماراتي", "إماراتية"],
+    "cities": ["Abu Dhabi", "Dubai", "أبو ظبي", "دبي"]
+  },
+  {
+    "code": "US",
+    "aliases": ["United States", "United States of America", "U.S.", "USA", "Estados Unidos", "États-Unis", "Vereinigte Staaten", "Stati Uniti", "Verenigde Staten", "США", "الولايات المتحدة", "美国", "美國", "米国", "미국"],
+    "demonyms": ["American", "estadounidense", "américain", "amerikanisch"],
+    "cities": ["Washington, D.C.", "New York City"]
+  },
+  {
+    "code": "GB",
+    "aliases": ["United Kingdom", "Britain", "Great Britain", "UK", "Reino Unido", "Royaume-Uni", "Vereinigtes Königreich", "Regno Unito", "Verenigd Koninkrijk", "Великобритания", "المملكة المتحدة", "英国", "英國", "イギリス", "영국"],
+    "demonyms": ["British", "británico", "britannique"],
+    "cities": ["London", "Edinburgh", "Londres", "Londra", "ロンドン", "伦敦", "런던"]
+  },
+  {
+    "code": "SG",
+    "aliases": ["Singapore", "S'pore", "S’pore", "新加坡", "シンガポール", "싱가포르"],
+    "demonyms": ["Singaporean"],
+    "cities": ["Singapore City"]
+  },
+  {
+    "code": "TR",
+    "aliases": ["Türkiye", "Republic of Türkiye"],
+    "demonyms": ["Turkish", "Türk"],
+    "cities": ["Ankara", "Istanbul", "İstanbul"],
+    "ambiguousAliases": ["Turkey"],
+    "contextTerms": ["government", "president", "parliament", "election", "Ankara", "Turkish", "Türkiye"]
+  },
+  {
+    "code": "GE",
+    "aliases": ["Republic of Georgia", "საქართველო"],
+    "demonyms": ["Georgian government", "Georgian president"],
+    "cities": ["Tbilisi", "თბილისი"],
+    "ambiguousAliases": ["Georgia"],
+    "contextTerms": ["government", "president", "parliament", "election", "Tbilisi", "Caucasus", "Republic of Georgia"]
+  },
+  {
+    "code": "JO",
+    "aliases": ["Hashemite Kingdom of Jordan", "الأردن"],
+    "demonyms": ["Jordanian", "أردني"],
+    "cities": ["Amman", "عمّان", "عمان"],
+    "ambiguousAliases": ["Jordan"],
+    "contextTerms": ["government", "king", "parliament", "Amman", "Jordanian", "Hashemite"]
+  }
+]

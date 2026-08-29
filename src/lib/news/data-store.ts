@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient, ProviderName, SourceScope } from "@prisma/client";
 import { getFixtureStories } from "@/data/fixture-news";
-import { clusterArticles } from "./cluster";
+import { clusterArticlesHybrid } from "./cluster";
 import { deduplicateArticles } from "./deduplicate";
 import { logNews } from "./logger";
 import { normalizeProviderArticles } from "./normalize";
@@ -209,7 +209,7 @@ async function loadLiveStories(query: NewsQuery): Promise<StoryView[]> {
       : [await fetchProviderArticlesGracefully(providers, request)];
     const normalized = normalizeProviderArticles(results.flatMap((result) => result.articles));
     const deduplicated = deduplicateArticles(normalized);
-    const stories = clusterArticles(deduplicated.articles).map<StoryView>((story) => ({
+    const stories = (await clusterArticlesHybrid(deduplicated.articles)).map<StoryView>((story) => ({
       id: story.fingerprint,
       title: story.title,
       summary: story.summary,

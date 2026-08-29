@@ -1,13 +1,40 @@
 import countryCodes from "i18n-iso-countries/codes.json";
+import arLocale from "i18n-iso-countries/langs/ar.json";
+import deLocale from "i18n-iso-countries/langs/de.json";
 import enLocale from "i18n-iso-countries/langs/en.json";
+import esLocale from "i18n-iso-countries/langs/es.json";
+import frLocale from "i18n-iso-countries/langs/fr.json";
+import itLocale from "i18n-iso-countries/langs/it.json";
+import jaLocale from "i18n-iso-countries/langs/ja.json";
+import koLocale from "i18n-iso-countries/langs/ko.json";
+import nlLocale from "i18n-iso-countries/langs/nl.json";
+import ptLocale from "i18n-iso-countries/langs/pt.json";
+import ruLocale from "i18n-iso-countries/langs/ru.json";
+import zhLocale from "i18n-iso-countries/langs/zh.json";
 
 type CountryCodeRow = [alpha2: string, alpha3: string, numeric: string, subdivision: string];
 type CountryName = string | string[];
+type CountryLocale = { locale: string; countries: Record<string, CountryName> };
 
 const codeRows = countryCodes as CountryCodeRow[];
 const countryNames = enLocale.countries as Record<string, CountryName>;
+const countryLocales: CountryLocale[] = [
+  enLocale,
+  jaLocale,
+  zhLocale,
+  koLocale,
+  deLocale,
+  frLocale,
+  esLocale,
+  ptLocale,
+  itLocale,
+  nlLocale,
+  arLocale,
+  ruLocale,
+] as CountryLocale[];
 const validCodes = new Set(codeRows.map(([alpha2]) => alpha2));
 const numericCodes = new Map(codeRows.map(([alpha2, , numeric]) => [numeric, alpha2]));
+const alpha3Codes = new Map(codeRows.map(([alpha2, alpha3]) => [alpha2, alpha3]));
 
 function normalizeName(value: string): string {
   return value
@@ -18,9 +45,14 @@ function normalizeName(value: string): string {
 }
 
 const namesToCodes = new Map<string, string>();
-Object.entries(countryNames).forEach(([code, names]) => {
-  const variants = Array.isArray(names) ? names : [names];
-  variants.forEach((name) => namesToCodes.set(normalizeName(name), code));
+countryLocales.forEach((locale) => {
+  Object.entries(locale.countries).forEach(([code, names]) => {
+    const variants = Array.isArray(names) ? names : [names];
+    variants.forEach((name) => {
+      const normalized = normalizeName(name);
+      if (!namesToCodes.has(normalized)) namesToCodes.set(normalized, code);
+    });
+  });
 });
 
 export function normalizeCountryCode(value: string): string | null {
@@ -43,9 +75,23 @@ export function getCountryFlag(code: string): string {
 }
 
 export function getCountryNameVariants(code: string): string[] {
-  const names = countryNames[code.toUpperCase()];
-  if (!names) return [];
-  return Array.isArray(names) ? names : [names];
+  return [...new Set(getCountryNameVariantsByLocale(code).map(({ name }) => name))];
+}
+
+export function getCountryNameVariantsByLocale(code: string): Array<{ locale: string; name: string }> {
+  const normalized = code.toUpperCase();
+  return countryLocales.flatMap((locale) => {
+    const names = locale.countries[normalized];
+    if (!names) return [];
+    return (Array.isArray(names) ? names : [names]).map((name) => ({
+      locale: locale.locale,
+      name,
+    }));
+  });
+}
+
+export function countryCodeToAlpha3(code: string): string | null {
+  return alpha3Codes.get(code.toUpperCase()) ?? null;
 }
 
 export function listCountries(): Array<{ code: string; name: string }> {
