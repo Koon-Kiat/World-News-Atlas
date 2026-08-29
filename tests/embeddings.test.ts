@@ -17,6 +17,10 @@ describe("semantic embedding provider", () => {
       NEWS_SEMANTIC_CLUSTERING_ENABLED: "true",
       NEWS_EMBEDDING_API_KEY: "server-only-test-key",
     })).toBeInstanceOf(OpenAiTextEmbeddingProvider);
+    expect(configuredTextEmbeddingProvider({
+      NEWS_SEMANTIC_CLUSTERING_ENABLED: "true",
+      OPENAI_API_KEY: "standard-server-only-test-key",
+    })).toBeInstanceOf(OpenAiTextEmbeddingProvider);
   });
 
   it("batches embedding requests and preserves vector order", async () => {
