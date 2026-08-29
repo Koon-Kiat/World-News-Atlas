@@ -59,24 +59,54 @@ const story: StoryView = {
 
 describe("Worldline Reader", () => {
   it("opens from the entire story card and offers an explicit publisher choice", async () => {
-    render(<StoryCard story={story} />);
+    const { container } = render(<StoryCard story={story} featured />);
 
     expect(screen.getByText("Global")).toBeInTheDocument();
+    expect(container.querySelector(".story-card.is-featured")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Read at Example News" })).toHaveTextContent("Read source");
     fireEvent.click(screen.getByRole("button", { name: /Read A shared technology project.*Worldline Reader/i }));
 
     expect(screen.getByRole("dialog", { name: story.title })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Back to stories" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back to stories" })).toHaveTextContent("");
+    expect(container.querySelector(".reader-brand")).not.toBeInTheDocument();
     expect(screen.queryByText("Coverage at a glance")).not.toBeInTheDocument();
     expect(screen.getByText("Choose how to read")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Open Example News/i })).toHaveAttribute("href", "https://example.com/story");
-
-    fireEvent.click(screen.getByRole("button", { name: "Compare coverage here" }));
-    expect(elementScrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: "smooth" }));
-    expect(screen.getByRole("heading", { name: "Original report" }).closest("section")).toHaveFocus();
+    expect(screen.getByRole("link", { name: "Open A shared technology project takes shape at Example News" })).toHaveAttribute("href", "https://example.com/story");
+    expect(screen.queryByRole("button", { name: /Compare .* reports here/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Close reader" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     await waitFor(() => expect(window.scrollTo).toHaveBeenCalled());
+  });
+
+  it("scrolls to the source comparison when more than one report is available", () => {
+    const comparisonStory: StoryView = {
+      ...story,
+      id: "comparison-story",
+      articles: [
+        ...story.articles,
+        {
+          ...story.articles[0],
+          id: "reader-article-two",
+          providerArticleId: "two",
+          title: "A second report adds international context",
+          url: "https://example.org/story",
+          canonicalUrl: "https://example.org/story",
+          source: {
+            ...story.articles[0].source,
+            name: "Example World",
+            domain: "example.org",
+          },
+        },
+      ],
+    };
+
+    render(<StoryCard story={comparisonStory} />);
+    fireEvent.click(screen.getByRole("button", { name: /Read A shared technology project.*Worldline Reader/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Compare 2 reports here" }));
+
+    expect(elementScrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: "smooth" }));
+    expect(screen.getByRole("heading", { name: "2 reports in this story" }).closest("section")).toHaveFocus();
   });
 });

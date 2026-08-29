@@ -33,6 +33,55 @@ function PublisherLink({ article, prominent = false }: { article: ArticleView; p
   );
 }
 
+function ReaderSourceCard({ article, index }: { article: ArticleView; index: number }) {
+  const canOpenOriginal = !article.isFixture && isSafeHttpUrl(article.url);
+  const content = (
+    <>
+      <div className="reader-source-index">{String(index + 1).padStart(2, "0")}</div>
+      <div>
+        <div className="reader-source-meta">
+          <strong>{article.source.name}</strong>
+          <time dateTime={article.publishedAt}>{formattedDate(article.publishedAt)}</time>
+        </div>
+        <h4>{article.title}</h4>
+        {article.description ? (
+          <>
+            <span className="reader-excerpt-label">Full available publisher excerpt</span>
+            <p>{article.description}</p>
+          </>
+        ) : (
+          <p className="reader-no-excerpt">This publisher did not include article text in its feed.</p>
+        )}
+        {canOpenOriginal && (
+          <span className="reader-source-action">
+            Open original
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M7 4h9v9M16 4 8.5 11.5M14 10v5H5V6h5" />
+            </svg>
+          </span>
+        )}
+      </div>
+    </>
+  );
+
+  if (canOpenOriginal) {
+    return (
+      <a
+        className="reader-source-card is-clickable"
+        href={article.url}
+        target="_blank"
+        rel="noopener noreferrer nofollow"
+        referrerPolicy="strict-origin-when-cross-origin"
+        aria-label={`Open ${article.title} at ${article.source.name}`}
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return <article className="reader-source-card">{content}</article>;
+}
+
 export function StoryReader({
   story,
   imageUrl,
@@ -139,12 +188,7 @@ export function StoryReader({
           <div className="reader-chrome-start">
             <button ref={backButtonRef} type="button" className="reader-back" onClick={requestClose} aria-label="Back to stories">
               <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m11.5 4.5-5.5 5.5 5.5 5.5M6.5 10H16" /></svg>
-              <span>Back</span>
             </button>
-            <div className="reader-brand">
-              <span className="brand-mark" aria-hidden="true"><span /></span>
-              <span>WORLDLINE READER</span>
-            </div>
           </div>
           <div className="reader-mode" aria-label="Current reading mode">
             <span aria-hidden="true">Aa</span>
@@ -201,25 +245,7 @@ export function StoryReader({
                 <h3 id={`reports-title-${story.id}`}>{story.articles.length === 1 ? "Original report" : `${story.articles.length} reports in this story`}</h3>
                 <div className="reader-source-list">
                   {story.articles.map((article, index) => (
-                    <article key={article.id} className="reader-source-card">
-                      <div className="reader-source-index">{String(index + 1).padStart(2, "0")}</div>
-                      <div>
-                        <div className="reader-source-meta">
-                          <strong>{article.source.name}</strong>
-                          <time dateTime={article.publishedAt}>{formattedDate(article.publishedAt)}</time>
-                        </div>
-                        <h4>{article.title}</h4>
-                        {article.description ? (
-                          <>
-                            <span className="reader-excerpt-label">Full available publisher excerpt</span>
-                            <p>{article.description}</p>
-                          </>
-                        ) : (
-                          <p className="reader-no-excerpt">This publisher did not include article text in its feed.</p>
-                        )}
-                        <PublisherLink article={article} />
-                      </div>
-                    </article>
+                    <ReaderSourceCard key={article.id} article={article} index={index} />
                   ))}
                 </div>
               </section>
@@ -233,9 +259,11 @@ export function StoryReader({
                   This reader presents publisher-supplied headlines, excerpts and source comparisons. The full original reporting remains with the publisher.
                 </p>
                 {lead && <PublisherLink article={lead} prominent />}
-                <button type="button" className="reader-stay-button" onClick={showCoverage}>
-                  Compare coverage here
-                </button>
+                {story.articles.length > 1 && (
+                  <button type="button" className="reader-stay-button" onClick={showCoverage}>
+                    Compare {story.articles.length} reports here
+                  </button>
+                )}
               </div>
               <div className="reader-facts">
                 <span>First published</span>
