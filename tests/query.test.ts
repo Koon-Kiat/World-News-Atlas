@@ -143,6 +143,62 @@ describe("news matching", () => {
     expect(result.sourceFacets.some((source) => source.name === sourceName && source.storyCount > 0)).toBe(true);
   });
 
+  it("filters by stable publisher ID while retaining display-name compatibility", () => {
+    const stories = getFixtureStories();
+    const stableId = stories[0].articles[0].source.id;
+    const byId = queryStories(stories, { ...baseQuery, sources: [stableId] });
+    const byName = queryStories(stories, { ...baseQuery, sources: [stories[0].articles[0].source.name] });
+    expect(byId.stories.length).toBeGreaterThan(0);
+    expect(byId.stories.flatMap((story) => story.articles).every((article) => article.source.id === stableId)).toBe(true);
+    expect(byName.stories.map(({ id }) => id)).toEqual(byId.stories.map(({ id }) => id));
+    expect(byId.sourceFacets.find(({ id }) => id === stableId)?.storyCount).toBeGreaterThan(0);
+  });
+
+  it("derives language facets from the matching result set", () => {
+    const result = queryStories(getFixtureStories(), baseQuery);
+    expect(result.languageFacets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "en", label: "English", storyCount: expect.any(Number) }),
+    ]));
+  });
+
+  it("combines country, local perspective, and Japanese language filters", () => {
+    const template = getFixtureStories()[0];
+    const localJapanese = {
+      ...template.articles[0],
+      id: "jp-local-ja",
+      language: "ja",
+      source: {
+        ...template.articles[0].source,
+        id: "nhk",
+        name: "NHK",
+        domain: "nhk.or.jp",
+        countryCode: "JP",
+        language: "ja",
+      },
+    };
+    const internationalEnglish = {
+      ...template.articles[1],
+      id: "international-en",
+      language: "en",
+      source: { ...template.articles[1].source, countryCode: "GB" },
+    };
+    const result = queryStories([{ ...template, articles: [localJapanese, internationalEnglish] }], {
+      ...baseQuery,
+      countries: ["JP"],
+      sourcePerspective: "local",
+      language: "ja",
+    });
+    expect(result.stories).toHaveLength(1);
+    expect(result.stories[0].articles.map(({ id }) => id)).toEqual(["jp-local-ja"]);
+    expect(result.languageFacets).toEqual([expect.objectContaining({ code: "ja" })]);
+  });
+
+  it("keeps an explicitly selected publisher in facets even when its count is zero", () => {
+    const result = queryStories(getFixtureStories(), { ...baseQuery, sources: ["nhk"] });
+    expect(result.stories).toHaveLength(0);
+    expect(result.sourceFacets).toContainEqual(expect.objectContaining({ id: "nhk", name: "NHK", storyCount: 0 }));
+  });
+
   it("filters each story's coverage to articles that match the selected topic", () => {
     const result = queryStories(getFixtureStories(), {
       ...baseQuery,

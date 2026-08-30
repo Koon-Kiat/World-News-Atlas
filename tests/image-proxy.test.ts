@@ -94,4 +94,22 @@ describe("publisher image relay", () => {
     expect(response.headers.get("content-type")).toContain("image/svg+xml");
     expect(await response.text()).toContain("Politics briefing");
   });
+
+  it("allows the reviewed NHK article host but not unreviewed image hosts", async () => {
+    const unreviewedImage = "https://images.unreviewed.example/nhk.jpg";
+    const fetchMock = vi.fn(async () => new Response(
+      `<html><head><meta property="og:image" content="${unreviewedImage}"></head></html>`,
+      { status: 200, headers: { "Content-Type": "text/html" } },
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+    const article = "https://news.web.nhk/newsweb/na/na-k1000000001";
+
+    const response = await GET(
+      new Request(`https://example.test/api/image?article=${encodeURIComponent(article)}&topic=world`),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("image/svg+xml");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });

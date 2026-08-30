@@ -42,6 +42,7 @@ const story: StoryView = {
     publishedAt: "2026-08-28T01:00:00.000Z",
     language: "en",
     source: {
+      id: "domain:example.com",
       name: "Example News",
       domain: "example.com",
       countryCode: null,

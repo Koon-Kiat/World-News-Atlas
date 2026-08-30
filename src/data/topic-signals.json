@@ -1,0 +1,74 @@
+[
+  {
+    "slug": "politics",
+    "label": "Politics",
+    "signals": {
+      "en": ["election", "elections", "parliament", "parliamentary", "minister", "ministers", "government", "governments", "diplomacy", "diplomatic", "summit", "summits", "politics", "political"],
+      "ja": ["政治", "選挙", "国会", "政府", "首相", "外交", "内閣", "議員", "政党"]
+    }
+  },
+  {
+    "slug": "business",
+    "label": "Business",
+    "signals": {
+      "en": ["trade", "trading", "market", "markets", "investment", "investments", "economy", "economic", "economics", "business", "businesses", "bank", "banks", "banking", "tariff", "tariffs"],
+      "ja": ["経済", "企業", "市場", "株価", "投資", "貿易", "銀行", "関税", "円相場", "景気"]
+    }
+  },
+  {
+    "slug": "technology",
+    "label": "Technology",
+    "signals": {
+      "en": ["technology", "technologies", "technological", "digital", "semiconductor", "semiconductors", "chip", "chips", "ai", "artificial intelligence", "cybersecurity", "cyberattack", "cybercrime", "software"],
+      "ja": ["技術", "テクノロジー", "半導体", "人工知能", "ＡＩ", "AI", "サイバー", "ソフトウェア", "デジタル"]
+    }
+  },
+  {
+    "slug": "society",
+    "label": "Society",
+    "signals": {
+      "en": ["education", "educational", "health", "healthcare", "housing", "community", "communities", "population", "populations", "society", "societal", "welfare"],
+      "ja": ["社会", "教育", "医療", "健康", "住宅", "人口", "福祉", "子育て", "介護", "暮らし"]
+    }
+  },
+  {
+    "slug": "climate",
+    "label": "Climate",
+    "signals": {
+      "en": ["climate", "emission", "emissions", "renewable", "renewables", "weather", "flood", "floods", "flooding", "wildfire", "wildfires", "typhoon"],
+      "ja": ["気候", "温暖化", "排出", "再生可能", "天気", "台風", "豪雨", "洪水", "山火事", "猛暑"]
+    }
+  },
+  {
+    "slug": "defence",
+    "label": "Defence",
+    "signals": {
+      "en": ["defence", "defense", "military", "national security", "navy", "naval", "army", "armies", "missile", "missiles"],
+      "ja": ["防衛", "軍事", "安全保障", "自衛隊", "海軍", "陸軍", "空軍", "ミサイル"]
+    }
+  },
+  {
+    "slug": "transport",
+    "label": "Transport",
+    "signals": {
+      "en": ["transport", "transportation", "aviation", "rail", "railway", "railways", "railroad", "shipping", "port", "ports", "airline", "airlines", "logistics"],
+      "ja": ["交通", "運輸", "鉄道", "新幹線", "航空", "港湾", "物流", "船舶", "空港"]
+    }
+  },
+  {
+    "slug": "culture",
+    "label": "Culture",
+    "signals": {
+      "en": ["culture", "cultural", "film", "films", "music", "musical", "museum", "museums", "art", "arts", "festival", "festivals", "literature"],
+      "ja": ["文化", "映画", "音楽", "美術", "博物館", "芸術", "祭り", "文学", "伝統"]
+    }
+  },
+  {
+    "slug": "sports",
+    "label": "Sports",
+    "signals": {
+      "en": ["sport", "sports", "football", "soccer", "olympic", "olympics", "cricket", "tennis", "championship", "championships", "baseball"],
+      "ja": ["スポーツ", "野球", "サッカー", "五輪", "オリンピック", "テニス", "相撲", "大会", "選手"]
+    }
+  }
+]

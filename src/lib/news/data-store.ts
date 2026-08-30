@@ -7,17 +7,27 @@ import { normalizeProviderArticles } from "./normalize";
 import { createConfiguredProviders, fetchProviderArticlesGracefully } from "./providers";
 import { newsPeriodHours } from "./periods";
 import { getCountryName } from "./countries/metadata";
+import { registrableDomain } from "./sources/domain";
+import {
+  canonicalSourceId,
+  sourceSeedForSelection,
+  sourceTargetsFromSelections,
+} from "./sources/registry";
 import type { NewsQuery, StoryView } from "./types";
 
 const LIVE_CACHE_TTL_MS = 60 * 60_000;
 const MAX_LIVE_CACHE_ENTRIES = 40;
 const DEFAULT_LIVE_ARTICLE_LIMIT = 96;
+const DEFAULT_DATABASE_CANDIDATE_LIMIT = 1_000;
 const liveCaches = new Map<string, { expiresAt: number; stories: StoryView[] }>();
 const PROVIDER_COUNTRY_NAMES: Record<string, string> = {
   CN: "China",
   GB: "United Kingdom",
   RU: "Russia",
   US: "US",
+};
+const PROVIDER_COUNTRY_ALIASES: Record<string, string[]> = {
+  JP: ["Japan", "日本", "日本国"],
 };
 
 function enumValue<T extends string>(value: T): T {
@@ -28,7 +38,20 @@ function databaseArticleAccessWhere(query: NewsQuery): Prisma.ArticleWhereInput 
   const filters: Prisma.ArticleWhereInput[] = [];
 
   if (query.sources.length > 0) {
-    filters.push({ source: { name: { in: query.sources } } });
+    const sourcePredicates: Prisma.SourceWhereInput[] = query.sources.flatMap((selection): Prisma.SourceWhereInput[] => {
+      const seed = sourceSeedForSelection(selection);
+      if (seed) {
+        return [
+          { name: seed.name },
+          { domain: { in: [...new Set([seed.domain, ...seed.alternateDomains].map(registrableDomain))] } },
+        ];
+      }
+      if (selection.startsWith("domain:")) {
+        return [{ domain: registrableDomain(selection.slice("domain:".length)) }];
+      }
+      return [{ name: selection }];
+    });
+    filters.push({ source: { is: { OR: sourcePredicates } } });
   }
 
   const perspectiveCountry = query.sourcePerspective === "local" || query.sourcePerspective === "first-country"
@@ -102,6 +125,7 @@ export async function loadDatabaseStories(
     orderBy: query.sort === "newest"
       ? [{ lastUpdatedAt: "desc" }, { importanceScore: "desc" }]
       : [{ importanceScore: "desc" }, { lastUpdatedAt: "desc" }],
+    take: databaseCandidateLimit(),
     include: {
       countries: { include: { country: true } },
       topics: { include: { topic: true } },
@@ -144,7 +168,11 @@ export async function loadDatabaseStories(
       publishedAt: article.publishedAt.toISOString(),
       language: article.language,
       source: {
-        id: article.source.id,
+        id: canonicalSourceId({
+          name: article.source.name,
+          domain: article.source.domain,
+          countryCode: article.source.countryCode,
+        }),
         name: article.source.name,
         domain: article.source.domain,
         countryCode: article.source.countryCode,
@@ -166,17 +194,30 @@ export async function loadDatabaseStories(
   })) as StoryView[];
 }
 
-function providerSearchQuery(query: NewsQuery): string | undefined {
-  const terms = [
-    ...query.countries.map((code) => PROVIDER_COUNTRY_NAMES[code] ?? getCountryName(code)),
-    ...(query.search ? [query.search] : []),
-  ]
-    .map((term) => term.replace(/["\\]/g, " ").replace(/\s+/g, " ").trim())
-    .filter(Boolean);
+export function providerSearchQuery(query: NewsQuery): string | undefined {
+  const countryGroups = query.countries.map((code) =>
+    PROVIDER_COUNTRY_ALIASES[code] ?? [PROVIDER_COUNTRY_NAMES[code] ?? getCountryName(code)],
+  );
+  const terms = countryGroups.map((aliases) => `(${aliases
+    .map((term) => term.replace(/["\\]/g, " ").replace(/\s+/gu, " ").trim())
+    .filter(Boolean)
+    .map((term) => `"${term}"`)
+    .join(" OR ")})`);
+  if (query.search) {
+    const search = query.search.replace(/["\\]/g, " ").replace(/\s+/gu, " ").trim();
+    if (search) terms.push(`"${search}"`);
+  }
   if (terms.length === 0) return undefined;
   // Fetch a focused candidate pool and let queryStories enforce the final
   // country/search intersection against normalized article signals.
-  return terms.map((term) => `"${term}"`).join(" AND ");
+  return terms.join(" AND ");
+}
+
+export function databaseCandidateLimit(): number {
+  const configured = Number(process.env.NEWS_DATABASE_CANDIDATE_LIMIT ?? DEFAULT_DATABASE_CANDIDATE_LIMIT);
+  return Number.isFinite(configured)
+    ? Math.max(300, Math.min(5_000, Math.floor(configured)))
+    : DEFAULT_DATABASE_CANDIDATE_LIMIT;
 }
 
 function liveArticleLimit(): number {
@@ -203,7 +244,14 @@ function takeDiverseArticles<T>(batches: T[][], limit: number): T[] {
 
 async function loadLiveStories(query: NewsQuery): Promise<StoryView[]> {
   const searchQuery = providerSearchQuery(query);
-  const cacheKey = `${query.period}|${searchQuery ?? "latest"}`;
+  const sourceTargets = sourceTargetsFromSelections(query.sources);
+  const cacheKey = JSON.stringify({
+    period: query.period,
+    query: searchQuery ?? "latest",
+    countries: query.countries,
+    language: query.language ?? null,
+    sourceTargets: sourceTargets.map(({ id }) => id).sort(),
+  });
   const liveCache = liveCaches.get(cacheKey);
   if (liveCache && liveCache.expiresAt > Date.now()) return liveCache.stories;
 
@@ -214,6 +262,8 @@ async function loadLiveStories(query: NewsQuery): Promise<StoryView[]> {
     const request = {
       from: new Date(Date.now() - newsPeriodHours(query.period) * 3_600_000),
       countries: query.countries,
+      language: query.language,
+      sourceTargets,
       limit,
     };
     const results = await Promise.all(

@@ -1,15 +1,10 @@
-import type { NewsPeriod, NewsSort } from "@/lib/news/types";
+import type { LanguageFacet, NewsPeriod, NewsSort, SourceFacet } from "@/lib/news/types";
 import { NEWS_PERIOD_OPTIONS } from "@/lib/news/periods";
+import { TOPIC_DEFINITIONS } from "@/lib/news/topics";
 import { FilterSelect } from "./FilterSelect";
 import { SourceFilter } from "./SourceFilter";
 
-const TOPICS = ["all", "politics", "business", "technology", "society", "climate", "transport"];
-const LANGUAGE_OPTIONS = [
-  { value: "all", label: "All languages" },
-  { value: "en", label: "English" },
-  { value: "ja", label: "Japanese" },
-  { value: "zh", label: "Chinese" },
-];
+const TOPICS = [{ slug: "all", label: "All" }, ...TOPIC_DEFINITIONS.map(({ slug, label }) => ({ slug, label }))];
 const SORT_OPTIONS: Array<{ value: NewsSort; label: string }> = [
   { value: "newest", label: "Newest first" },
   { value: "popular", label: "Most popular" },
@@ -20,7 +15,9 @@ interface NewsFiltersProps {
   period: NewsPeriod;
   sort: NewsSort;
   sources: string[];
-  availableSources: Array<{ name: string; storyCount: number }>;
+  selectedCountries: string[];
+  availableSources: SourceFacet[];
+  availableLanguages: LanguageFacet[];
   onTopicChange: (value: string) => void;
   onLanguageChange: (value: string) => void;
   onPeriodChange: (value: NewsPeriod) => void;
@@ -34,7 +31,9 @@ export function NewsFilters({
   period,
   sort,
   sources,
+  selectedCountries,
   availableSources,
+  availableLanguages,
   onTopicChange,
   onLanguageChange,
   onPeriodChange,
@@ -49,22 +48,33 @@ export function NewsFilters({
           {TOPICS.map((item) => (
             <button
               type="button"
-              key={item}
-              className={topic === item ? "topic-chip active" : "topic-chip"}
-              aria-pressed={topic === item}
-              onClick={() => onTopicChange(item)}
+              key={item.slug}
+              className={topic === item.slug ? "topic-chip active" : "topic-chip"}
+              aria-pressed={topic === item.slug}
+              onClick={() => onTopicChange(item.slug)}
             >
-              {item.charAt(0).toUpperCase() + item.slice(1)}
+              {item.label}
             </button>
           ))}
         </div>
       </div>
       <div className="compact-filters">
-        <SourceFilter availableSources={availableSources} value={sources} onChange={onSourcesChange} />
+        <SourceFilter
+          availableSources={availableSources}
+          selectedCountries={selectedCountries}
+          value={sources}
+          onChange={onSourcesChange}
+        />
         <FilterSelect
           label="Language"
           value={language}
-          options={LANGUAGE_OPTIONS}
+          options={[
+            { value: "all", label: "All languages" },
+            ...availableLanguages.map(({ code, label, storyCount }) => ({
+              value: code,
+              label: `${label} (${storyCount})`,
+            })),
+          ]}
           onChange={onLanguageChange}
         />
         <FilterSelect

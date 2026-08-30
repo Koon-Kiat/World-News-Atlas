@@ -71,7 +71,7 @@ describe("RSS provider", () => {
     ]);
   });
 
-  it("retains full article text when a publisher includes it in content:encoded", async () => {
+  it("prefers a short publisher summary over content:encoded article text", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -83,8 +83,56 @@ describe("RSS provider", () => {
     );
 
     const result = await new RssProvider([DEFAULT_RSS_FEEDS[0]]).fetchLatest();
-    expect(result.articles[0].description).toContain("First full paragraph");
-    expect(result.articles[0].description).toContain("Second full paragraph");
+    expect(result.articles[0].description).toBe("Short summary.");
+    expect(result.articles[0].description).not.toContain("First full paragraph");
+  });
+
+  it("sanitizes and truncates content:encoded when no summary exists", async () => {
+    const longBody = `<script>ignore()</script><p>${"日本語のニュース本文です。".repeat(100)}</p>`;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(
+        `<?xml version="1.0"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>World</title><item><title>Metadata fallback</title><link>https://www.bbc.com/news/articles/fallback</link><guid>fallback</guid><pubDate>Tue, 25 Aug 2026 12:00:00 GMT</pubDate><content:encoded><![CDATA[${longBody}]]></content:encoded></item></channel></rss>`,
+        { status: 200, headers: { "Content-Type": "application/rss+xml" } },
+      )),
+    );
+
+    const result = await new RssProvider([DEFAULT_RSS_FEEDS[0]]).fetchLatest();
+    expect(result.articles[0].description?.length).toBeLessThanOrEqual(801);
+    expect(result.articles[0].description).not.toContain("<script>");
+    expect(result.articles[0].description).toMatch(/…$/);
+  });
+
+  it("fetches only matching configured feeds for a selected publisher", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      void input;
+      return new Response(
+        `<?xml version="1.0"?><rss version="2.0"><channel><title>World</title></channel></rss>`,
+        { status: 200, headers: { "Content-Type": "application/rss+xml" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new RssProvider(DEFAULT_RSS_FEEDS.slice(0, 2)).fetchLatest({
+      sourceTargets: [{
+        id: "guardian",
+        name: "The Guardian",
+        domains: ["theguardian.com"],
+        providerIdentifiers: {},
+      }],
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).toContain("theguardian.com");
+  });
+
+  it("includes the reviewed Japanese NHK metadata feed", () => {
+    expect(DEFAULT_RSS_FEEDS).toContainEqual(expect.objectContaining({
+      sourceId: "nhk",
+      countryCode: "JP",
+      language: "ja",
+      feedUrl: "https://news.web.nhk/n-data/conf/na/rss/cat0.xml",
+    }));
   });
 
   it("matches every quoted country term for bilateral searches", async () => {

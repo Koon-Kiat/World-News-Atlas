@@ -1,91 +1,34 @@
-const TOPIC_SIGNALS: Record<string, RegExp[]> = {
-  politics: [
-    /\belections?\b/,
-    /\bparliament(?:ary)?\b/,
-    /\bministers?\b/,
-    /\bgovernment(?:s|al)?\b/,
-    /\bdiplomac(?:y|ies)\b/,
-    /\bdiplomatic\b/,
-    /\bsummits?\b/,
-    /\bpolitic(?:s|al)\b/,
-  ],
-  business: [
-    /\btrad(?:e|es|ing)\b/,
-    /\bmarkets?\b/,
-    /\binvestments?\b/,
-    /\beconom(?:y|ies|ic|ics)\b/,
-    /\bbusiness(?:es)?\b/,
-    /\bbanks?\b/,
-    /\bbanking\b/,
-    /\btariffs?\b/,
-  ],
-  technology: [
-    /\btechnolog(?:y|ies|ical)\b/,
-    /\bdigital\b/,
-    /\bsemiconductors?\b/,
-    /\bchips?\b/,
-    /\bai\b/,
-    /\bartificial intelligence\b/,
-    /\bcyber(?:security|attack|crime|warfare)?\b/,
-    /\bsoftware\b/,
-  ],
-  society: [
-    /\beducation(?:al)?\b/,
-    /\bhealth(?:care)?\b/,
-    /\bhousing\b/,
-    /\bcommunities?\b/,
-    /\bpopulations?\b/,
-    /\bsociet(?:y|ies|al)\b/,
-  ],
-  climate: [
-    /\bclimate\b/,
-    /\bemissions?\b/,
-    /\brenewables?\b/,
-    /\bweather\b/,
-    /\bflood(?:s|ing|ed)?\b/,
-    /\bwildfires?\b/,
-  ],
-  defence: [
-    /\bdefen[cs]e\b/,
-    /\bmilitary\b/,
-    /\bnational security\b/,
-    /\bnav(?:y|al)\b/,
-    /\barm(?:y|ies)\b/,
-  ],
-  transport: [
-    /\btransport(?:ation)?\b/,
-    /\baviation\b/,
-    /\brail(?:way|ways|road|roads)?\b/,
-    /\bshipping\b/,
-    /\bports?\b/,
-    /\bairlines?\b/,
-  ],
-  culture: [
-    /\bcultur(?:e|al)\b/,
-    /\bfilms?\b/,
-    /\bmusic(?:al)?\b/,
-    /\bmuseums?\b/,
-    /\barts?\b/,
-    /\bfestivals?\b/,
-  ],
-  sports: [
-    /\bsports?\b/,
-    /\bfootball\b/,
-    /\bolympics?\b/,
-    /\bcricket\b/,
-    /\btennis\b/,
-    /\bchampionships?\b/,
-  ],
-};
+import topicSignalData from "@/data/topic-signals.json";
+
+interface TopicDefinition {
+  slug: string;
+  label: string;
+  signals: Record<string, string[]>;
+}
+
+export const TOPIC_DEFINITIONS = topicSignalData as TopicDefinition[];
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function matchesSignal(text: string, signal: string): boolean {
+  const escaped = escapeRegExp(signal.normalize("NFKC").toLocaleLowerCase());
+  if (/^[\p{Script=Latin}\p{N} ]+$/u.test(signal)) {
+    return new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}([^\\p{L}\\p{N}]|$)`, "iu").test(text);
+  }
+  return text.includes(signal.normalize("NFKC").toLocaleLowerCase());
+}
 
 export function detectTopics(title: string, description?: string | null): string[] {
-  const text = `${title} ${description ?? ""}`.toLowerCase();
-  const topics = Object.entries(TOPIC_SIGNALS)
-    .filter(([, signals]) => signals.some((signal) => signal.test(text)))
-    .map(([topic]) => topic);
+  const text = `${title} ${description ?? ""}`.normalize("NFKC").toLocaleLowerCase();
+  const topics = TOPIC_DEFINITIONS
+    .filter(({ signals }) => Object.values(signals).flat().some((signal) => matchesSignal(text, signal)))
+    .map(({ slug }) => slug);
   return topics.length > 0 ? topics : ["world"];
 }
 
 export function topicLabel(slug: string): string {
-  return slug.charAt(0).toUpperCase() + slug.slice(1);
+  return TOPIC_DEFINITIONS.find((topic) => topic.slug === slug)?.label ??
+    slug.charAt(0).toUpperCase() + slug.slice(1);
 }

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { DEFAULT_RSS_FEEDS, type RssFeedConfig } from "@/config/news-sources";
 import { MemoryTtlCache } from "../bounded-cache";
 import { logNews } from "../logger";
+import { canonicalSourceId, domainFromUrl } from "../sources/registry";
 import type {
   ProviderArticle,
   ProviderFetchRequest,
@@ -16,6 +17,7 @@ import { ProviderError } from "./provider";
 import { RssProvider } from "./rss";
 
 const rssFeedSchema = z.object({
+  sourceId: z.string().min(1).max(80).optional(),
   name: z.string().min(1).max(120),
   feedUrl: z.url(),
   websiteUrl: z.url(),
@@ -38,6 +40,11 @@ export function rssFeedsFromEnvironment(): RssFeedConfig[] {
     const parsed = z.array(rssFeedSchema).max(100).parse(JSON.parse(raw));
     return parsed.map((feed) => ({
       ...feed,
+      sourceId: feed.sourceId ?? canonicalSourceId({
+        name: feed.name,
+        domain: domainFromUrl(feed.websiteUrl),
+        countryCode: feed.countryCode?.toUpperCase() ?? null,
+      }),
       countryCode: feed.countryCode?.toUpperCase() ?? null,
       coverageCountries: feed.coverageCountries?.map((code) => code.toUpperCase()),
     }));
@@ -96,6 +103,8 @@ function providerRequestKey(provider: NewsProvider, request: ProviderFetchReques
     from: requestTimeBucket(request.from),
     to: requestTimeBucket(request.to),
     countries: [...(request.countries ?? [])].sort(),
+    language: request.language ?? null,
+    sourceTargets: (request.sourceTargets ?? []).map(({ id }) => id).sort(),
     limit: request.limit ?? null,
   });
 }

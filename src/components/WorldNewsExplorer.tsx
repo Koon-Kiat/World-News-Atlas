@@ -387,7 +387,9 @@ export function WorldNewsExplorer({
             period={period}
             sort={sort}
             sources={sources}
+            selectedCountries={selectedCountries}
             availableSources={data.meta.sourceFacets}
+            availableLanguages={data.meta.languageFacets}
             onTopicChange={setTopic}
             onLanguageChange={setLanguage}
             onPeriodChange={changePeriod}

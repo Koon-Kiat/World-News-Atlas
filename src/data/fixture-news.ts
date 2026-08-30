@@ -15,6 +15,7 @@ const source = (
   scope: SourceReference["scope"],
   language = "en",
 ): SourceReference => ({
+  id: `fixture:${name.toLocaleLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`,
   name,
   domain: "example.com",
   countryCode,
