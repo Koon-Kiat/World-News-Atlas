@@ -34,6 +34,25 @@ interface DetectedSignal {
 interface PreparedText {
   normalized: string;
   lower: string;
+  nfkc: string;
+}
+
+interface PreparedPhrase {
+  compact: boolean;
+  lower: string;
+}
+
+interface PreparedCountrySignal {
+  signal: CountrySignals;
+  names: PreparedPhrase[];
+  englishNames: PreparedPhrase[];
+  demonyms: PreparedPhrase[];
+  locations: PreparedPhrase[];
+  ambiguousAliases: PreparedPhrase[];
+  contextTerms: PreparedPhrase[];
+  structuredPhrases: PreparedPhrase[];
+  urlPhrases: PreparedPhrase[];
+  isoCodes: string[];
 }
 
 const UNSAFE_ALPHA2_CODES = new Set([
@@ -41,10 +60,7 @@ const UNSAFE_ALPHA2_CODES = new Set([
 ]);
 const UNSAFE_ALPHA3_CODES = new Set(["ARE", "CAN"]);
 const COMPACT_SCRIPT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+const LETTER_OR_NUMBER = /[\p{L}\p{N}]/u;
 
 function normalizeText(value: string): string {
   return value.normalize("NFKD").replace(/\p{Diacritic}/gu, "");
@@ -52,31 +68,70 @@ function normalizeText(value: string): string {
 
 function prepareText(text: string): PreparedText {
   const normalized = normalizeText(text);
-  return { normalized, lower: normalized.toLocaleLowerCase() };
+  return {
+    normalized,
+    lower: normalized.toLocaleLowerCase(),
+    nfkc: text.normalize("NFKC"),
+  };
 }
 
-function containsPhrase(text: PreparedText, phrase: string): boolean {
+function preparePhrase(phrase: string): PreparedPhrase | null {
   const normalizedPhrase = normalizeText(phrase).trim();
-  if (normalizedPhrase.length < 2) return false;
-  if (COMPACT_SCRIPT.test(normalizedPhrase)) {
-    return text.lower.includes(normalizedPhrase.toLocaleLowerCase());
+  if (normalizedPhrase.length < 2) return null;
+  return {
+    compact: COMPACT_SCRIPT.test(normalizedPhrase),
+    lower: normalizedPhrase.toLocaleLowerCase(),
+  };
+}
+
+function preparePhrases(phrases: string[]): PreparedPhrase[] {
+  const prepared = new Map<string, PreparedPhrase>();
+  for (const phrase of phrases) {
+    const value = preparePhrase(phrase);
+    if (value) prepared.set(`${value.compact}:${value.lower}`, value);
   }
-  return new RegExp(
-    `(^|[^\\p{L}\\p{N}])${escapeRegExp(normalizedPhrase)}([^\\p{L}\\p{N}]|$)`,
-    "iu",
-  ).test(text.normalized);
+  return [...prepared.values()];
 }
 
-function containsIsoCode(text: string, code: string): boolean {
-  if (code.length === 2 && UNSAFE_ALPHA2_CODES.has(code)) return false;
-  if (code.length === 3 && UNSAFE_ALPHA3_CODES.has(code)) return false;
-  return new RegExp(
-    `(^|[^\\p{L}\\p{N}])${escapeRegExp(code)}(?!\\$)([^\\p{L}\\p{N}]|$)`,
-    "u",
-  ).test(text.normalize("NFKC"));
+function codePointBefore(value: string, index: number): string {
+  if (index <= 0) return "";
+  let start = index - 1;
+  const unit = value.charCodeAt(start);
+  if (unit >= 0xdc00 && unit <= 0xdfff && start > 0) start -= 1;
+  const point = value.codePointAt(start);
+  return point === undefined ? "" : String.fromCodePoint(point);
 }
 
-function countMatches(text: PreparedText, phrases: string[]): number {
+function codePointAt(value: string, index: number): string {
+  if (index >= value.length) return "";
+  const point = value.codePointAt(index);
+  return point === undefined ? "" : String.fromCodePoint(point);
+}
+
+function containsBounded(text: string, phrase: string, rejectDollarSuffix = false): boolean {
+  let offset = 0;
+  while (offset <= text.length - phrase.length) {
+    const index = text.indexOf(phrase, offset);
+    if (index < 0) return false;
+    const before = codePointBefore(text, index);
+    const after = codePointAt(text, index + phrase.length);
+    if (
+      (!before || !LETTER_OR_NUMBER.test(before)) &&
+      (!after || !LETTER_OR_NUMBER.test(after)) &&
+      (!rejectDollarSuffix || after !== "$")
+    ) return true;
+    offset = index + Math.max(1, phrase.length);
+  }
+  return false;
+}
+
+function containsPhrase(text: PreparedText, phrase: PreparedPhrase): boolean {
+  return phrase.compact
+    ? text.lower.includes(phrase.lower)
+    : containsBounded(text.lower, phrase.lower);
+}
+
+function countMatches(text: PreparedText, phrases: PreparedPhrase[]): number {
   return phrases.filter((phrase) => containsPhrase(text, phrase)).length;
 }
 
@@ -94,9 +149,36 @@ function safeNames(signal: CountrySignals): string[] {
   );
 }
 
-function hasAmbiguousContext(signal: CountrySignals, text: PreparedText, hasCorroboration: boolean): boolean {
-  return hasCorroboration || signal.contextTerms.some((term) => containsPhrase(text, term));
+function prepareIsoCodes(codes: string[]): string[] {
+  return [...new Set(codes)].filter((code) => {
+    if (code.length === 2 && UNSAFE_ALPHA2_CODES.has(code)) return false;
+    if (code.length === 3 && UNSAFE_ALPHA3_CODES.has(code)) return false;
+    return true;
+  });
 }
+
+const PREPARED_COUNTRY_SIGNALS: PreparedCountrySignal[] = COUNTRY_SIGNALS.map((signal) => {
+  const aliases = codeLikeAliases(signal);
+  const names = safeNames(signal);
+  const englishNames = signal.englishNames.filter((value) => !aliases.includes(value));
+  return {
+    signal,
+    names: preparePhrases(names),
+    englishNames: preparePhrases(englishNames),
+    demonyms: preparePhrases(signal.demonyms),
+    locations: preparePhrases(signal.locations),
+    ambiguousAliases: preparePhrases(signal.ambiguousAliases),
+    contextTerms: preparePhrases(signal.contextTerms),
+    structuredPhrases: preparePhrases([
+      ...names,
+      ...englishNames,
+      ...signal.demonyms,
+      ...signal.locations,
+    ]),
+    urlPhrases: preparePhrases([...names, ...englishNames, ...signal.locations]),
+    isoCodes: prepareIsoCodes([...signal.isoCodes, ...aliases]),
+  };
+});
 
 export function detectCountrySignals(options: CountryDetectionOptions): CountryDetectionDetail[] {
   const primaryText = `${options.title}\n${options.description ?? ""}`;
@@ -119,24 +201,19 @@ export function detectCountrySignals(options: CountryDetectionOptions): CountryD
   for (const code of options.coverageCountries ?? []) register(code, 1, "provider_coverage");
   for (const code of options.structuredCountryCodes ?? []) register(code, 0.98, "structured_country");
 
-  for (const signal of COUNTRY_SIGNALS) {
-    const names = safeNames(signal);
-    const englishNames = signal.englishNames.filter((value) => !codeLikeAliases(signal).includes(value));
-    const multilingualHits = countMatches(preparedPrimary, names);
-    const demonymHits = countMatches(preparedPrimary, signal.demonyms);
-    const cityHits = countMatches(preparedPrimary, signal.locations);
-    const englishHits = countMatches(preparedPrimary, englishNames);
-    const isoHits = [...signal.isoCodes, ...codeLikeAliases(signal)].filter((code) => containsIsoCode(primaryText, code)).length;
-    const structuredHits = countMatches(
-      preparedStructured,
-      [...names, ...englishNames, ...signal.demonyms, ...signal.locations],
-    );
-    const urlHits = countMatches(
-      preparedSupplemental,
-      [...names, ...englishNames, ...signal.locations],
-    );
+  for (const prepared of PREPARED_COUNTRY_SIGNALS) {
+    const { signal } = prepared;
+    const multilingualHits = countMatches(preparedPrimary, prepared.names);
+    const demonymHits = countMatches(preparedPrimary, prepared.demonyms);
+    const cityHits = countMatches(preparedPrimary, prepared.locations);
+    const englishHits = countMatches(preparedPrimary, prepared.englishNames);
+    const isoHits = prepared.isoCodes.filter((code) =>
+      containsBounded(preparedPrimary.nfkc, code, true)
+    ).length;
+    const structuredHits = countMatches(preparedStructured, prepared.structuredPhrases);
+    const urlHits = countMatches(preparedSupplemental, prepared.urlPhrases);
     const corroborated = multilingualHits + demonymHits + cityHits + structuredHits > 0;
-    const ambiguousHits = countMatches(preparedPrimary, signal.ambiguousAliases);
+    const ambiguousHits = countMatches(preparedPrimary, prepared.ambiguousAliases);
 
     if (structuredHits > 0) register(signal.code, 0.96, "structured_location");
     if (multilingualHits > 0) register(signal.code, 0.91, "multilingual_name");
@@ -145,10 +222,15 @@ export function detectCountrySignals(options: CountryDetectionOptions): CountryD
     if (isoHits > 0) register(signal.code, 0.69, "iso_code");
     if (urlHits > 0) register(signal.code, 0.52, "url_hint");
     if (englishHits > 0) {
-      const isOnlyAmbiguous = signal.ambiguousAliases.some((alias) => containsPhrase(preparedPrimary, alias)) && !corroborated;
+      const isOnlyAmbiguous = prepared.ambiguousAliases.some((alias) =>
+        containsPhrase(preparedPrimary, alias)
+      ) && !corroborated;
       if (!isOnlyAmbiguous) register(signal.code, 0.89, "english_fallback");
     }
-    if (ambiguousHits > 0 && hasAmbiguousContext(signal, preparedPrimary, corroborated)) {
+    if (
+      ambiguousHits > 0 &&
+      (corroborated || prepared.contextTerms.some((term) => containsPhrase(preparedPrimary, term)))
+    ) {
       register(signal.code, corroborated ? 0.82 : 0.64, "multilingual_name");
     }
   }
