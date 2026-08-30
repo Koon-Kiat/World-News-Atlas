@@ -1,5 +1,6 @@
 [
   {
+    "id": "bbc",
     "name": "BBC",
     "domain": "bbc.com",
     "alternateDomains": ["bbc.co.uk"],
@@ -11,6 +12,7 @@
     "providerIdentifiers": { "NEWSAPI": ["bbc-news"], "GDELT": ["bbc.com", "bbc.co.uk"] }
   },
   {
+    "id": "reuters",
     "name": "Reuters",
     "domain": "reuters.com",
     "alternateDomains": [],
@@ -22,6 +24,7 @@
     "providerIdentifiers": { "GDELT": ["reuters.com"] }
   },
   {
+    "id": "associated-press",
     "name": "Associated Press",
     "domain": "apnews.com",
     "alternateDomains": [],
@@ -33,9 +36,10 @@
     "providerIdentifiers": { "GDELT": ["apnews.com"], "NEWSAPI": ["associated-press"] }
   },
   {
+    "id": "nhk",
     "name": "NHK",
     "domain": "nhk.or.jp",
-    "alternateDomains": ["www3.nhk.or.jp"],
+    "alternateDomains": ["www3.nhk.or.jp", "news.web.nhk"],
     "countryCode": "JP",
     "region": null,
     "language": "ja",
@@ -44,6 +48,7 @@
     "providerIdentifiers": { "GDELT": ["nhk.or.jp"] }
   },
   {
+    "id": "cna",
     "name": "CNA",
     "domain": "channelnewsasia.com",
     "alternateDomains": [],
@@ -55,6 +60,7 @@
     "providerIdentifiers": { "GDELT": ["channelnewsasia.com"] }
   },
   {
+    "id": "straits-times",
     "name": "The Straits Times",
     "domain": "straitstimes.com",
     "alternateDomains": [],
@@ -66,6 +72,7 @@
     "providerIdentifiers": { "GDELT": ["straitstimes.com"] }
   },
   {
+    "id": "japan-times",
     "name": "The Japan Times",
     "domain": "japantimes.co.jp",
     "alternateDomains": [],
@@ -77,6 +84,7 @@
     "providerIdentifiers": { "GDELT": ["japantimes.co.jp"] }
   },
   {
+    "id": "guardian",
     "name": "The Guardian",
     "domain": "theguardian.com",
     "alternateDomains": [],
@@ -88,6 +96,7 @@
     "providerIdentifiers": { "GDELT": ["theguardian.com"] }
   },
   {
+    "id": "al-jazeera",
     "name": "Al Jazeera",
     "domain": "aljazeera.com",
     "alternateDomains": [],
@@ -99,6 +108,7 @@
     "providerIdentifiers": { "GDELT": ["aljazeera.com"] }
   },
   {
+    "id": "dw",
     "name": "DW",
     "domain": "dw.com",
     "alternateDomains": [],
@@ -110,6 +120,7 @@
     "providerIdentifiers": { "GDELT": ["dw.com"] }
   },
   {
+    "id": "france-24",
     "name": "France 24",
     "domain": "france24.com",
     "alternateDomains": [],
@@ -121,6 +132,7 @@
     "providerIdentifiers": { "GDELT": ["france24.com"] }
   },
   {
+    "id": "euronews",
     "name": "Euronews",
     "domain": "euronews.com",
     "alternateDomains": [],
@@ -132,6 +144,7 @@
     "providerIdentifiers": { "GDELT": ["euronews.com"] }
   },
   {
+    "id": "sky-news",
     "name": "Sky News",
     "domain": "sky.com",
     "alternateDomains": ["news.sky.com", "skynews.com"],
@@ -143,6 +156,7 @@
     "providerIdentifiers": { "NEWSAPI": ["sky-news"], "GDELT": ["news.sky.com"] }
   },
   {
+    "id": "npr",
     "name": "NPR",
     "domain": "npr.org",
     "alternateDomains": [],

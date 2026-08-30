@@ -4,25 +4,12 @@ import {
   type CountryDetectionMethod,
 } from "./countries/detectCountries";
 import { logNews } from "./logger";
+import { inferArticleLanguage } from "./language";
 import { resolveSourceDetailed, type SourceResolutionMethod } from "./sources/registry";
+import { cleanMetadataText, metadataExcerpt } from "./text";
 import { detectTopics } from "./topics";
 import type { NormalizedArticle, ProviderArticle } from "./types";
 import { canonicalizeArticleUrl, isSafeHttpUrl } from "./url";
-
-function normalizeLanguage(value: string | null | undefined): string {
-  const language = value?.trim().toLowerCase() ?? "und";
-  return /^[a-z]{2,3}(?:-[a-z0-9]{2,8})?$/.test(language) ? language : "und";
-}
-
-function cleanProviderText(value: string): string {
-  return value
-    .replace(/<!\[CDATA\[|\]\]>/g, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 function articleUrlLocationText(value: string): string {
   try {
@@ -47,13 +34,14 @@ interface NormalizedArticleWithTelemetry {
 }
 
 function normalizeProviderArticleWithTelemetry(article: ProviderArticle): NormalizedArticleWithTelemetry {
-  const title = cleanProviderText(article.title);
+  const title = cleanMetadataText(article.title);
   if (!title) throw new Error("Provider article has no title");
   const publishedAt = new Date(article.publishedAt);
   if (Number.isNaN(publishedAt.getTime())) throw new Error("Provider article has an invalid date");
 
   const canonicalUrl = canonicalizeArticleUrl(article.url);
-  const language = normalizeLanguage(article.language);
+  const description = metadataExcerpt(article.description).value;
+  const language = inferArticleLanguage(article.language, title, description);
   const resolvedSource = resolveSourceDetailed({
     provider: article.provider,
     sourceName: article.sourceName,
@@ -66,7 +54,6 @@ function normalizeProviderArticleWithTelemetry(article: ProviderArticle): Normal
     metadataOrigin: article.sourceMetadataOrigin,
   });
   const source = resolvedSource.source;
-  const description = article.description ? cleanProviderText(article.description) || null : null;
   const countrySignals = detectCountrySignals({
     title,
     description,
@@ -109,12 +96,26 @@ export function normalizeProviderArticles(
   const normalized: NormalizedArticle[] = [];
   const countryMethodCounts = new Map<string, number>();
   const sourceMethodCounts = new Map<string, number>();
+  const languageCounts = new Map<string, number>();
+  const sourceCountryCounts = new Map<string, number>();
   let missingCountryCount = 0;
   let unknownSourceCount = 0;
+  let jpLocalArticleCount = 0;
   for (const article of articles) {
     try {
       const result = normalizeProviderArticleWithTelemetry(article);
       normalized.push(result.article);
+      languageCounts.set(
+        result.article.language,
+        (languageCounts.get(result.article.language) ?? 0) + 1,
+      );
+      const sourceCountry = result.article.source.countryCode ?? "unknown";
+      sourceCountryCounts.set(sourceCountry, (sourceCountryCounts.get(sourceCountry) ?? 0) + 1);
+      if (
+        result.article.language === "ja" &&
+        result.article.source.countryCode === "JP" &&
+        result.article.countries.some(({ code }) => code === "JP")
+      ) jpLocalArticleCount += 1;
       sourceMethodCounts.set(
         result.sourceResolutionMethod,
         (sourceMethodCounts.get(result.sourceResolutionMethod) ?? 0) + 1,
@@ -133,7 +134,10 @@ export function normalizeProviderArticles(
     countryDetectionMethods: Object.fromEntries([...countryMethodCounts].sort()),
     countryDetectionFallbackCount: countryMethodCounts.get("english_fallback") ?? 0,
     missingCountryCount,
-    sourceResolutionMethods: Object.fromEntries([...sourceMethodCounts].sort()),
+    articles_by_language: Object.fromEntries([...languageCounts].sort()),
+    articles_by_source_country: Object.fromEntries([...sourceCountryCounts].sort()),
+    jp_local_article_count: jpLocalArticleCount,
+    source_resolution_method: Object.fromEntries([...sourceMethodCounts].sort()),
     unknownSourceCount,
   });
   return normalized;

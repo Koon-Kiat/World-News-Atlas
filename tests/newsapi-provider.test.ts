@@ -45,4 +45,31 @@ describe("NewsAPI provider", () => {
     expect(everythingRequests[1]).not.toContain("from=");
     expect(result.articles).toHaveLength(1);
   });
+
+  it("targets selected source IDs and domains without forcing Japanese requests to English", async () => {
+    const requestedUrls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      requestedUrls.push(url);
+      if (url.includes("top-headlines/sources")) {
+        return new Response(JSON.stringify({ status: "ok", sources: [] }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ status: "ok", articles: [] }), { status: 200 });
+    }));
+
+    await new NewsApiProvider("test-key").search("Japan", {
+      language: "ja",
+      sourceTargets: [{
+        id: "bbc",
+        name: "BBC",
+        domains: ["bbc.com", "bbc.co.uk"],
+        providerIdentifiers: { NEWSAPI: ["bbc-news"] },
+      }],
+    });
+
+    const request = new URL(requestedUrls.find((url) => url.includes("/everything"))!);
+    expect(request.searchParams.get("sources")).toBe("bbc-news");
+    expect(request.searchParams.get("domains")).toBe("bbc.com,bbc.co.uk");
+    expect(request.searchParams.has("language")).toBe(false);
+  });
 });

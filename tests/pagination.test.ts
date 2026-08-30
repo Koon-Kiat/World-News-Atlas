@@ -17,6 +17,7 @@ function response(page: number, total: number, stories: StoryView[]): NewsRespon
       pageSize: 12,
       dataSource: "live",
       sourceFacets: [],
+      languageFacets: [],
       generatedAt: new Date().toISOString(),
     },
   };

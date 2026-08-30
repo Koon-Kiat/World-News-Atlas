@@ -10,11 +10,13 @@ Fixture mode is an explicit development option only. Production returns live sto
 - Global, one-country, and two-country exploration.
 - Local/international perspective filtering based on publisher country—not article subject.
 - Bilateral source filters for first-country, second-country, and outside sources.
-- Topic, language, time, outlet, keyword, and newest/popularity sorting controls.
+- Topic, result-derived language, time, outlet, keyword, and newest/popularity sorting controls.
+- Searchable, grouped multi-publisher selection with stable publisher IDs, per-result counts, sticky selected outlets, and display-name compatibility for older API links.
 - Story-first results with grouped publisher coverage and links to original live articles.
 - Provider adapters for NewsAPI, GDELT, publisher RSS/Atom feeds, and Bing News RSS discovery with original-publisher URL extraction.
-- Provider-independent source registry and many-to-one provider identifier mapping.
-- Layered multilingual country detection, deterministic topic classification, URL canonicalization, deduplication, hybrid semantic/lexical story clustering, and ranking.
+- Provider-independent source registry and many-to-one provider identifier mapping, including provider-aware domain/source pushdown before the final server filter.
+- English and Japanese Japan discovery (`Japan`, `日本`, and `日本国`) with separate Bing locales and optional GDELT language queries.
+- Layered multilingual country detection, conservative script-aware language inference, data-driven English/Japanese topic classification, URL canonicalization, deduplication, hybrid semantic/lexical story clustering, and ranking.
 - PostgreSQL schema, Prisma migration, database seed, manual ingestion command, structured logs, caching, rate limiting, response validation, provider timeouts, and RSS SSRF controls.
 - Device-local Light, Dark, and System themes with a pre-hydration theme bootstrap to prevent a wrong-theme flash.
 - Opt-in fixtures for local development and tests; disabled by default and never required by the production UI.
@@ -71,7 +73,7 @@ npm run db:seed
 
 The normalized schema includes `Country`, `Source`, `SourceProviderIdentifier`, `Article`, `ArticleProviderRef`, `ArticleCountry`, `Topic`, `ArticleTopic`, `Story`, `StoryArticle`, `StoryCountry`, `StoryTopic`, and `ProviderIngestionRun`. Important time, source, country, language, topic, and relationship fields are indexed.
 
-Database reads apply the time range, selected countries, topic, language, and text search in PostgreSQL before mapping records. The final deterministic bilateral relevance and popularity ranking stays in application code. There is no pre-filter 250-story truncation, so newest sorting and pagination remain correct for larger stored datasets.
+Database reads apply the time range, selected countries, topic, language, source, and text search in PostgreSQL before mapping records. The final deterministic bilateral relevance and popularity ranking stays in application code. Candidate loading is bounded to 1,000 matching stories by default (operator-configurable from 300 to 5,000) after the database sort, preventing unbounded nested-relation reads while preserving the ranking window used by the UI.
 
 Ingestion is transactional and idempotent. When an article's countries, topics, or cluster fingerprint changes, the new cluster becomes authoritative, obsolete story rows and their relationships are retired, and an article is not left attached to a stale cluster.
 
@@ -87,6 +89,7 @@ The current ChatGPT Sites deployment uses live HTTP providers because hosted Sit
 | `NEWS_FIXTURES_ENABLED` | No | Opts into fixture fallback for local development or ingestion tests; defaults to `false`. |
 | `NEWS_PROVIDER_TIMEOUT_MS` | No | External request timeout, clamped to 2–30 seconds; defaults to 8 seconds. |
 | `NEWS_LIVE_ARTICLE_LIMIT` | No | Maximum live articles normalized on a cold request, clamped to 24–150; defaults to 96 and samples providers/feeds round-robin. |
+| `NEWS_DATABASE_CANDIDATE_LIMIT` | No | Maximum matching stored stories loaded with nested coverage before application ranking; defaults to 1,000 and is clamped to 300–5,000. |
 | `NEWS_SEMANTIC_CLUSTERING_ENABLED` | No | Enables the semantic stage when set to `true` and an embedding credential is present. Defaults to deterministic lexical clustering. |
 | `NEWS_EMBEDDING_API_KEY` or `OPENAI_API_KEY` | When semantic clustering is enabled | Server-only credential for the configured OpenAI embedding adapter. The project-specific variable takes precedence when both are set. |
 | `NEWS_EMBEDDING_MODEL` | No | Embedding model name; defaults to `text-embedding-3-small`. |
@@ -112,7 +115,7 @@ The command:
 5. Removes canonical URL and strong headline duplicates.
 6. Builds hybrid semantic/lexical story clusters when configured, or deterministic lexical clusters otherwise.
 7. Persists articles, provider references, country/topic relations, and stories when `DATABASE_URL` is set.
-8. Logs received, normalized, rejected, duplicate, stored, and story counts without logging secrets.
+8. Logs received, normalized, rejected, duplicate, stored, and story counts without logging secrets or article bodies. Aggregate fields include `articles_by_language`, `articles_by_source_country`, `jp_local_article_count`, `source_resolution_method`, `provider_source_targeted_query_count`, `rss_articles_per_source`, and `rss_truncated_description_count`.
 
 Without `DATABASE_URL`, the command still fetches, normalizes, deduplicates, clusters, and prints a dry-run summary. Fixtures are used only when `NEWS_FIXTURES_ENABLED=true` is set explicitly.
 
@@ -122,17 +125,17 @@ The command has no hosting-provider dependency. A later deployment can invoke it
 
 | Provider | Credentials | Default behavior |
 | --- | --- | --- |
-| GDELT | None | Opt in with `GDELT_ENABLED=true`. Availability and metadata quality can vary. |
-| RSS/Atom | None | Reviewed feeds from BBC News, The Guardian, Al Jazeera, CNA, The Straits Times, The Japan Times, DW, Euronews, France 24, Sky News, and NPR are enabled by default. Country-category feeds carry an explicit coverage signal instead of treating every story from a national publisher as domestic news. |
-| Bing News RSS | None | Adds a bounded set of country and bilateral discovery queries—including focused Reuters and AP discovery—then extracts the original publisher URL, source name, excerpt, date, and available thumbnail. This is discovery, not a Reuters/AP content licence. |
-| NewsAPI | `NEWSAPI_KEY` | Disabled gracefully when the key is absent. |
+| GDELT | None | Opt in with `GDELT_ENABLED=true`. Japan requests issue separate `sourcelang:english` and `sourcelang:japanese` queries; selected publishers become exact `domainis:` filters. Availability and metadata quality can vary. |
+| RSS/Atom | None | Reviewed feeds from BBC News, The Guardian, Al Jazeera, CNA, The Straits Times, The Japan Times, NHK, DW, Euronews, France 24, Sky News, and NPR are enabled by default. NHK supplies Japanese-language Japan coverage from its current publisher-operated feed. Country-category feeds carry an explicit coverage signal only when the category itself is domestic. |
+| Bing News RSS | None | Japan discovery uses separate `en-SG` and `ja-JP` requests across English and Japanese aliases. Selected publishers become `site:` queries. The bounded fan-out also retains focused Reuters and AP discovery when no publisher is selected. This is discovery, not a content licence. |
+| NewsAPI | `NEWSAPI_KEY` | Disabled gracefully when the key is absent. Stable publisher selections are translated to supported `sources` IDs and/or `domains`; Japanese is not forced to English because `/everything` does not offer a Japanese language parameter. |
 | Fixtures | None | Disabled by default. Available only as an explicit local development/testing fallback. |
 
-Publisher availability is never assumed. Entries such as BBC, Reuters, AP, NHK, and CNA in the source registry are identity mappings only; they do not claim that a current provider or subscription returns those publishers.
+Publisher availability is never assumed. A source-registry entry is an identity mapping, not an availability claim. The UI lists only publishers present in the current candidate set plus any publisher the visitor already selected. NHK is additionally enabled through its reviewed default RSS feed; Reuters and AP remain discovery targets rather than bundled feeds.
 
-Publisher identity and country resolution is layered. Maintained registry identities and provider-specific identifiers take precedence, followed by canonical registrable-domain matching, provider metadata, reviewed RSS configuration, and reliable ccTLD signals. Generic domains such as `.com`, `.org`, and `.net` never create a country assignment. Resolution method and confidence are retained internally for logs and tests, while the public API continues to expose the same source shape.
+Publisher identity and country resolution is layered. Maintained stable IDs and provider-specific identifiers take precedence, followed by canonical registrable-domain matching through the Public Suffix List, provider metadata, reviewed RSS configuration, and reliable ccTLD signals. Generic domains such as `.com`, `.org`, and `.net` never create a country assignment, and publisher country is never inferred from the article subject. Resolution method and confidence are retained internally for logs and tests. Public source facets expose stable ID, display name, canonical domain, publisher country, language, scope, quality score, and story count.
 
-RSS items are accepted only when the publisher supplies a parseable publication time. Missing, invalid, implausibly future, or out-of-range dates are rejected rather than being relabelled as newly published.
+RSS items are accepted only when the publisher supplies a parseable publication time. Missing, invalid, implausibly future, or out-of-range dates are rejected rather than being relabelled as newly published. The adapter prefers publisher snippets/summaries/descriptions, never persists unrestricted `content:encoded` as an article body, and sanitizes and truncates an encoded fallback to about 800 characters.
 
 ### Configuring approved RSS feeds
 
@@ -141,6 +144,7 @@ RSS items are accepted only when the publisher supplies a parseable publication 
 ```json
 [
   {
+    "sourceId": "approved-publisher",
     "name": "Approved publisher",
     "feedUrl": "https://publisher.example/feed.xml",
     "websiteUrl": "https://publisher.example/",
@@ -165,7 +169,8 @@ GET /api/news?countries=JP
 GET /api/news?countries=JP,SG
 GET /api/news?countries=JP&sourcePerspective=local&period=24h
 GET /api/news?countries=JP,SG&sourcePerspective=second-country&topic=technology
-GET /api/news?countries=JP&source=The+Japan+Times&source=Al+Jazeera
+GET /api/news?countries=JP&source=japan-times&source=al-jazeera
+GET /api/news?countries=JP&sourcePerspective=local&language=ja
 GET /api/news?countries=JP&period=30d&sort=newest&page=2
 ```
 
@@ -175,8 +180,8 @@ Typed values:
 - `sourcePerspective`: `all`; `local` or `international` for one country; `first-country`, `second-country`, or `international` for two countries.
 - `period`: `latest`, `24h`, `7d`, or `30d`.
 - `sort`: `newest` (strict publication-time order) or `popular` (multi-source coverage and story-importance score).
-- `source`: repeatable exact news-outlet name; up to 20 outlets.
-- `topic`: lowercase topic slug.
+- `source`: repeatable stable publisher ID; up to 20 outlets. Maintained display names remain accepted for compatibility.
+- `topic`: lowercase topic slug. The shared UI/backend set is politics, business, technology, society, climate, defence, transport, culture, and sports.
 - `language`: BCP 47-style short language tag when metadata exists.
 - `search`: at most 120 characters.
 - `page`: 1–100; `pageSize`: 1–250.
@@ -189,7 +194,7 @@ Invalid combinations return a sanitized `400` response. The API uses a short in-
 - Provider requests are coalesced while in flight. Successful results are cached for five minutes, empty results for 45 seconds, and failures for 20 seconds, preventing rapid retry amplification.
 - Provider caching is capped at 160 entries. The request limiter is capped at 2,000 client windows and trusts the deployment-provided Cloudflare client address before generic proxy headers.
 - The cache and limiter expose small store interfaces so a multi-instance deployment can replace process-local state with Redis, Durable Objects, or KV without changing the API contract.
-- Bing country discovery uses at most eight upstream searches per focused request, including Reuters and AP discovery.
+- Bing country discovery uses at most ten upstream searches per focused request. Japan requests reserve space for both English and Japanese locales; publisher selections replace broad discovery with targeted `site:` queries.
 
 No cache key, log entry, or API response contains provider credentials.
 
@@ -213,14 +218,14 @@ Clustering keeps lexical comparison as a cheap deterministic signal and adds a p
 - RSS ingestion is allow-list only and applies SSRF-oriented URL, DNS, redirect, protocol, and size checks.
 - Article/image URLs are restricted to HTTP(S), external article links use safe target attributes, and provider error details are not returned to ordinary users. A reviewed same-origin media relay resolves missing publisher `og:image` metadata and rejects unapproved article, image, and redirect hosts.
 - Security headers include CSP, frame denial, content-type protection, a restrictive permissions policy, and a strict referrer policy.
-- Full article bodies are never stored or rendered by this MVP. Live cards show attribution, metadata, permitted short descriptions, and original-publisher links.
+- Full article bodies are never stored or rendered by this MVP. Live cards and Reader show attribution, metadata, permitted short descriptions, and original-publisher links. RSS `content:encoded` is used only as a sanitized, bounded fallback when no publisher summary exists.
 
 ## Licensing and provider limitations
 
 - NewsAPI plan restrictions and production rights depend on the operator's account and current terms. Verify them before deployment.
 - Bing News RSS discovery is used only for headline-level, private, non-commercial exploration and links directly to the discovered publisher URL. Review Microsoft's current terms before changing that usage model.
 - GDELT can supply broad discovery metadata but does not grant rights to republish publisher content. The original publisher's rights still apply.
-- RSS availability does not automatically grant permission to archive, reproduce, translate, or commercially reuse full content. Enable only reviewed feeds and retain only permitted metadata/excerpts.
+- RSS availability does not automatically grant permission to archive, reproduce, translate, or commercially reuse full content. Enable only reviewed feeds and retain only permitted metadata/excerpts. Mainichi and Jiji feeds are intentionally not enabled by default because their published reuse terms are too restrictive for this hosted aggregator.
 - Images and descriptions may have separate rights or hotlinking restrictions. A production operator should disable or proxy only expressly licensed media according to publisher/provider terms.
 - This repository does not include licensed Reuters, AP, or other full-content feeds and does not claim that any named publisher is currently available.
 
@@ -232,7 +237,7 @@ Review the current official terms for every selected provider and publisher befo
 - Story clustering uses hybrid semantic and lexical similarity when semantic embeddings are explicitly configured and gracefully falls back to deterministic lexical clustering otherwise. The embedding cache is process-local rather than shared or database-backed.
 - Publisher-country resolution uses a structured registry, provider identifiers, RSS metadata, registrable domains, and reliable ccTLD signals; truly unknown, globally hosted, or internationally repurposed country-code domains may remain unclassified.
 - Cache and rate-limit state are process-local; multi-instance deployments should use a shared implementation.
-- Live-provider browsing is finite for the chosen time range and provider result windows. Infinite scroll paginates the complete candidate set; it does not crawl publisher sites or bypass provider/API limits.
+- Live-provider browsing is finite for the chosen time range and provider result windows. Infinite scroll paginates the bounded current candidate set; it does not crawl publisher sites or bypass provider/API limits.
 - No automatic translation, accounts, saved stories, admin UI, or full-content storage is implemented.
 - Fixture URLs are intentionally non-live and shown as “Sample article” rather than pretending to be publisher links.
 
@@ -247,4 +252,4 @@ npx prisma validate
 npm audit
 ```
 
-The test suite covers selection limits and deselection, one- and two-country matching, source-country perspectives, multilingual country/entity signals, ambiguous country terms and ISO false positives, layered publisher/domain/ccTLD resolution, provider normalization, canonical URLs, deduplication, hybrid semantic clustering, embedding batching/caching/timeouts/fallback, two-country relevance, provider failure isolation and coalescing, RSS publication dates, API validation, bounded rate limiting, progressive pagination, and theme persistence. GitHub Actions starts PostgreSQL 17, applies the real migration, and runs integration tests for persistence, repeated ingestion, reclustering, stale-story cleanup, database filtering, newest ordering, two-country results, and pagination beyond 250 stories.
+The test suite covers selection limits and deselection, one- and two-country matching, country plus local plus Japanese filtering, multilingual country/entity and script signals, Japanese Unicode preservation, data-driven Japanese topics, ambiguous country terms and ISO false positives, stable publisher IDs, provider-aware source pushdown, Public Suffix List domains, layered publisher/domain/ccTLD resolution, provider normalization, canonical URLs, deduplication, hybrid semantic clustering, embedding batching/caching/timeouts/fallback, two-country relevance, provider failure isolation and coalescing, fair and selected-priority RSS allocation, metadata truncation, RSS publication dates, reviewed image boundaries, API validation, bounded database candidates, bounded rate limiting, progressive pagination, grouped source-picker behavior, and theme persistence. GitHub Actions starts PostgreSQL 17, applies the real migration, and runs integration tests for persistence, Japanese Unicode, repeated ingestion, reclustering, stale-story cleanup, database filtering, newest ordering, two-country results, and pagination beyond 250 stories.

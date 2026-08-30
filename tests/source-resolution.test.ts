@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { KNOWN_SOURCE_SEEDS } from "@/config/news-sources";
 import { normalizeProviderArticle } from "@/lib/news/normalize";
-import { domainFromUrl, resolveSourceDetailed } from "@/lib/news/sources/registry";
+import {
+  domainFromUrl,
+  resolveSourceDetailed,
+  sourceTargetsFromSelections,
+} from "@/lib/news/sources/registry";
 
 const source = (overrides: Partial<Parameters<typeof resolveSourceDetailed>[0]> = {}) =>
   resolveSourceDetailed({
@@ -11,6 +16,14 @@ const source = (overrides: Partial<Parameters<typeof resolveSourceDetailed>[0]> 
   });
 
 describe("publisher identity and country resolution", () => {
+  it("keeps maintained publisher IDs unique and resolves API selections to provider targets", () => {
+    expect(new Set(KNOWN_SOURCE_SEEDS.map(({ id }) => id)).size).toBe(KNOWN_SOURCE_SEEDS.length);
+    expect(sourceTargetsFromSelections(["nhk", "The Japan Times"])).toEqual([
+      expect.objectContaining({ id: "nhk", domains: expect.arrayContaining(["nhk.or.jp", "news.web.nhk"]) }),
+      expect.objectContaining({ id: "japan-times", domains: ["japantimes.co.jp"] }),
+    ]);
+  });
+
   it("resolves maintained publishers before conflicting metadata", () => {
     const result = source({
       sourceName: "BBC",
@@ -18,6 +31,7 @@ describe("publisher identity and country resolution", () => {
       sourceCountry: "AU",
     });
     expect(result.source).toMatchObject({ name: "BBC", countryCode: "GB", domain: "bbc.com" });
+    expect(result.source.id).toBe("bbc");
     expect(result.resolution).toEqual({ method: "registry", confidence: 1 });
   });
 
@@ -40,6 +54,8 @@ describe("publisher identity and country resolution", () => {
 
   it.each([
     ["https://news.example.co.jp/story", "JP"],
+    ["https://news.example.com.sg/story", "SG"],
+    ["https://news.example.com.my/story", "MY"],
     ["https://news.example.co.uk/story", "GB"],
     ["https://news.example.com.au/story", "AU"],
     ["https://example.sg/story", "SG"],
@@ -49,6 +65,16 @@ describe("publisher identity and country resolution", () => {
     const result = source({ articleUrl: url });
     expect(result.source.countryCode).toBe(code);
     expect(result.resolution.method).toBe("cctld");
+  });
+
+  it.each([
+    ["news.publisher.co.jp", "publisher.co.jp"],
+    ["news.publisher.com.sg", "publisher.com.sg"],
+    ["news.publisher.com.my", "publisher.com.my"],
+    ["news.publisher.co.uk", "publisher.co.uk"],
+    ["news.publisher.com.au", "publisher.com.au"],
+  ])("uses the public suffix list for %s", (hostname, expected) => {
+    expect(domainFromUrl(`https://${hostname}/story`)).toBe(expected);
   });
 
   it("does not infer a country from a generic domain", () => {

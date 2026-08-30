@@ -1,6 +1,11 @@
 import { KNOWN_SOURCE_SEEDS, type SourceSeed } from "@/config/news-sources";
 import { normalizeCountryCode } from "../countries/metadata";
-import type { ProviderName, SourceReference, SourceScope } from "../types";
+import type {
+  ProviderName,
+  ProviderSourceTarget,
+  SourceReference,
+  SourceScope,
+} from "../types";
 import {
   domainCountrySignal,
   hostnameFromUrl,
@@ -14,6 +19,7 @@ function normalizeName(value: string): string {
 
 function seedToReference(seed: SourceSeed): SourceReference {
   return {
+    id: seed.id,
     name: seed.name,
     domain: registrableDomain(seed.domain),
     countryCode: seed.countryCode,
@@ -28,8 +34,10 @@ const exactHostRegistry = new Map<string, SourceSeed>();
 const canonicalDomainRegistry = new Map<string, SourceSeed>();
 const sourceNameRegistry = new Map<string, SourceSeed>();
 const providerIdentifierRegistry = new Map<string, SourceSeed>();
+const sourceIdRegistry = new Map<string, SourceSeed>();
 
 for (const source of KNOWN_SOURCE_SEEDS) {
+  sourceIdRegistry.set(source.id, source);
   sourceNameRegistry.set(normalizeName(source.name), source);
   for (const domain of [source.domain, ...source.alternateDomains]) {
     exactHostRegistry.set(normalizeHostname(domain), source);
@@ -40,6 +48,71 @@ for (const source of KNOWN_SOURCE_SEEDS) {
       providerIdentifierRegistry.set(`${provider}:${identifier.toLocaleLowerCase("en")}`, source);
     }
   }
+}
+
+function slug(value: string): string {
+  return normalizeName(value).replace(/\s+/g, "-").slice(0, 64) || "unknown";
+}
+
+export function canonicalSourceId(source: Pick<SourceReference, "name" | "domain" | "countryCode">): string {
+  if (source.domain) {
+    const known = canonicalDomainRegistry.get(registrableDomain(source.domain));
+    return known?.id ?? `domain:${registrableDomain(source.domain)}`;
+  }
+  const known = sourceNameRegistry.get(normalizeName(source.name));
+  return known?.id ?? `name:${slug(source.name)}:${source.countryCode?.toLowerCase() ?? "global"}`;
+}
+
+export function sourceSeedForSelection(selection: string): SourceSeed | null {
+  const normalized = selection.trim();
+  if (!normalized) return null;
+  return (
+    sourceIdRegistry.get(normalized) ??
+    sourceNameRegistry.get(normalizeName(normalized)) ??
+    (normalized.startsWith("domain:")
+      ? canonicalDomainRegistry.get(registrableDomain(normalized.slice("domain:".length)))
+      : undefined) ??
+    null
+  );
+}
+
+export function sourceTargetsFromSelections(selections: string[]): ProviderSourceTarget[] {
+  const targets = new Map<string, ProviderSourceTarget>();
+  for (const selection of selections) {
+    const seed = sourceSeedForSelection(selection);
+    if (seed) {
+      targets.set(seed.id, {
+        id: seed.id,
+        name: seed.name,
+        domains: [...new Set([seed.domain, ...seed.alternateDomains].map(normalizeHostname))],
+        providerIdentifiers: seed.providerIdentifiers,
+      });
+      continue;
+    }
+    if (selection.startsWith("domain:")) {
+      const domain = registrableDomain(selection.slice("domain:".length));
+      if (domain) {
+        targets.set(selection, {
+          id: selection,
+          name: domain,
+          domains: [domain],
+          providerIdentifiers: {},
+        });
+      }
+    }
+  }
+  return [...targets.values()];
+}
+
+export function sourceMatchesSelection(source: SourceReference, selection: string): boolean {
+  const normalized = selection.trim();
+  if (!normalized) return false;
+  if (source.id === normalized || normalizeName(source.name) === normalizeName(normalized)) return true;
+  if (normalized.startsWith("domain:")) {
+    return source.domain === registrableDomain(normalized.slice("domain:".length));
+  }
+  const seed = sourceSeedForSelection(normalized);
+  return seed ? source.id === seed.id : false;
 }
 
 export type SourceResolutionMethod =
@@ -108,6 +181,11 @@ export function resolveSourceDetailed(input: ResolveSourceInput): ResolvedSource
     const method = input.metadataOrigin === "rss-config" ? "rss-config" : "provider";
     return {
       source: {
+        id: canonicalSourceId({
+          name: input.sourceName.trim() || domain || "Unknown source",
+          domain,
+          countryCode: metadataCountry,
+        }),
         name: input.sourceName.trim() || domain || "Unknown source",
         domain,
         countryCode: metadataCountry,
@@ -125,6 +203,11 @@ export function resolveSourceDetailed(input: ResolveSourceInput): ResolvedSource
     if (countrySignal) {
       return {
         source: {
+          id: canonicalSourceId({
+            name: input.sourceName.trim() || domain || hostname,
+            domain,
+            countryCode: countrySignal.countryCode,
+          }),
           name: input.sourceName.trim() || domain || hostname,
           domain,
           countryCode: countrySignal.countryCode,
@@ -140,6 +223,11 @@ export function resolveSourceDetailed(input: ResolveSourceInput): ResolvedSource
 
   return {
     source: {
+      id: canonicalSourceId({
+        name: input.sourceName.trim() || domain || "Unknown source",
+        domain,
+        countryCode: null,
+      }),
       name: input.sourceName.trim() || domain || "Unknown source",
       domain,
       countryCode: null,

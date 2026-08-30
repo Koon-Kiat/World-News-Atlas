@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { countryNameToCode } from "../countries/metadata";
+import { logNews } from "../logger";
 import { publicationDateInRange, trustedPublicationDate } from "../publication-date";
 import type { ProviderArticle, ProviderFetchRequest, ProviderFetchResult } from "../types";
 import { fetchWithTimeout, type NewsProvider, ProviderError } from "./provider";
@@ -40,6 +41,32 @@ function gdeltDate(value?: string): string | null {
 function gdeltLanguage(value?: string): string | null {
   if (!value) return null;
   return LANGUAGE_CODES[value.toLowerCase()] ?? value.toLowerCase().slice(0, 3);
+}
+
+function gdeltLanguageNames(request: ProviderFetchRequest): string[] {
+  const language = request.language?.toLowerCase();
+  if (language?.startsWith("ja")) return ["japanese"];
+  if (language?.startsWith("en")) return ["english"];
+  if (request.countries?.includes("JP")) return ["english", "japanese"];
+  return [];
+}
+
+export function buildGdeltDiscoveryQueries(
+  query: string,
+  request: ProviderFetchRequest = {},
+): string[] {
+  const targetDomains = [...new Set((request.sourceTargets ?? []).flatMap((target) => [
+    ...target.domains,
+    ...(target.providerIdentifiers.GDELT ?? []),
+  ]))];
+  const domainFilter = targetDomains.length > 0
+    ? `(${targetDomains.map((domain) => `domainis:${domain}`).join(" OR ")})`
+    : "";
+  const base = [query, domainFilter].filter(Boolean).join(" AND ");
+  const languages = gdeltLanguageNames(request);
+  return languages.length > 0
+    ? languages.map((language) => `${base} sourcelang:${language}`)
+    : [base];
 }
 
 export class GdeltProvider implements NewsProvider {
@@ -102,10 +129,32 @@ export class GdeltProvider implements NewsProvider {
   }
 
   fetchLatest(request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
-    return this.request(request.query ?? "sourcelang:english", request);
+    return this.search(
+      request.query ?? (request.countries?.includes("JP") ? '("Japan" OR "日本" OR "日本国")' : "world"),
+      request,
+    );
   }
 
-  search(query: string, request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
-    return this.request(query, request);
+  async search(query: string, request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
+    const discoveryQueries = buildGdeltDiscoveryQueries(query, request);
+    logNews("info", "gdelt_discovery_planned", {
+      provider_source_targeted_query_count: request.sourceTargets?.length
+        ? discoveryQueries.length
+        : 0,
+      discoveryQueryCount: discoveryQueries.length,
+    });
+    const settled = await Promise.allSettled(
+      discoveryQueries.map((discoveryQuery) => this.request(discoveryQuery, request)),
+    );
+    const successful = settled.flatMap((result) => result.status === "fulfilled" ? result.value.articles : []);
+    if (successful.length === 0 && settled.every((result) => result.status === "rejected")) {
+      throw new ProviderError(this.name, "REQUEST_FAILED", "GDELT discovery failed");
+    }
+    const unique = new Map(successful.map((article) => [article.url, article]));
+    return {
+      provider: this.name,
+      articles: [...unique.values()].slice(0, request.limit ?? 250),
+      receivedAt: new Date().toISOString(),
+    };
   }
 }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { logNews } from "../logger";
 import type { ProviderArticle, ProviderFetchRequest, ProviderFetchResult } from "../types";
 import { fetchWithTimeout, type NewsProvider, ProviderError } from "./provider";
 
@@ -30,6 +31,8 @@ const newsApiSourcesSchema = z.object({
     )
     .default([]),
 });
+
+const NEWSAPI_LANGUAGES = new Set(["ar", "de", "en", "es", "fr", "he", "it", "nl", "no", "pt", "ru", "sv", "ud", "zh"]);
 
 export class NewsApiProvider implements NewsProvider {
   readonly name = "NEWSAPI" as const;
@@ -76,9 +79,22 @@ export class NewsApiProvider implements NewsProvider {
     url.searchParams.set("q", query);
     url.searchParams.set("sortBy", "publishedAt");
     url.searchParams.set("pageSize", String(Math.min(100, request.limit ?? 100)));
+    const sourceIdentifiers = [...new Set((request.sourceTargets ?? []).flatMap(
+      (target) => target.providerIdentifiers.NEWSAPI ?? [],
+    ))];
+    const domains = [...new Set((request.sourceTargets ?? []).flatMap(({ domains: values }) => values))];
+    if (sourceIdentifiers.length > 0) url.searchParams.set("sources", sourceIdentifiers.slice(0, 20).join(","));
+    if (domains.length > 0) url.searchParams.set("domains", domains.slice(0, 20).join(","));
+    const language = request.language?.toLowerCase().split("-")[0];
+    if (language && NEWSAPI_LANGUAGES.has(language)) url.searchParams.set("language", language);
     if (request.from) url.searchParams.set("from", request.from.toISOString());
     if (request.to) url.searchParams.set("to", request.to.toISOString());
 
+    logNews("info", "newsapi_discovery_planned", {
+      provider_source_targeted_query_count: request.sourceTargets?.length ? 1 : 0,
+      sourceIdentifierCount: sourceIdentifiers.length,
+      domainCount: domains.length,
+    });
     let response: Response;
     try {
       response = await fetchWithTimeout(

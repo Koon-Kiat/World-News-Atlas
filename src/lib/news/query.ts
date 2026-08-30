@@ -1,11 +1,16 @@
 import { z } from "zod";
 import { getCountryName, normalizeCountryCode } from "./countries/metadata";
+import { languageLabel } from "./language";
 import { newsPeriodHours } from "./periods";
 import { rankStories, scoreTwoCountryRelevance } from "./ranking";
+import { registrableDomain } from "./sources/domain";
+import { sourceMatchesSelection, sourceSeedForSelection } from "./sources/registry";
 import type {
   ArticleView,
+  LanguageFacet,
   NewsQuery,
   NewsResponse,
+  SourceFacet,
   SourcePerspective,
   StoryView,
 } from "./types";
@@ -185,6 +190,14 @@ function articleMatchesTopicAndLanguage(article: ArticleView, query: NewsQuery):
   );
 }
 
+function articleMatchesTopic(article: ArticleView, query: NewsQuery): boolean {
+  return !query.topic || article.topics.includes(query.topic);
+}
+
+function articleMatchesSelectedSource(article: ArticleView, selections: string[]): boolean {
+  return selections.length === 0 || selections.some((selection) => sourceMatchesSelection(article.source, selection));
+}
+
 function visibleStoryTopics(story: StoryView, articles: ArticleView[], selectedTopic?: string): string[] {
   const articleTopics = [...new Set(articles.flatMap((article) => article.topics))];
   const topics = articleTopics.length > 0 ? articleTopics : story.topics;
@@ -199,7 +212,8 @@ export function queryStories(
 ): {
   stories: StoryView[];
   total: number;
-  sourceFacets: Array<{ name: string; storyCount: number }>;
+  sourceFacets: SourceFacet[];
+  languageFacets: LanguageFacet[];
 } {
   const cutoff = now.getTime() - newsPeriodHours(query.period) * 3_600_000;
   const candidates = stories
@@ -214,34 +228,82 @@ export function queryStories(
         scoreTwoCountryRelevance(story, query.countries[0], query.countries[1]) >= MIN_BILATERAL_RELEVANCE
       );
     })
-    .filter((story) => story.articles.some((article) => articleMatchesTopicAndLanguage(article, query)))
+    .filter((story) => story.articles.some((article) => articleMatchesTopic(article, query)))
     .filter((story) => !query.search || matchesSearch(story, query.search));
 
-  const sourceCounts = new Map<string, number>();
+  const sourceCounts = new Map<string, { source: ArticleView["source"]; storyCount: number }>();
   for (const story of candidates) {
-    const storySources = new Set(
+    const storySources = new Map(
       story.articles
         .filter(
           (article) =>
             articleMatchesTopicAndLanguage(article, query) &&
             perspectiveMatches(article, query.sourcePerspective, query.countries),
         )
-        .map((article) => article.source.name),
+        .map((article) => [article.source.id, article.source]),
     );
-    for (const source of storySources) sourceCounts.set(source, (sourceCounts.get(source) ?? 0) + 1);
+    for (const [id, source] of storySources) {
+      const current = sourceCounts.get(id);
+      sourceCounts.set(id, { source, storyCount: (current?.storyCount ?? 0) + 1 });
+    }
   }
-  const sourceFacets = [...sourceCounts.entries()]
-    .map(([name, storyCount]) => ({ name, storyCount }))
+  for (const selection of query.sources) {
+    if ([...sourceCounts.values()].some(({ source }) => sourceMatchesSelection(source, selection))) continue;
+    const seed = sourceSeedForSelection(selection);
+    const source = seed
+      ? {
+          id: seed.id,
+          name: seed.name,
+          domain: registrableDomain(seed.domain),
+          countryCode: seed.countryCode,
+          region: seed.region,
+          language: seed.language,
+          scope: seed.scope,
+          qualityScore: seed.qualityScore,
+        }
+      : {
+          id: selection,
+          name: selection,
+          domain: selection.startsWith("domain:") ? selection.slice("domain:".length) : null,
+          countryCode: null,
+          region: null,
+          language: null,
+          scope: "INTERNATIONAL" as const,
+          qualityScore: 0,
+        };
+    sourceCounts.set(source.id, { source, storyCount: 0 });
+  }
+  const sourceFacets = [...sourceCounts.values()]
+    .map(({ source, storyCount }) => ({ ...source, storyCount }))
     .sort((left, right) => right.storyCount - left.storyCount || left.name.localeCompare(right.name));
 
-  const selectedSources = new Set(query.sources);
+  const languageCounts = new Map<string, number>();
+  for (const story of candidates) {
+    const storyLanguages = new Set(
+      story.articles
+        .filter((article) =>
+          articleMatchesTopic(article, query) &&
+          perspectiveMatches(article, query.sourcePerspective, query.countries) &&
+          articleMatchesSelectedSource(article, query.sources)
+        )
+        .map((article) => article.language),
+    );
+    for (const language of storyLanguages) {
+      languageCounts.set(language, (languageCounts.get(language) ?? 0) + 1);
+    }
+  }
+  if (query.language && !languageCounts.has(query.language)) languageCounts.set(query.language, 0);
+  const languageFacets = [...languageCounts.entries()]
+    .map(([code, storyCount]) => ({ code, label: languageLabel(code), storyCount }))
+    .sort((left, right) => right.storyCount - left.storyCount || left.label.localeCompare(right.label));
+
   const matching = candidates
     .map((story) => {
       const articles = story.articles.filter(
         (article) =>
           articleMatchesTopicAndLanguage(article, query) &&
           perspectiveMatches(article, query.sourcePerspective, query.countries) &&
-          (selectedSources.size === 0 || selectedSources.has(article.source.name)),
+          articleMatchesSelectedSource(article, query.sources),
       );
       return {
         ...story,
@@ -257,6 +319,7 @@ export function queryStories(
     stories: ranked.slice(start, start + query.pageSize),
     total: ranked.length,
     sourceFacets,
+    languageFacets,
   };
 }
 
@@ -276,6 +339,7 @@ export function buildNewsResponse(
       pageSize: query.pageSize,
       dataSource,
       sourceFacets: result.sourceFacets,
+      languageFacets: result.languageFacets,
       generatedAt: new Date().toISOString(),
       notice,
     },

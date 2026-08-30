@@ -24,7 +24,7 @@ export interface CountryReference {
 }
 
 export interface SourceReference {
-  id?: string;
+  id: string;
   name: string;
   domain: string | null;
   countryCode: string | null;
@@ -32,6 +32,23 @@ export interface SourceReference {
   language: string | null;
   scope: SourceScope;
   qualityScore: number;
+}
+
+export interface SourceFacet extends SourceReference {
+  storyCount: number;
+}
+
+export interface LanguageFacet {
+  code: string;
+  label: string;
+  storyCount: number;
+}
+
+export interface ProviderSourceTarget {
+  id: string;
+  name: string;
+  domains: string[];
+  providerIdentifiers: Partial<Record<ProviderName, string[]>>;
 }
 
 export interface ArticleView {
@@ -87,7 +104,8 @@ export interface NewsResponse {
     page: number;
     pageSize: number;
     dataSource: "database" | "live" | "fixtures";
-    sourceFacets: Array<{ name: string; storyCount: number }>;
+    sourceFacets: SourceFacet[];
+    languageFacets: LanguageFacet[];
     generatedAt: string;
     notice?: string;
   };
@@ -118,6 +136,8 @@ export interface ProviderFetchRequest {
   to?: Date;
   query?: string;
   countries?: string[];
+  language?: string;
+  sourceTargets?: ProviderSourceTarget[];
   limit?: number;
 }
 

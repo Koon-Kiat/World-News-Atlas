@@ -38,6 +38,7 @@ function article(
     publishedAt,
     language: "en",
     source: {
+      id: "integration-news",
       name: "Integration News",
       domain: "example.com",
       countryCode: "JP",
@@ -288,5 +289,37 @@ describe.skipIf(!databaseTestsEnabled)("PostgreSQL news integration", () => {
       prisma,
     );
     expect(internationalPerspective).toEqual([]);
+  });
+
+  it("persists Japanese Unicode and returns the stable publisher ID", async () => {
+    const japanese = {
+      ...article(
+        "jp-unicode",
+        "日本政府が半導体投資を発表",
+        [{ code: "JP", name: "Japan", relevanceScore: 1 }],
+        ["politics", "business", "technology"],
+      ),
+      description: "東京で新しい技術政策を説明しました。",
+      language: "ja",
+      url: "https://news.web.nhk/newsweb/na/na-k1000000002",
+      canonicalUrl: "https://news.web.nhk/newsweb/na/na-k1000000002",
+      source: {
+        id: "nhk",
+        name: "NHK",
+        domain: "nhk.or.jp",
+        countryCode: "JP",
+        region: "Asia",
+        language: "ja",
+        scope: "NATIONAL" as const,
+        qualityScore: 0.88,
+      },
+    };
+    await persistStoryCandidates(clusterArticles([japanese]), prisma);
+
+    const stored = await prisma.article.findUniqueOrThrow({ where: { canonicalUrl: japanese.canonicalUrl } });
+    expect(stored.title).toBe("日本政府が半導体投資を発表");
+    expect(stored.description).toBe("東京で新しい技術政策を説明しました。");
+    const stories = await loadDatabaseStories({ ...baseQuery, countries: ["JP"], language: "ja" }, prisma);
+    expect(stories[0].articles[0].source.id).toBe("nhk");
   });
 });

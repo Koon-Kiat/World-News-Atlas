@@ -354,17 +354,28 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .filter-select-menu button[aria-selected="true"] span:last-child { color: var(--coral-dark); }
 .filter-select-trigger:disabled { opacity: .55; cursor: not-allowed; }
 .source-filter .filter-select-trigger { min-width: 170px; }
-.source-filter-menu { position: absolute; z-index: 14; top: calc(100% + 7px); right: 0; width: min(340px, calc(100vw - 32px)); padding: 12px; color: var(--ink); background: var(--white); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 20px 48px rgba(25,48,51,.2); }
+.source-filter-menu { position: absolute; z-index: 14; top: calc(100% + 7px); right: 0; width: min(420px, calc(100vw - 32px)); padding: 12px; color: var(--ink); background: var(--white); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 20px 48px rgba(25,48,51,.2); }
 .source-filter-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 3px 4px 11px; border-bottom: 1px solid var(--line); }
 .source-filter-heading strong, .source-filter-heading small { display: block; }
 .source-filter-heading strong { font-size: .76rem; }
 .source-filter-heading small { margin-top: 3px; color: var(--muted); font-size: .62rem; }
 .source-filter-heading button { padding: 4px; color: var(--coral-dark); background: transparent; border: 0; cursor: pointer; font-size: .64rem; font-weight: 800; }
-.source-filter-options { max-height: 310px; padding: 7px 0; overflow-y: auto; }
+.source-filter-search { min-height: 42px; display: flex; align-items: center; gap: 9px; margin: 10px 0 4px; padding: 0 10px; background: var(--paper); border: 1px solid var(--line); border-radius: 9px; }
+.source-filter-search svg { width: 16px; flex: 0 0 auto; fill: none; stroke: var(--muted); stroke-width: 1.8; }
+.source-filter-search input { width: 100%; min-width: 0; color: var(--ink); background: transparent; border: 0; outline: 0; font: inherit; font-size: .72rem; }
+.source-filter-search input::placeholder { color: var(--muted); }
+.source-filter-options { max-height: 360px; padding: 4px 0 7px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+.source-filter-group { padding-top: 7px; }
+.source-filter-group.is-selected { position: sticky; z-index: 1; top: 0; padding-bottom: 5px; background: var(--white); border-bottom: 1px solid var(--line); }
+.source-filter-group h3 { margin: 0; padding: 3px 6px; color: var(--muted); font-size: .56rem; letter-spacing: .1em; text-transform: uppercase; }
 .source-filter-options label { min-height: 39px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; padding: 7px 6px; border-radius: 8px; cursor: pointer; font-size: .7rem; font-weight: 700; }
 .source-filter-options label:hover { background: var(--surface-hover); }
 .source-filter-options input { width: 16px; height: 16px; margin: 0; accent-color: var(--coral-dark); }
-.source-filter-options small { min-width: 24px; color: var(--muted); text-align: right; }
+.source-filter-options label span, .source-filter-options label strong, .source-filter-options label small { display: block; }
+.source-filter-options label strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.source-filter-options label small { margin-top: 2px; color: var(--muted); font-size: .56rem; font-weight: 500; }
+.source-filter-options label em { min-width: 24px; color: var(--muted); text-align: right; font-size: .62rem; font-style: normal; }
+.source-filter-empty { margin: 12px 6px; color: var(--muted); font-size: .68rem; }
 .source-filter-done { width: 100%; min-height: 38px; color: var(--action-foreground); background: var(--action-background); border: 0; border-radius: 9px; cursor: pointer; font-size: .7rem; font-weight: 800; }
 .notice-banner, .error-banner { margin-bottom: 24px; display: flex; align-items: center; gap: 12px; padding: 12px 15px; border-radius: 10px; font-size: .76rem; }
 .notice-banner { color: #526663; background: #e3ece7; border: 1px solid #ceded7; }

@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { deduplicateArticles } from "@/lib/news/deduplicate";
-import { normalizeProviderArticle } from "@/lib/news/normalize";
+import { normalizeProviderArticle, normalizeProviderArticles } from "@/lib/news/normalize";
 import { canonicalizeArticleUrl } from "@/lib/news/url";
 
 const providerArticle = (url: string, title = "Japan and Singapore launch digital trade corridor") =>
@@ -99,6 +99,72 @@ describe("provider normalization", () => {
     expect(result.countries).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: "SG", relevanceScore: 1 })]),
     );
+  });
+
+  it("preserves Japanese Unicode while inferring language and topics", () => {
+    const result = normalizeProviderArticle({
+      provider: "RSS",
+      providerArticleId: "japanese-metadata",
+      title: "日本政府が半導体投資を発表",
+      description: "東京で新しい技術政策を説明しました。",
+      url: "https://news.web.nhk/newsweb/na/na-k1000000000",
+      publishedAt: new Date().toISOString(),
+      sourceName: "NHK",
+      sourceCountry: "JP",
+    });
+
+    expect(result.title).toBe("日本政府が半導体投資を発表");
+    expect(result.description).toBe("東京で新しい技術政策を説明しました。");
+    expect(result.language).toBe("ja");
+    expect(result.topics).toEqual(expect.arrayContaining(["politics", "business", "technology"]));
+    expect(result.countries).toEqual(expect.arrayContaining([expect.objectContaining({ code: "JP" })]));
+  });
+
+  it("infers Hangul conservatively and leaves Han-only text unknown without metadata", () => {
+    expect(normalizeProviderArticle({
+      provider: "OTHER",
+      providerArticleId: "korean",
+      title: "한국 정부가 새로운 정책을 발표했습니다",
+      url: "https://example.com/korean",
+      publishedAt: new Date().toISOString(),
+      sourceName: "Example",
+    }).language).toBe("ko");
+    expect(normalizeProviderArticle({
+      provider: "OTHER",
+      providerArticleId: "han-only",
+      title: "政府宣布新政策",
+      url: "https://example.com/han-only",
+      publishedAt: new Date().toISOString(),
+      sourceName: "Example",
+    }).language).toBe("und");
+  });
+
+  it("logs aggregate language, publisher-country, local-Japan, and source-resolution metrics", () => {
+    const output: string[] = [];
+    const consoleSpy = vi.spyOn(console, "info").mockImplementation((message) => output.push(String(message)));
+    try {
+      normalizeProviderArticles([{
+        provider: "RSS",
+        providerArticleId: "jp-observability",
+        title: "日本政府が新しい政策を発表",
+        description: "東京で発表しました。",
+        url: "https://news.web.nhk/newsweb/na/na-k1000000001",
+        publishedAt: new Date().toISOString(),
+        language: "ja",
+        sourceName: "NHK",
+        sourceCountry: "JP",
+      }]);
+    } finally {
+      consoleSpy.mockRestore();
+    }
+    const entry = JSON.parse(output.at(-1)!);
+    expect(entry).toMatchObject({
+      articles_by_language: { ja: 1 },
+      articles_by_source_country: { JP: 1 },
+      jp_local_article_count: 1,
+      source_resolution_method: { registry: 1 },
+    });
+    expect(JSON.stringify(entry)).not.toContain("東京で発表しました");
   });
 });
 

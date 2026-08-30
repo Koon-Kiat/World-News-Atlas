@@ -2,7 +2,10 @@ import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import Parser from "rss-parser";
 import type { RssFeedConfig } from "@/config/news-sources";
+import { logNews } from "../logger";
 import { publicationDateInRange, trustedPublicationDate } from "../publication-date";
+import { registrableDomain } from "../sources/domain";
+import { metadataExcerpt } from "../text";
 import type { ProviderArticle, ProviderFetchRequest, ProviderFetchResult } from "../types";
 import { type NewsProvider, ProviderError } from "./provider";
 
@@ -18,6 +21,7 @@ const REVIEWED_FEED_HOSTS = new Set([
   "www.france24.com",
   "feeds.skynews.com",
   "feeds.npr.org",
+  "news.web.nhk",
 ]);
 
 interface RssMediaNode {
@@ -66,6 +70,12 @@ function feedImage(item: Parser.Item & RssMediaFields): string | null {
   const encodedImage = item.contentEncoded?.match(/<img\b[^>]*\bsrc=["']([^"']+)["']/i)?.[1];
   const fallback = item.enclosure?.url ?? encodedImage ?? null;
   return mediaCandidates[0]?.url ?? (fallback && !/\/(?:no-image|placeholder)[^/]*\./i.test(fallback) ? fallback : null);
+}
+
+function rssDescription(item: Parser.Item & RssMediaFields): { value: string | null; truncated: boolean } {
+  const preferred = item.contentSnippet ?? item.summary ?? item.content;
+  if (preferred) return metadataExcerpt(preferred);
+  return metadataExcerpt(item.contentEncoded);
 }
 
 function isPrivateAddress(address: string): boolean {
@@ -164,20 +174,35 @@ export class RssProvider implements NewsProvider {
   ) {}
 
   async fetchLatest(request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
+    const targets = request.sourceTargets ?? [];
+    const targetedFeedIds = new Set(targets.map(({ id }) => id));
+    const targetedDomains = new Set(targets.flatMap(({ domains }) => domains.map(registrableDomain)));
+    const feeds = targets.length === 0
+      ? this.feeds
+      : this.feeds.filter((feed) => {
+          const websiteDomain = registrableDomain(new URL(feed.websiteUrl).hostname);
+          return targetedFeedIds.has(feed.sourceId) || targetedDomains.has(websiteDomain);
+        });
+    logNews("info", "rss_source_targeting", {
+      provider_source_targeted_query_count: targets.length > 0 ? feeds.length : 0,
+    });
     const settled = await Promise.allSettled(
-      this.feeds.map(async (feed) => {
+      feeds.map(async (feed) => {
         const xml = await fetchFeed(feed.feedUrl, this.timeoutMs);
         const parsed = await this.parser.parseString(xml);
-        return parsed.items.flatMap<ProviderArticle>((item, index) => {
+        let truncatedDescriptionCount = 0;
+        const articles = parsed.items.flatMap<ProviderArticle>((item, index) => {
           const publishedAt = trustedPublicationDate([item.isoDate, item.pubDate]);
           if (!publishedAt || !publicationDateInRange(publishedAt, request.from, request.to)) {
             return [];
           }
+          const description = rssDescription(item);
+          if (description.truncated) truncatedDescriptionCount += 1;
           return [{
             provider: this.name,
             providerArticleId: item.guid ?? item.id ?? item.link ?? `${feed.feedUrl}#${index}`,
             title: item.title ?? "Untitled RSS item",
-            description: item.contentEncoded ?? item.contentSnippet ?? item.summary ?? item.content ?? null,
+            description: description.value,
             url: item.link ?? feed.websiteUrl,
             imageUrl: feedImage(item),
             publishedAt,
@@ -191,11 +216,27 @@ export class RssProvider implements NewsProvider {
             coverageCountries: feed.coverageCountries,
           }];
         });
+        return { feed, articles, truncatedDescriptionCount };
       }),
     );
-    const articleBatches = settled.map((result) => (result.status === "fulfilled" ? result.value : []));
+    const successful = settled.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+    const articleBatches = successful.map(({ articles }) => articles);
     const articles = takeRoundRobin(articleBatches, request.limit ?? 250);
-    if (this.feeds.length > 0 && articles.length === 0 && settled.every((result) => result.status === "rejected")) {
+    const articlesPerSource = new Map<string, number>();
+    for (const { feed, articles: feedArticles } of successful) {
+      articlesPerSource.set(
+        feed.sourceId,
+        (articlesPerSource.get(feed.sourceId) ?? 0) + feedArticles.length,
+      );
+    }
+    logNews("info", "rss_fetch_complete", {
+      rss_articles_per_source: Object.fromEntries([...articlesPerSource].sort()),
+      rss_truncated_description_count: successful.reduce(
+        (total, { truncatedDescriptionCount }) => total + truncatedDescriptionCount,
+        0,
+      ),
+    });
+    if (feeds.length > 0 && articles.length === 0 && settled.every((result) => result.status === "rejected")) {
       throw new ProviderError(this.name, "ALL_FEEDS_FAILED", "All configured RSS feeds failed");
     }
     return {

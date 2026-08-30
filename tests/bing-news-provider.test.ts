@@ -63,10 +63,44 @@ describe("Bing News RSS provider", () => {
       from: new Date("2026-08-01T00:00:00Z"),
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(8);
+    expect(fetchMock).toHaveBeenCalledTimes(10);
     const requestedQueries = fetchMock.mock.calls.map(([input]) => new URL(String(input)).searchParams.get("q"));
     expect(requestedQueries).toContain('"Japan" site:reuters.com');
     expect(requestedQueries).toContain('"Japan" site:apnews.com');
+    expect(requestedQueries.some((requestedQuery) => requestedQuery?.includes('"日本" OR "日本国"'))).toBe(true);
+    expect(fetchMock.mock.calls.map(([input]) => new URL(String(input)).searchParams.get("mkt"))).toContain("ja-JP");
     expect(result.articles).toHaveLength(1);
+  });
+
+  it("pushes selected publisher domains into every upstream discovery query", async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      void input;
+      return new Response(
+        `<?xml version="1.0"?><rss version="2.0"><channel><title>News</title></channel></rss>`,
+        { status: 200, headers: { "Content-Type": "application/rss+xml" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new BingNewsProvider().search('"Japan"', {
+      countries: ["JP"],
+      sourceTargets: [{
+        id: "japan-times",
+        name: "The Japan Times",
+        domains: ["japantimes.co.jp"],
+        providerIdentifiers: {},
+      }, {
+        id: "nhk",
+        name: "NHK",
+        domains: ["nhk.or.jp", "news.web.nhk"],
+        providerIdentifiers: {},
+      }],
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [input] of fetchMock.mock.calls) {
+      expect(new URL(String(input)).searchParams.get("q")).toContain("site:japantimes.co.jp");
+      expect(new URL(String(input)).searchParams.get("q")).toContain("site:news.web.nhk");
+    }
   });
 });

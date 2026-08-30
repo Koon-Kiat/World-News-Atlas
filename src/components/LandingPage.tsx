@@ -100,6 +100,7 @@ function previewArticle(
     publishedAt: "2026-08-29T01:30:00.000Z",
     language: "en",
     source: {
+      id: `preview:${id}`,
       name: sourceName,
       domain: null,
       countryCode: sourceCountry,

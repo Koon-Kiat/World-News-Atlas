@@ -1,6 +1,7 @@
 const APPROVED_ARTICLE_HOSTS = new Set([
   "feeds.bbci.co.uk",
   "news.sky.com",
+  "news.web.nhk",
   "www.aljazeera.com",
   "www.bbc.com",
   "www.channelnewsasia.com",

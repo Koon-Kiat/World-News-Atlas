@@ -12,6 +12,8 @@
   { "suffix": "au", "countryCode": "AU", "confidence": 0.82 },
   { "suffix": "com.sg", "countryCode": "SG", "confidence": 0.88 },
   { "suffix": "sg", "countryCode": "SG", "confidence": 0.84 },
+  { "suffix": "com.my", "countryCode": "MY", "confidence": 0.88 },
+  { "suffix": "my", "countryCode": "MY", "confidence": 0.82 },
   { "suffix": "de", "countryCode": "DE", "confidence": 0.84 },
   { "suffix": "fr", "countryCode": "FR", "confidence": 0.84 },
   { "suffix": "es", "countryCode": "ES", "confidence": 0.82 },
