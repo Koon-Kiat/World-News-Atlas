@@ -3,6 +3,7 @@
 
 import { useCallback, useState } from "react";
 import { CountryFlag } from "@/components/CountryFlag";
+import { useSavedStories } from "@/hooks/useSavedStories";
 import { getCountryName } from "@/lib/news/countries/metadata";
 import { approvedArticleUrl, approvedImageUrl } from "@/lib/news/image-policy";
 import type { ArticleView, StoryView } from "@/lib/news/types";
@@ -15,7 +16,10 @@ function displayImageUrl(
   topic: string,
 ): string | null {
   const topicParameter = `&topic=${encodeURIComponent(topic)}`;
-  if (approvedImageUrl(imageUrl)) return `/api/image?url=${encodeURIComponent(imageUrl!)}${topicParameter}`;
+  if (approvedImageUrl(imageUrl)) {
+    const articleParameter = approvedArticleUrl(articleUrl) ? `&article=${encodeURIComponent(articleUrl!)}` : "";
+    return `/api/image?url=${encodeURIComponent(imageUrl!)}${articleParameter}${topicParameter}`;
+  }
   if (approvedArticleUrl(articleUrl)) return `/api/image?article=${encodeURIComponent(articleUrl!)}${topicParameter}`;
   return null;
 }
@@ -51,6 +55,7 @@ function ArticleLink({ article }: { article: ArticleView }) {
 
 export function StoryCard({ story, featured = false }: { story: StoryView; featured?: boolean }) {
   const [readerOpen, setReaderOpen] = useState(false);
+  const savedStories = useSavedStories();
   const closeReader = useCallback(() => setReaderOpen(false), []);
   const lead = story.articles[0];
   const imageArticle = story.articles.find((article) => isSafeHttpUrl(article.imageUrl));
@@ -61,7 +66,7 @@ export function StoryCard({ story, featured = false }: { story: StoryView; featu
 
   return (
     <>
-      <article className={featured ? "story-card is-featured has-media" : "story-card has-media"}>
+      <article id={story.id} className={featured ? "story-card is-featured has-media" : "story-card has-media"}>
       <button
         className="story-card-link"
         type="button"
@@ -91,6 +96,19 @@ export function StoryCard({ story, featured = false }: { story: StoryView; featu
         )}
         <span className="image-shade" />
         <span className="story-rank">{featured ? "Lead story" : "Developing"}</span>
+        <button
+          type="button"
+          className={savedStories.isSaved(story.id) ? "save-story-button is-saved" : "save-story-button"}
+          aria-label={savedStories.isSaved(story.id) ? `Remove ${story.title} from saved articles` : `Save ${story.title} for later`}
+          aria-pressed={savedStories.isSaved(story.id)}
+          title={savedStories.isSaved(story.id) ? "Remove from saved articles" : "Save for later"}
+          onClick={(event) => {
+            event.stopPropagation();
+            savedStories.toggle(story);
+          }}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4Z" /></svg>
+        </button>
       </div>
       <div className="story-body">
         <div className="story-kicker">

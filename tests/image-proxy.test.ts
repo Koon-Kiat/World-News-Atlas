@@ -95,12 +95,18 @@ describe("publisher image relay", () => {
     expect(await response.text()).toContain("Politics briefing");
   });
 
-  it("allows the reviewed NHK article host but not unreviewed image hosts", async () => {
-    const unreviewedImage = "https://images.unreviewed.example/nhk.jpg";
-    const fetchMock = vi.fn(async () => new Response(
-      `<html><head><meta property="og:image" content="${unreviewedImage}"></head></html>`,
-      { status: 200, headers: { "Content-Type": "text/html" } },
-    ));
+  it("relays an image from the reviewed official NHK news path", async () => {
+    const nhkImage = "https://imgu.web.nhk/news/u/news/nd/kiji/example.jpg";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(
+        `<html><head><meta property="og:image" content="${nhkImage}"></head></html>`,
+        { status: 200, headers: { "Content-Type": "text/html" } },
+      ))
+      .mockResolvedValueOnce(new Response(new Uint8Array([7, 8, 9]), {
+        status: 200,
+        headers: { "Content-Type": "image/jpeg", "Content-Length": "3" },
+      }));
     vi.stubGlobal("fetch", fetchMock);
     const article = "https://news.web.nhk/newsweb/na/na-k1000000001";
 
@@ -109,7 +115,33 @@ describe("publisher image relay", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toContain("image/svg+xml");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(response.headers.get("content-type")).toContain("image/jpeg");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      new URL(nhkImage),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Referer: "https://news.web.nhk/" }),
+      }),
+    );
+  });
+
+  it("falls back from a failed supplied image to the article metadata image", async () => {
+    const direct = "https://www.japantimes.co.jp/japantimes/uploads/images/2026/08/26/missing.jpg";
+    const article = "https://www.japantimes.co.jp/news/2026/08/26/example";
+    const recovered = "https://www.japantimes.co.jp/japantimes/uploads/images/2026/08/26/recovered.jpg";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("missing", { status: 404, headers: { "Content-Type": "text/plain" } }))
+      .mockResolvedValueOnce(new Response(`<meta property="og:image" content="${recovered}">`, { status: 200, headers: { "Content-Type": "text/html" } }))
+      .mockResolvedValueOnce(new Response(new Uint8Array([1]), { status: 200, headers: { "Content-Type": "image/webp", "Content-Length": "1" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await GET(new Request(
+      `https://example.test/api/image?url=${encodeURIComponent(direct)}&article=${encodeURIComponent(article)}`,
+    ));
+
+    expect(response.headers.get("content-type")).toBe("image/webp");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });

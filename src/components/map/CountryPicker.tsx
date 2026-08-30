@@ -5,6 +5,24 @@ import { CountryFlag } from "@/components/CountryFlag";
 import { getCountryName, listCountries } from "@/lib/news/countries/metadata";
 
 const COUNTRIES = listCountries();
+const COUNTRY_ALIASES: Record<string, string[]> = {
+  US: ["us", "usa", "united states", "united states of america", "america"],
+  GB: ["gb", "uk", "united kingdom", "great britain", "britain"],
+  CN: ["cn", "china", "prc", "people's republic of china"],
+  SG: ["sg", "singapore"],
+  JP: ["jp", "japan"],
+  DE: ["de", "germany"],
+  FR: ["fr", "france"],
+};
+
+function normalizedSearchValue(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/gi, " ")
+    .trim()
+    .toLocaleLowerCase("en");
+}
 
 interface CountryPickerProps {
   selectedCountries: string[];
@@ -15,13 +33,21 @@ export function CountryPicker({ selectedCountries, onSelect }: CountryPickerProp
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState(false);
   const matches = useMemo(() => {
-    const search = query.trim().toLocaleLowerCase("en");
+    const search = normalizedSearchValue(query);
     if (!search) return [];
-    return COUNTRIES.filter(
-      (country) =>
-        country.name.toLocaleLowerCase("en").includes(search) ||
-        country.code.toLocaleLowerCase("en").startsWith(search),
-    ).slice(0, 7);
+    return COUNTRIES.map((country) => {
+      const code = normalizedSearchValue(country.code);
+      const name = normalizedSearchValue(country.name);
+      const aliases = COUNTRY_ALIASES[country.code] ?? [];
+      const exact = code === search || name === search || aliases.includes(search);
+      const prefix = code.startsWith(search) || name.startsWith(search) || aliases.some((alias) => alias.startsWith(search));
+      const partial = name.includes(search) || aliases.some((alias) => alias.includes(search));
+      return { country, score: exact ? 0 : prefix ? 1 : partial ? 2 : 3 };
+    })
+      .filter(({ score }) => score < 3)
+      .sort((left, right) => left.score - right.score || left.country.name.localeCompare(right.country.name))
+      .slice(0, 7)
+      .map(({ country }) => country);
   }, [query]);
 
   function choose(code: string) {

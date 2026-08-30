@@ -42,6 +42,7 @@ async function fetchWithReviewedRedirects(
 function imageReferer(url: URL): string {
   if (url.hostname === "cassette.sphdigital.com.sg") return "https://www.straitstimes.com/";
   if (url.hostname === "dam.mediacorp.sg") return "https://www.channelnewsasia.com/";
+  if (url.hostname === "imgu.web.nhk") return "https://news.web.nhk/";
   return `${url.protocol}//${url.hostname}/`;
 }
 
@@ -146,9 +147,18 @@ export async function GET(request: Request): Promise<Response> {
   if (!directImage && !article) return new Response("Not found", { status: 404 });
 
   try {
-    const imageUrl = directImage ?? (article ? await resolveArticleImage(article) : null);
-    if (!imageUrl) return placeholderImageResponse(topic);
-    return (await imageResponse(imageUrl)) ?? placeholderImageResponse(topic);
+    if (directImage) {
+      const directResponse = await imageResponse(directImage);
+      if (directResponse) return directResponse;
+    }
+    if (article) {
+      const articleImage = await resolveArticleImage(article);
+      if (articleImage) {
+        const articleResponse = await imageResponse(articleImage);
+        if (articleResponse) return articleResponse;
+      }
+    }
+    return placeholderImageResponse(topic);
   } catch {
     return placeholderImageResponse(topic);
   }
