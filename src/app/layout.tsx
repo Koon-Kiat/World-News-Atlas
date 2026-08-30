@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { PwaRegistration } from "@/components/PwaRegistration";
 import { THEME_BOOTSTRAP_SCRIPT } from "@/lib/theme";
 import "flag-icons/css/flag-icons.min.css";
 import "./globals.css";
@@ -11,6 +12,16 @@ export const metadata: Metadata = {
   },
   description:
     "Explore global news and the stories connecting any two countries through an interactive world map.",
+  applicationName: "World News Atlas",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Worldline",
+  },
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }, { url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
+  },
   openGraph: {
     type: "website",
     title: "World News Atlas",
@@ -25,6 +36,11 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: "#000000",
+  colorScheme: "dark light",
+};
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" suppressHydrationWarning>
@@ -33,6 +49,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }}
           suppressHydrationWarning
         />
+        <PwaRegistration />
         {children}
       </body>
     </html>

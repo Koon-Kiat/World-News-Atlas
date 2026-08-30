@@ -20,7 +20,9 @@ const APPROVED_IMAGE_HOSTS = new Set([
   "e3.365dm.com",
   "i.guim.co.uk",
   "ichef.bbci.co.uk",
+  "imgu.web.nhk",
   "media.npr.org",
+  "news.web.nhk",
   "npr.brightspotcdn.com",
   "s.france24.com",
   "static.dw.com",
@@ -28,6 +30,7 @@ const APPROVED_IMAGE_HOSTS = new Set([
   "www.aljazeera.com",
   "www.bing.com",
   "www.japantimes.co.jp",
+  "www3.nhk.or.jp",
 ]);
 
 export function parsedHttpsUrl(value: string | null | undefined): URL | null {
@@ -60,5 +63,8 @@ export function approvedImageUrl(value: string | null | undefined): URL | null {
   }
   if (host === "www.bing.com" && !url.pathname.startsWith("/th")) return null;
   if (host === "cassette.sphdigital.com.sg" && !url.pathname.startsWith("/image/")) return null;
+  if (host === "news.web.nhk" && !url.pathname.startsWith("/newsweb/")) return null;
+  if (host === "imgu.web.nhk" && !url.pathname.startsWith("/news/")) return null;
+  if (host === "www3.nhk.or.jp" && !url.pathname.startsWith("/news/")) return null;
   return url;
 }

@@ -4,6 +4,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import Link from "next/link";
 import { CountryFlag } from "@/components/CountryFlag";
 import { ExploreNavigation, HeaderTools } from "@/components/ExploreNavigation";
+import { HeaderSearch } from "@/components/HeaderSearch";
 import { NewsFilters } from "@/components/filters/NewsFilters";
 import { PerspectiveFilter } from "@/components/filters/PerspectiveFilter";
 import { CountryPicker } from "@/components/map/CountryPicker";
@@ -274,18 +275,11 @@ export function WorldNewsExplorer({
           <span>WORLDLINE</span>
         </Link>
         <ExploreNavigation active={mode} />
-        <form
-          className="header-search"
-          role="search"
-          onSubmit={(event) => {
-            event.preventDefault();
-            storiesSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-          }}
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.7-4.7m2.2-5.3a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" /></svg>
-          <label className="sr-only" htmlFor="news-search">Search news</label>
-          <input id="news-search" type="search" value={search} maxLength={120} placeholder="Search topics, people, places…" onChange={(event) => setSearch(event.target.value)} />
-        </form>
+        <HeaderSearch
+          value={search}
+          onChange={setSearch}
+          onSearch={() => storiesSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+        />
         <HeaderTools active={mode} />
       </header>
 
