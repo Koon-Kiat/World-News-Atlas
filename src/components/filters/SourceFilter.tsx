@@ -10,11 +10,15 @@ interface SourceFilterProps {
   onChange: (value: string[]) => void;
 }
 
+const MAX_SELECTED_OUTLETS = 20;
+
 export function SourceFilter({ availableSources, selectedCountries, value, onChange }: SourceFilterProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
+  const limitMessageId = `${panelId}-limit`;
+  const atSelectionLimit = value.length >= MAX_SELECTED_OUTLETS;
 
   useEffect(() => {
     function closeOnOutsideClick(event: PointerEvent) {
@@ -57,7 +61,12 @@ export function SourceFilter({ availableSources, selectedCountries, value, onCha
   }, [availableSources, search, selectedCountries, value]);
 
   function toggle(source: string) {
-    onChange(value.includes(source) ? value.filter((item) => item !== source) : [...value, source]);
+    if (value.includes(source)) {
+      onChange(value.filter((item) => item !== source));
+      return;
+    }
+    if (atSelectionLimit) return;
+    onChange([...value, source]);
   }
 
   return (
@@ -88,6 +97,9 @@ export function SourceFilter({ availableSources, selectedCountries, value, onCha
             </div>
             {value.length > 0 && <button type="button" onClick={() => onChange([])}>Clear</button>}
           </div>
+          {atSelectionLimit && (
+            <p className="source-filter-limit" id={limitMessageId} role="status">Maximum 20 outlets</p>
+          )}
           <label className="source-filter-search">
             <span className="sr-only">Search news outlets</span>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.7-4.7m2.2-5.3a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" /></svg>
@@ -108,6 +120,8 @@ export function SourceFilter({ availableSources, selectedCountries, value, onCha
                     <input
                       type="checkbox"
                       checked={value.includes(source.id)}
+                      disabled={atSelectionLimit && !value.includes(source.id)}
+                      aria-describedby={atSelectionLimit ? limitMessageId : undefined}
                       onChange={() => toggle(source.id)}
                     />
                     <span><strong>{source.name}</strong><small>{source.domain ?? source.countryCode ?? "Publisher"}</small></span>

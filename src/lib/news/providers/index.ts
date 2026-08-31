@@ -5,6 +5,7 @@ import { logNews } from "../logger";
 import { canonicalSourceId, domainFromUrl } from "../sources/registry";
 import type {
   ProviderArticle,
+  ProviderContinuationState,
   ProviderFetchRequest,
   ProviderFetchResult,
   ProviderName,
@@ -78,6 +79,8 @@ export interface ProviderBatchResult {
   articles: ProviderArticle[];
   failures: Array<{ provider: ProviderName; code: string }>;
   providerCounts: Partial<Record<ProviderName, number>>;
+  continuations: Partial<Record<ProviderName, ProviderContinuationState | null>>;
+  exhaustedProviders: ProviderName[];
 }
 
 interface ProviderOutcome {
@@ -106,6 +109,7 @@ function providerRequestKey(provider: NewsProvider, request: ProviderFetchReques
     language: request.language ?? null,
     sourceTargets: (request.sourceTargets ?? []).map(({ id }) => id).sort(),
     limit: request.limit ?? null,
+    continuation: request.continuation ?? null,
   });
 }
 
@@ -178,15 +182,21 @@ export async function fetchProviderArticlesGracefully(
   const articles: ProviderArticle[] = [];
   const failures: ProviderBatchResult["failures"] = [];
   const providerCounts: ProviderBatchResult["providerCounts"] = {};
+  const continuations: ProviderBatchResult["continuations"] = {};
+  const exhaustedProviders: ProviderName[] = [];
 
   outcomes.forEach((outcome, index) => {
     const provider = providers[index];
     if (outcome.result) {
       articles.push(...outcome.result.articles);
       providerCounts[provider.name] = outcome.result.articles.length;
+      continuations[provider.name] = outcome.result.continuation ?? null;
+      if (outcome.result.exhausted ?? (outcome.result.continuation === null)) {
+        exhaustedProviders.push(provider.name);
+      }
     } else if (outcome.failure) {
       failures.push(outcome.failure);
     }
   });
-  return { articles, failures, providerCounts };
+  return { articles, failures, providerCounts, continuations, exhaustedProviders };
 }

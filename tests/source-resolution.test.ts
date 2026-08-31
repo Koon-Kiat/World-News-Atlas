@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { KNOWN_SOURCE_SEEDS } from "@/config/news-sources";
 import { normalizeProviderArticle } from "@/lib/news/normalize";
 import {
+  canonicalSourceId,
   domainFromUrl,
+  sourceMatchesSelection,
+  sourceReferenceForSelection,
   resolveSourceDetailed,
   sourceTargetsFromSelections,
 } from "@/lib/news/sources/registry";
@@ -22,6 +25,27 @@ describe("publisher identity and country resolution", () => {
       expect.objectContaining({ id: "nhk", domains: expect.arrayContaining(["nhk.or.jp", "news.web.nhk"]) }),
       expect.objectContaining({ id: "japan-times", domains: ["japantimes.co.jp"] }),
     ]);
+  });
+
+  it("keeps stable identity semantics for maintained, legacy, domain-backed, and domainless sources", () => {
+    const maintained = source({ sourceName: "NHK", articleUrl: "https://news.web.nhk/newsweb/na/example" }).source;
+    expect(maintained.id).toBe("nhk");
+    expect(sourceMatchesSelection(maintained, "NHK")).toBe(true);
+
+    expect(canonicalSourceId({ name: "Unknown", domain: "news.example.co.jp", countryCode: null }))
+      .toBe("domain:example.co.jp");
+    expect(canonicalSourceId({ name: "Example News", domain: null, countryCode: null }))
+      .toBe("name:example-news:global");
+    expect(sourceReferenceForSelection("name:example-news:global")).toMatchObject({
+      id: "name:example-news:global",
+      name: "Example News",
+      domain: null,
+    });
+    expect(sourceTargetsFromSelections(["name:example-news:global"])).toEqual([
+      expect.objectContaining({ id: "name:example-news:global", name: "Example News", domains: [] }),
+    ]);
+    expect(canonicalSourceId({ name: "Example News Network", domain: null, countryCode: null }))
+      .not.toBe(canonicalSourceId({ name: "Example News", domain: null, countryCode: null }));
   });
 
   it("resolves maintained publishers before conflicting metadata", () => {

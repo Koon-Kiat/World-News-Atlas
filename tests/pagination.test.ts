@@ -8,11 +8,17 @@ function story(id: string): StoryView {
 }
 
 function response(page: number, total: number, stories: StoryView[]): NewsResponse {
+  const hasMore = page < 100 && page * 12 < total;
   return {
     stories,
     meta: {
       selectedCountries: [],
       total,
+      articleCount: total,
+      materializedStoryCount: total,
+      hasMore,
+      corpusComplete: true,
+      nextPage: hasMore ? page + 1 : null,
       page,
       pageSize: 12,
       dataSource: "live",
@@ -36,11 +42,20 @@ describe("news pagination", () => {
     expect(nextPageNumber(last)).toBeNull();
   });
 
-  it("stops when a provider page adds no unique stories", () => {
+  it("continues past duplicate cards when authoritative continuation remains", () => {
     const current = [story("known")];
     const merged = mergeNextPage(current, response(2, 60, [story("known")]), 2);
     expect(merged.stories).toHaveLength(1);
-    expect(merged.canFetchMore).toBe(false);
+    expect(merged.canFetchMore).toBe(true);
+  });
+
+  it("can repeat a partial page while provider discovery remains possible", () => {
+    const partial = response(3, 25, [story("new")]);
+    partial.meta.corpusComplete = false;
+    partial.meta.hasMore = true;
+    partial.meta.nextPage = 3;
+    expect(nextPageNumber(partial)).toBe(3);
+    expect(mergeNextPage([], partial, 3).canFetchMore).toBe(true);
   });
 
   it("rejects a response for an unexpected page", () => {

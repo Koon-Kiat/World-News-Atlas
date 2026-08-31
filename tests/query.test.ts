@@ -154,6 +154,39 @@ describe("news matching", () => {
     expect(byId.sourceFacets.find(({ id }) => id === stableId)?.storyCount).toBeGreaterThan(0);
   });
 
+  it("filters domainless publishers by stable ID and legacy display name", () => {
+    const template = getFixtureStories()[0];
+    const article = {
+      ...template.articles[0],
+      id: "domainless-example",
+      source: {
+        ...template.articles[0].source,
+        id: "name:example-news:global",
+        name: "Example News",
+        domain: null,
+        countryCode: null,
+      },
+    };
+    const stories = [{ ...template, id: "domainless-story", articles: [article] }];
+
+    const byId = queryStories(stories, {
+      ...baseQuery,
+      sources: ["name:example-news:global"],
+    });
+    const byName = queryStories(stories, {
+      ...baseQuery,
+      sources: ["Example News"],
+    });
+
+    expect(byId.stories.map(({ id }) => id)).toEqual(["domainless-story"]);
+    expect(byName.stories.map(({ id }) => id)).toEqual(["domainless-story"]);
+    expect(byId.sourceFacets).toContainEqual(expect.objectContaining({
+      id: "name:example-news:global",
+      name: "Example News",
+      storyCount: 1,
+    }));
+  });
+
   it("derives language facets from the matching result set", () => {
     const result = queryStories(getFixtureStories(), baseQuery);
     expect(result.languageFacets).toEqual(expect.arrayContaining([

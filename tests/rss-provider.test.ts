@@ -126,6 +126,23 @@ describe("RSS provider", () => {
     expect(String(fetchMock.mock.calls[0][0])).toContain("theguardian.com");
   });
 
+  it("fetches each finite feed snapshot once across bounded continuation stages", async () => {
+    const fetchMock = vi.fn(async () => new Response(
+      `<?xml version="1.0"?><rss version="2.0"><channel><title>World</title></channel></rss>`,
+      { status: 200, headers: { "Content-Type": "application/rss+xml" } },
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+    const provider = new RssProvider(DEFAULT_RSS_FEEDS.slice(0, 5));
+
+    const first = await provider.fetchLatest();
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(first).toMatchObject({ continuation: { offset: 4 }, exhausted: false });
+
+    const second = await provider.fetchLatest({ continuation: first.continuation ?? undefined });
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(second).toMatchObject({ continuation: null, exhausted: true });
+  });
+
   it("includes the reviewed Japanese NHK metadata feed", () => {
     expect(DEFAULT_RSS_FEEDS).toContainEqual(expect.objectContaining({
       sourceId: "nhk",

@@ -74,6 +74,30 @@ describe("progressive story list", () => {
     expect(onRequestMore).toHaveBeenCalledTimes(1);
   });
 
+  it("prefetches only after the ready buffer crosses the low-water threshold", async () => {
+    vi.stubGlobal("IntersectionObserver", TestIntersectionObserver);
+    const onRequestMore = vi.fn();
+    render(
+      <ProgressiveStoryList
+        stories={stories(48)}
+        canFetchMore
+        isFetchingMore={false}
+        onRequestMore={onRequestMore}
+      />,
+    );
+
+    expect(onRequestMore).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Load more" })).toBeInTheDocument();
+    expect(screen.queryByText(/^Page \d+/i)).not.toBeInTheDocument();
+
+    await act(async () => observerCallback?.(
+      [{ isIntersecting: true } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    ));
+    expect(screen.getAllByRole("article")).toHaveLength(24);
+    expect(onRequestMore).toHaveBeenCalledTimes(1);
+  });
+
   it("continues requesting later pages as appended stories are consumed", async () => {
     vi.stubGlobal("IntersectionObserver", TestIntersectionObserver);
     const onRequestMore = vi.fn();
@@ -128,7 +152,7 @@ describe("progressive story list", () => {
       [{ isIntersecting: true } as IntersectionObserverEntry],
       {} as IntersectionObserver,
     ));
-    expect(screen.getByText("All 24 available matching stories are loaded.")).toBeInTheDocument();
+    expect(screen.getByText("All available matching stories are loaded.")).toBeInTheDocument();
     expect(onRequestMore).not.toHaveBeenCalled();
   });
 });

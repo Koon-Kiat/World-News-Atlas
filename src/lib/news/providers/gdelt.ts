@@ -43,6 +43,10 @@ function gdeltLanguage(value?: string): string | null {
   return LANGUAGE_CODES[value.toLowerCase()] ?? value.toLowerCase().slice(0, 3);
 }
 
+function gdeltApiDate(value: Date): string {
+  return value.toISOString().replace(/[-:T]/g, "").replace(/\.\d{3}Z$/, "");
+}
+
 function gdeltLanguageNames(request: ProviderFetchRequest): string[] {
   const language = request.language?.toLowerCase();
   if (language?.startsWith("ja")) return ["japanese"];
@@ -89,12 +93,18 @@ export class GdeltProvider implements NewsProvider {
     url.searchParams.set("query", query);
     url.searchParams.set("mode", "artlist");
     url.searchParams.set("format", "json");
-    url.searchParams.set("sort", "hybridrel");
-    url.searchParams.set("maxrecords", String(Math.min(250, request.limit ?? 150)));
-    const rangeEnd = request.to ?? new Date();
+    url.searchParams.set("sort", "datedesc");
+    const maximumRecords = Math.min(250, request.limit ?? 150);
+    url.searchParams.set("maxrecords", String(maximumRecords));
+    const continuationEnd = request.continuation?.before
+      ? new Date(request.continuation.before)
+      : null;
+    const rangeEnd = continuationEnd && !Number.isNaN(continuationEnd.getTime())
+      ? continuationEnd
+      : request.to ?? new Date();
     const rangeStart = request.from ?? new Date(rangeEnd.getTime() - 24 * 3_600_000);
-    const rangeDays = Math.max(1, Math.min(90, Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / 86_400_000)));
-    url.searchParams.set("timespan", `${rangeDays}d`);
+    url.searchParams.set("startdatetime", gdeltApiDate(rangeStart));
+    url.searchParams.set("enddatetime", gdeltApiDate(rangeEnd));
 
     let response: Response;
     try {
@@ -125,7 +135,18 @@ export class GdeltProvider implements NewsProvider {
         sourceCountry: countryNameToCode(article.sourcecountry),
       }];
     });
-    return { provider: this.name, articles, receivedAt: new Date().toISOString() };
+    const oldest = articles.reduce<number | null>((current, article) => {
+      const timestamp = new Date(article.publishedAt).getTime();
+      return current === null || timestamp < current ? timestamp : current;
+    }, null);
+    const exhausted = articles.length < maximumRecords || oldest === null || oldest <= rangeStart.getTime();
+    return {
+      provider: this.name,
+      articles,
+      receivedAt: new Date().toISOString(),
+      continuation: exhausted ? null : { before: new Date(oldest - 1).toISOString() },
+      exhausted,
+    };
   }
 
   fetchLatest(request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
@@ -151,10 +172,20 @@ export class GdeltProvider implements NewsProvider {
       throw new ProviderError(this.name, "REQUEST_FAILED", "GDELT discovery failed");
     }
     const unique = new Map(successful.map((article) => [article.url, article]));
+    const continuations = settled.flatMap((result) =>
+      result.status === "fulfilled" && result.value.continuation ? [result.value.continuation] : [],
+    );
+    const before = continuations
+      .map((continuation) => continuation.before)
+      .filter((value): value is string => Boolean(value))
+      .sort()[0];
+    const exhausted = before === undefined;
     return {
       provider: this.name,
       articles: [...unique.values()].slice(0, request.limit ?? 250),
       receivedAt: new Date().toISOString(),
+      continuation: exhausted ? null : { before },
+      exhausted,
     };
   }
 }

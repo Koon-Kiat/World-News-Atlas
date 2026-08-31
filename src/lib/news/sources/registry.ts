@@ -54,6 +54,20 @@ function slug(value: string): string {
   return normalizeName(value).replace(/\s+/g, "-").slice(0, 64) || "unknown";
 }
 
+export function parseDomainlessSourceId(selection: string): {
+  id: string;
+  name: string;
+  countryCode: string | null;
+} | null {
+  const match = selection.trim().match(/^name:([a-z0-9-]+):([a-z]{2}|global)$/);
+  if (!match) return null;
+  return {
+    id: selection.trim(),
+    name: match[1].split("-").filter(Boolean).map((part) => `${part[0].toUpperCase()}${part.slice(1)}`).join(" "),
+    countryCode: match[2] === "global" ? null : normalizeCountryCode(match[2]),
+  };
+}
+
 export function canonicalSourceId(source: Pick<SourceReference, "name" | "domain" | "countryCode">): string {
   if (source.domain) {
     const known = canonicalDomainRegistry.get(registrableDomain(source.domain));
@@ -99,9 +113,48 @@ export function sourceTargetsFromSelections(selections: string[]): ProviderSourc
           providerIdentifiers: {},
         });
       }
+      continue;
+    }
+    const domainless = parseDomainlessSourceId(selection);
+    if (domainless) {
+      targets.set(domainless.id, {
+        id: domainless.id,
+        name: domainless.name,
+        domains: [],
+        providerIdentifiers: {},
+      });
     }
   }
   return [...targets.values()];
+}
+
+export function sourceReferenceForSelection(selection: string): SourceReference {
+  const seed = sourceSeedForSelection(selection);
+  if (seed) return seedToReference(seed);
+  const domainless = parseDomainlessSourceId(selection);
+  if (domainless) {
+    return {
+      ...domainless,
+      domain: null,
+      region: null,
+      language: null,
+      scope: "INTERNATIONAL",
+      qualityScore: 0,
+    };
+  }
+  const domain = selection.startsWith("domain:")
+    ? registrableDomain(selection.slice("domain:".length))
+    : null;
+  return {
+    id: selection,
+    name: domain ?? selection,
+    domain,
+    countryCode: null,
+    region: null,
+    language: null,
+    scope: "INTERNATIONAL",
+    qualityScore: 0,
+  };
 }
 
 export function sourceMatchesSelection(source: SourceReference, selection: string): boolean {

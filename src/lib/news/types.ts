@@ -100,7 +100,18 @@ export interface NewsResponse {
   stories: StoryView[];
   meta: {
     selectedCountries: Array<{ code: string; name: string }>;
+    /** Currently materialized matching story clusters, not publisher articles. */
     total: number;
+    /** Individual normalized publisher articles in the current corpus. */
+    articleCount: number;
+    /** Matching story clusters currently materialized before page slicing. */
+    materializedStoryCount: number;
+    /** Cached stories or provider discovery can still produce continuation. */
+    hasMore: boolean;
+    /** True only after provider discovery is exhausted or the corpus limit is reached. */
+    corpusComplete: boolean;
+    /** Internal continuation page used by the infinite-scroll client. */
+    nextPage: number | null;
     page: number;
     pageSize: number;
     dataSource: "database" | "live" | "fixtures";
@@ -109,6 +120,15 @@ export interface NewsResponse {
     generatedAt: string;
     notice?: string;
   };
+}
+
+export interface ProviderContinuationState {
+  /** Page-based providers such as NewsAPI. */
+  page?: number;
+  /** Finite discovery-plan/feed offset used by Bing RSS and RSS. */
+  offset?: number;
+  /** Exclusive upper publication-time boundary used by GDELT windows. */
+  before?: string;
 }
 
 export interface ProviderArticle {
@@ -139,6 +159,7 @@ export interface ProviderFetchRequest {
   language?: string;
   sourceTargets?: ProviderSourceTarget[];
   limit?: number;
+  continuation?: ProviderContinuationState;
 }
 
 export interface ProviderCapabilities {
@@ -153,6 +174,8 @@ export interface ProviderFetchResult {
   provider: ProviderName;
   articles: ProviderArticle[];
   receivedAt: string;
+  continuation?: ProviderContinuationState | null;
+  exhausted?: boolean;
 }
 
 export interface NormalizedArticle extends ArticleView {

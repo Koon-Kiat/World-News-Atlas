@@ -3,8 +3,7 @@ import { getCountryName, normalizeCountryCode } from "./countries/metadata";
 import { languageLabel } from "./language";
 import { newsPeriodHours } from "./periods";
 import { rankStories, scoreTwoCountryRelevance } from "./ranking";
-import { registrableDomain } from "./sources/domain";
-import { sourceMatchesSelection, sourceSeedForSelection } from "./sources/registry";
+import { sourceMatchesSelection, sourceReferenceForSelection } from "./sources/registry";
 import type {
   ArticleView,
   LanguageFacet,
@@ -209,6 +208,7 @@ export function queryStories(
   stories: StoryView[],
   query: NewsQuery,
   now = new Date(),
+  options: { preserveOrder?: boolean } = {},
 ): {
   stories: StoryView[];
   total: number;
@@ -249,28 +249,7 @@ export function queryStories(
   }
   for (const selection of query.sources) {
     if ([...sourceCounts.values()].some(({ source }) => sourceMatchesSelection(source, selection))) continue;
-    const seed = sourceSeedForSelection(selection);
-    const source = seed
-      ? {
-          id: seed.id,
-          name: seed.name,
-          domain: registrableDomain(seed.domain),
-          countryCode: seed.countryCode,
-          region: seed.region,
-          language: seed.language,
-          scope: seed.scope,
-          qualityScore: seed.qualityScore,
-        }
-      : {
-          id: selection,
-          name: selection,
-          domain: selection.startsWith("domain:") ? selection.slice("domain:".length) : null,
-          countryCode: null,
-          region: null,
-          language: null,
-          scope: "INTERNATIONAL" as const,
-          qualityScore: 0,
-        };
+    const source = sourceReferenceForSelection(selection);
     sourceCounts.set(source.id, { source, storyCount: 0 });
   }
   const sourceFacets = [...sourceCounts.values()]
@@ -313,7 +292,7 @@ export function queryStories(
     })
     .filter((story) => story.articles.length > 0);
 
-  const ranked = rankStories(matching, query, now);
+  const ranked = options.preserveOrder ? matching : rankStories(matching, query, now);
   const start = (query.page - 1) * query.pageSize;
   return {
     stories: ranked.slice(start, start + query.pageSize),
@@ -328,13 +307,29 @@ export function buildNewsResponse(
   query: NewsQuery,
   dataSource: NewsResponse["meta"]["dataSource"],
   notice?: string,
+  corpus: { articleCount?: number; corpusComplete?: boolean } = {},
 ): NewsResponse {
-  const result = queryStories(stories, query);
+  const preserveOrder = dataSource === "live";
+  const result = queryStories(stories, query, new Date(), { preserveOrder });
+  const corpusComplete = corpus.corpusComplete ?? true;
+  const cachedStoriesRemain = query.page * query.pageSize < result.total;
+  const hasMore = cachedStoriesRemain || !corpusComplete;
+  const partialPage = result.stories.length < query.pageSize;
+  const nextPage = !hasMore
+    ? null
+    : partialPage && !corpusComplete
+      ? query.page
+      : Math.min(100, query.page + 1);
   return {
     stories: result.stories,
     meta: {
       selectedCountries: query.countries.map((code) => ({ code, name: getCountryName(code) })),
       total: result.total,
+      articleCount: corpus.articleCount ?? new Set(stories.flatMap((story) => story.articles.map(({ id }) => id))).size,
+      materializedStoryCount: result.total,
+      hasMore,
+      corpusComplete,
+      nextPage,
       page: query.page,
       pageSize: query.pageSize,
       dataSource,

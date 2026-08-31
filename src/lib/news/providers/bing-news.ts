@@ -7,6 +7,7 @@ import { fetchWithTimeout, type NewsProvider, ProviderError } from "./provider";
 
 const MAX_FEED_BYTES = 2 * 1024 * 1024;
 const MAX_DISCOVERY_QUERIES = 10;
+const DISCOVERY_PLANS_PER_STAGE = 2;
 
 export interface BingDiscoveryPlan {
   query: string;
@@ -41,13 +42,20 @@ export function buildBingDiscoveryPlans(
   const targets = request.sourceTargets ?? [];
   if (targets.length > 0) {
     const domains = [...new Set(targets.flatMap(({ domains: values }) => values))].slice(0, 20);
-    const siteFilter = domains.length === 1
+    const publisherNames = [...new Set(targets.filter(({ domains: values }) => values.length === 0).map(({ name }) => name))];
+    const domainFilter = domains.length === 1
       ? `site:${domains[0]}`
-      : `(${domains.map((domain) => `site:${domain}`).join(" OR ")})`;
+      : domains.length > 1
+        ? `(${domains.map((domain) => `site:${domain}`).join(" OR ")})`
+        : "";
+    const nameFilter = publisherNames.length > 0
+      ? `(${publisherNames.map((name) => `"${name.replace(/["\\]/g, " ")}"`).join(" OR ")})`
+      : "";
+    const sourceFilter = [domainFilter, nameFilter].filter(Boolean).join(" OR ");
     for (const locale of locales) {
       plans.push({
         ...locale,
-        query: `${queryForLanguage(query, locale.language, request)} ${siteFilter}`,
+        query: `${queryForLanguage(query, locale.language, request)} (${sourceFilter})`,
       });
     }
   } else {
@@ -207,20 +215,32 @@ export class BingNewsProvider implements NewsProvider {
       query: request.countries?.includes("JP") ? '"Japan" OR "日本" OR "日本国"' : "world OR international",
       market: request.language?.startsWith("ja") ? "ja-JP" : "en-SG",
       language: request.language?.startsWith("ja") ? "ja" : "en",
-    }, request);
+    }, request).then((result) => ({ ...result, continuation: null, exhausted: true }));
   }
 
   async search(query: string, request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
     const discoveryPlans = buildBingDiscoveryPlans(query, request);
+    const offset = Math.max(0, request.continuation?.offset ?? 0);
+    const stagePlans = discoveryPlans.slice(offset, offset + DISCOVERY_PLANS_PER_STAGE);
     logNews("info", "bing_discovery_planned", {
       provider_source_targeted_query_count: request.sourceTargets?.length
-        ? discoveryPlans.length
+        ? stagePlans.length
         : 0,
-      discoveryQueryCount: discoveryPlans.length,
-      markets: [...new Set(discoveryPlans.map(({ market }) => market))],
+      discoveryQueryCount: stagePlans.length,
+      discoveryPlanOffset: offset,
+      markets: [...new Set(stagePlans.map(({ market }) => market))],
     });
+    if (stagePlans.length === 0) {
+      return {
+        provider: this.name,
+        articles: [],
+        receivedAt: new Date().toISOString(),
+        continuation: null,
+        exhausted: true,
+      };
+    }
     const settled = await Promise.allSettled(
-      discoveryPlans.map((plan) => this.requestOnce(plan, request)),
+      stagePlans.map((plan) => this.requestOnce(plan, request)),
     );
     const successful = settled.flatMap((result) => result.status === "fulfilled" ? result.value.articles : []);
     if (successful.length === 0 && settled.every((result) => result.status === "rejected")) {
@@ -228,10 +248,14 @@ export class BingNewsProvider implements NewsProvider {
     }
     const unique = new Map<string, ProviderArticle>();
     for (const article of successful) unique.set(article.url, article);
+    const nextOffset = offset + stagePlans.length;
+    const exhausted = nextOffset >= discoveryPlans.length;
     return {
       provider: this.name,
       articles: [...unique.values()].slice(0, request.limit ?? 250),
       receivedAt: new Date().toISOString(),
+      continuation: exhausted ? null : { offset: nextOffset },
+      exhausted,
     };
   }
 }

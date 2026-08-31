@@ -49,6 +49,8 @@ export async function runNewsIngestion(options: {
       articles: fixtureBatch.articles,
       failures: [...batch.failures, ...fixtureBatch.failures],
       providerCounts: { ...batch.providerCounts, ...fixtureBatch.providerCounts },
+      continuations: { ...batch.continuations, ...fixtureBatch.continuations },
+      exhaustedProviders: [...new Set([...batch.exhaustedProviders, ...fixtureBatch.exhaustedProviders])],
     };
     usedFixtures = true;
   }

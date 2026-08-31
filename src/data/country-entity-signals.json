@@ -3,7 +3,7 @@
     "code": "JP",
     "aliases": ["日本", "日本国", "Nippon", "Nihon"],
     "demonyms": ["Japanese", "日本人"],
-    "cities": ["Tokyo", "Osaka", "Kyoto", "東京", "大阪", "京都"]
+    "cities": ["Tokyo", "Osaka", "Kyoto", "Hokkaido", "Okinawa", "Fukuoka", "Nagoya", "Yokohama", "Sapporo", "Sendai", "Kobe", "Hiroshima", "Nagasaki", "東京", "大阪", "京都", "北海道", "沖縄", "福岡", "名古屋", "横浜", "札幌", "仙台", "神戸", "広島", "長崎"]
   },
   {
     "code": "CN",
