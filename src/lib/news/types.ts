@@ -129,6 +129,12 @@ export interface ProviderContinuationState {
   offset?: number;
   /** Exclusive upper publication-time boundary used by GDELT windows. */
   before?: string;
+  /**
+   * Independent exclusive upper boundaries for providers that fan one logical
+   * request out into multiple discovery queries. A null cursor marks only that
+   * branch as exhausted; a missing branch remains retryable.
+   */
+  discoveryCursors?: Record<string, string | null>;
 }
 
 export interface ProviderArticle {

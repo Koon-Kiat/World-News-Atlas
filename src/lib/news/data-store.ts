@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Prisma, PrismaClient, ProviderName as DatabaseProviderName, SourceScope } from "@prisma/client";
 import { getFixtureStories } from "@/data/fixture-news";
-import { clusterArticlesHybrid } from "./cluster";
+import { clusterArticlesHybridIncremental } from "./cluster";
 import { deduplicateArticles } from "./deduplicate";
 import { logNews } from "./logger";
 import { normalizeProviderArticles } from "./normalize";
@@ -36,11 +36,14 @@ const DEFAULT_LIVE_LOW_WATER = 24;
 const DEFAULT_DATABASE_CANDIDATE_LIMIT = 1_000;
 interface LiveCorpusState {
   articles: NormalizedArticle[];
+  clusters: StoryCandidate[];
   stories: StoryView[];
   seenCanonicalUrls: Set<string>;
   providerStates: Map<ProviderName, ProviderContinuationState>;
   exhaustedProviders: Set<ProviderName>;
   providers: NewsProvider[];
+  snapshotFrom: Date;
+  snapshotTo: Date;
   generatedAt: number;
   expiresAt: number;
   discoveryPromise?: Promise<void>;
@@ -89,7 +92,7 @@ function databaseArticleAccessWhere(query: NewsQuery): Prisma.ArticleWhereInput 
       if (domainless) {
         return [{
           domain: null,
-          name: { contains: domainless.name, mode: "insensitive" },
+          name: { equals: domainless.name, mode: "insensitive" },
           ...(domainless.countryCode ? { countryCode: domainless.countryCode } : {}),
         }];
       }
@@ -359,41 +362,60 @@ function toStoryView(story: StoryCandidate): StoryView {
   };
 }
 
-function stableStoryExpansion(
-  previous: StoryView[],
-  candidates: StoryView[],
+function clusterArticleKey(articles: NormalizedArticle[]): string {
+  return articles.map(({ canonicalUrl }) => canonicalUrl).sort().join("\n");
+}
+
+function rankClusterCandidates(
+  candidates: StoryCandidate[],
   query: NewsQuery,
-): StoryView[] {
-  if (previous.length === 0) return rankStories(candidates, query);
-  const previousUrlSets = previous.map((story) => new Set(story.articles.map(({ canonicalUrl }) => canonicalUrl)));
-  const matchedCandidates = new Set<number>();
-  const matches = new Map<number, StoryView>();
+): { clusters: StoryCandidate[]; stories: StoryView[] } {
+  const byArticleKey = new Map(candidates.map((candidate) => [
+    clusterArticleKey(candidate.articles),
+    candidate,
+  ]));
+  const stories = rankStories(candidates.map(toStoryView), query);
+  return {
+    clusters: stories.map((story) => {
+      const candidate = byArticleKey.get(clusterArticleKey(story.articles));
+      if (!candidate) throw new Error("Ranked story did not resolve to its cluster");
+      return candidate;
+    }),
+    stories,
+  };
+}
 
-  previous.forEach((oldStory, oldIndex) => {
-    let bestIndex = -1;
-    let bestOverlap = 0;
-    candidates.forEach((candidate, candidateIndex) => {
-      if (matchedCandidates.has(candidateIndex)) return;
-      const overlap = candidate.articles.reduce(
-        (count, article) => count + Number(previousUrlSets[oldIndex].has(article.canonicalUrl)),
-        0,
-      );
-      if (overlap > bestOverlap) {
-        bestOverlap = overlap;
-        bestIndex = candidateIndex;
-      }
-    });
-    if (bestIndex < 0) return;
-    matchedCandidates.add(bestIndex);
-    matches.set(oldIndex, { ...candidates[bestIndex], id: oldStory.id });
-  });
+async function appendLiveClusters(
+  state: LiveCorpusState,
+  incomingArticles: NormalizedArticle[],
+  query: NewsQuery,
+): Promise<number> {
+  const previousClusterCount = state.clusters.length;
+  const previousStoryIds = state.stories.map(({ id }) => id);
+  const incremental = await clusterArticlesHybridIncremental(
+    state.clusters,
+    incomingArticles,
+  );
 
-  const retained = previous.flatMap((story, index) => matches.get(index) ?? [story]);
-  const additions = rankStories(
-    candidates.filter((_, index) => !matchedCandidates.has(index)),
+  if (previousClusterCount === 0) {
+    const ranked = rankClusterCandidates(incremental.clusters, query);
+    state.clusters = ranked.clusters;
+    state.stories = ranked.stories;
+    return incremental.comparedPairCount;
+  }
+
+  const retainedClusters = incremental.clusters.slice(0, previousClusterCount);
+  const retainedStories = retainedClusters.map((candidate, index) => ({
+    ...toStoryView(candidate),
+    id: previousStoryIds[index] ?? candidate.fingerprint,
+  }));
+  const rankedAdditions = rankClusterCandidates(
+    incremental.clusters.slice(previousClusterCount),
     query,
   );
-  return [...retained, ...additions];
+  state.clusters = [...retainedClusters, ...rankedAdditions.clusters];
+  state.stories = [...retainedStories, ...rankedAdditions.stories];
+  return incremental.comparedPairCount;
 }
 
 function corpusComplete(state: LiveCorpusState): boolean {
@@ -429,7 +451,8 @@ async function discoverLiveStage(
     if (stageLimit <= 0) return;
     const perProviderLimit = Math.max(1, Math.ceil(stageLimit / activeProviders.length));
     const requestBase = {
-      from: new Date(Date.now() - newsPeriodHours(query.period) * 3_600_000),
+      from: state.snapshotFrom,
+      to: state.snapshotTo,
       countries: query.countries,
       language: query.language,
       sourceTargets,
@@ -478,15 +501,17 @@ async function discoverLiveStage(
       }
     });
     const normalized = normalizeProviderArticles(unseen);
-    const beforeUrls = new Set(state.articles.map(({ canonicalUrl }) => canonicalUrl));
-    let duplicateCount = 0;
-    if (normalized.length > 0) {
-      const deduplicated = deduplicateArticles([...state.articles, ...normalized]);
-      duplicateCount = deduplicated.duplicateCount;
-      state.articles = deduplicated.articles.slice(0, liveCorpusLimit());
-      state.seenCanonicalUrls = new Set(state.articles.map(({ canonicalUrl }) => canonicalUrl));
-      const clustered = (await clusterArticlesHybrid(state.articles)).map(toStoryView);
-      state.stories = stableStoryExpansion(state.stories, clustered, query);
+    const deduplicatedBatch = deduplicateArticles(normalized);
+    const newArticles = deduplicatedBatch.articles
+      .filter(({ canonicalUrl }) => !state.seenCanonicalUrls.has(canonicalUrl))
+      .slice(0, liveCorpusLimit() - state.articles.length);
+    const duplicateCount = deduplicatedBatch.duplicateCount +
+      deduplicatedBatch.articles.length - newArticles.length;
+    let comparedPairCount = 0;
+    if (newArticles.length > 0) {
+      state.articles.push(...newArticles);
+      newArticles.forEach(({ canonicalUrl }) => state.seenCanonicalUrls.add(canonicalUrl));
+      comparedPairCount = await appendLiveClusters(state, newArticles, query);
     }
     state.generatedAt = Date.now();
     state.expiresAt = Date.now() + LIVE_CACHE_TTL_MS;
@@ -497,9 +522,8 @@ async function discoverLiveStage(
     ]));
     const acceptedByProvider = Object.fromEntries(activeProviders.map((provider) => [
       provider.name,
-      normalized.filter((article) =>
+      newArticles.filter((article) =>
         article.provider === provider.name &&
-        !beforeUrls.has(article.canonicalUrl) &&
         state.seenCanonicalUrls.has(article.canonicalUrl),
       ).length,
     ]));
@@ -512,6 +536,7 @@ async function discoverLiveStage(
       articles_received_by_provider: receivedByProvider,
       articles_accepted_by_provider: acceptedByProvider,
       articles_deduplicated: duplicateCount,
+      clustering_pairs_compared: comparedPairCount,
       stories_clustered: state.stories.length,
     });
   })();
@@ -544,15 +569,19 @@ async function loadLiveStories(query: NewsQuery): Promise<{
         const oldestKey = liveCaches.keys().next().value;
         if (oldestKey !== undefined) liveCaches.delete(oldestKey);
       }
+      const snapshotTo = new Date();
       state = {
         articles: [],
+        clusters: [],
         stories: [],
         seenCanonicalUrls: new Set(),
         providerStates: new Map(),
         exhaustedProviders: new Set(),
         providers: liveProviderFactory(),
-        generatedAt: Date.now(),
-        expiresAt: Date.now() + LIVE_CACHE_TTL_MS,
+        snapshotFrom: new Date(snapshotTo.getTime() - newsPeriodHours(query.period) * 3_600_000),
+        snapshotTo,
+        generatedAt: snapshotTo.getTime(),
+        expiresAt: snapshotTo.getTime() + LIVE_CACHE_TTL_MS,
       };
       liveCaches.set(cacheKey, state);
       logNews("info", "live_cache_miss", { live_cache_miss: true });

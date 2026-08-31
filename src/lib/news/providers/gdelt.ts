@@ -158,33 +158,62 @@ export class GdeltProvider implements NewsProvider {
 
   async search(query: string, request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
     const discoveryQueries = buildGdeltDiscoveryQueries(query, request);
+    const existingCursors = request.continuation?.discoveryCursors;
+    const activeQueries = discoveryQueries.filter((discoveryQuery) =>
+      existingCursors?.[discoveryQuery] !== null
+    );
     logNews("info", "gdelt_discovery_planned", {
       provider_source_targeted_query_count: request.sourceTargets?.length
-        ? discoveryQueries.length
+        ? activeQueries.length
         : 0,
-      discoveryQueryCount: discoveryQueries.length,
+      discoveryQueryCount: activeQueries.length,
+      exhaustedDiscoveryQueryCount: discoveryQueries.length - activeQueries.length,
     });
+    if (activeQueries.length === 0) {
+      return {
+        provider: this.name,
+        articles: [],
+        receivedAt: new Date().toISOString(),
+        continuation: null,
+        exhausted: true,
+      };
+    }
     const settled = await Promise.allSettled(
-      discoveryQueries.map((discoveryQuery) => this.request(discoveryQuery, request)),
+      activeQueries.map((discoveryQuery) => {
+        const branchBefore = existingCursors?.[discoveryQuery] ?? request.continuation?.before;
+        return this.request(discoveryQuery, {
+          ...request,
+          continuation: branchBefore ? { before: branchBefore } : undefined,
+        });
+      }),
     );
     const successful = settled.flatMap((result) => result.status === "fulfilled" ? result.value.articles : []);
     if (successful.length === 0 && settled.every((result) => result.status === "rejected")) {
       throw new ProviderError(this.name, "REQUEST_FAILED", "GDELT discovery failed");
     }
     const unique = new Map(successful.map((article) => [article.url, article]));
-    const continuations = settled.flatMap((result) =>
-      result.status === "fulfilled" && result.value.continuation ? [result.value.continuation] : [],
+    const discoveryCursors: Record<string, string | null> = { ...existingCursors };
+    activeQueries.forEach((discoveryQuery, index) => {
+      const result = settled[index];
+      if (result.status === "fulfilled") {
+        discoveryCursors[discoveryQuery] = result.value.continuation?.before ?? null;
+      }
+    });
+    const exhausted = discoveryQueries.every((discoveryQuery) =>
+      discoveryCursors[discoveryQuery] === null
     );
-    const before = continuations
-      .map((continuation) => continuation.before)
-      .filter((value): value is string => Boolean(value))
-      .sort()[0];
-    const exhausted = before === undefined;
+    const singleCursor = discoveryQueries.length === 1
+      ? discoveryCursors[discoveryQueries[0]]
+      : null;
     return {
       provider: this.name,
       articles: [...unique.values()].slice(0, request.limit ?? 250),
       receivedAt: new Date().toISOString(),
-      continuation: exhausted ? null : { before },
+      continuation: exhausted
+        ? null
+        : discoveryQueries.length === 1 && singleCursor
+          ? { before: singleCursor }
+          : { discoveryCursors },
       exhausted,
     };
   }

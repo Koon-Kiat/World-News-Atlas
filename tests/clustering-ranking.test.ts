@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clusterArticles,
   clusterArticlesHybrid,
+  clusterArticlesHybridIncremental,
   resetEmbeddingCacheForTesting,
   semanticContentHash,
 } from "@/lib/news/cluster";
@@ -123,6 +124,39 @@ describe("story clustering", () => {
 
     expect(embed).toHaveBeenCalledTimes(1);
     expect(embed.mock.calls[0][0]).toHaveLength(2);
+  });
+
+  it("compares incoming articles without revisiting existing cluster pairs", async () => {
+    const existingArticles = Array.from({ length: 20 }, (_, index) =>
+      normalizeProviderArticle({
+        provider: "RSS",
+        providerArticleId: `existing-${index}`,
+        title: `Isolated report ${index}`,
+        description: null,
+        url: `https://isolated.example/${index}`,
+        publishedAt: new Date().toISOString(),
+        sourceName: `Desk ${index}`,
+      })
+    );
+    const existingClusters = clusterArticles(existingArticles);
+    const incoming = normalizeProviderArticle({
+      provider: "RSS",
+      providerArticleId: "incoming",
+      title: "A completely separate incoming bulletin",
+      description: null,
+      url: "https://isolated.example/incoming",
+      publishedAt: new Date().toISOString(),
+      sourceName: "Incoming Desk",
+    });
+
+    const result = await clusterArticlesHybridIncremental(existingClusters, [incoming], {
+      embeddingProvider: null,
+    });
+
+    expect(existingClusters).toHaveLength(20);
+    expect(result.comparedPairCount).toBe(20);
+    expect(result.clusters).toHaveLength(21);
+    expect(result.clusters.slice(0, 20).every((cluster, index) => cluster === existingClusters[index])).toBe(true);
   });
 });
 

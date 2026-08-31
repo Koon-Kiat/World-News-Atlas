@@ -29,29 +29,32 @@ export function ProgressiveStoryList({
   canFetchMore,
   isFetchingMore,
   onRequestMore,
+  continuationVersion = 0,
 }: {
   stories: StoryView[];
   canFetchMore: boolean;
   isFetchingMore: boolean;
   onRequestMore: () => void;
+  continuationVersion?: number;
 }) {
   const [visibleStoryCount, setVisibleStoryCount] = useState(INITIAL_STORY_COUNT);
   const loadMoreRef = useRef<HTMLDivElement>(null);
-  const prefetchedLengthRef = useRef(-1);
+  const prefetchedRequestRef = useRef<string | null>(null);
   const visibleStories = stories.slice(0, visibleStoryCount);
   const hasMoreRenderedStories = visibleStoryCount < stories.length;
   const hasMoreServerStories = canFetchMore;
   const hasMoreStories = hasMoreRenderedStories || hasMoreServerStories;
+  const automaticRequestKey = `${continuationVersion}:${stories.length}`;
 
   const requestMoreOnce = useCallback(() => {
     if (
       !hasMoreServerStories ||
       isFetchingMore ||
-      prefetchedLengthRef.current === stories.length
+      prefetchedRequestRef.current === automaticRequestKey
     ) return;
-    prefetchedLengthRef.current = stories.length;
+    prefetchedRequestRef.current = automaticRequestKey;
     onRequestMore();
-  }, [hasMoreServerStories, isFetchingMore, onRequestMore, stories.length]);
+  }, [automaticRequestKey, hasMoreServerStories, isFetchingMore, onRequestMore]);
 
   const revealOrRequestMore = useCallback(() => {
     if (hasMoreRenderedStories) {
@@ -89,10 +92,10 @@ export function ProgressiveStoryList({
       !hasMoreServerStories ||
       isFetchingMore ||
       bufferedStories > STORY_PREFETCH_LOW_WATER ||
-      prefetchedLengthRef.current === stories.length
+      prefetchedRequestRef.current === automaticRequestKey
     ) return;
     requestMoreOnce();
-  }, [hasMoreServerStories, isFetchingMore, requestMoreOnce, stories.length, visibleStoryCount]);
+  }, [automaticRequestKey, hasMoreServerStories, isFetchingMore, requestMoreOnce, stories.length, visibleStoryCount]);
 
   return (
     <>
@@ -144,6 +147,7 @@ export function WorldNewsExplorer({
   const [loadedPage, setLoadedPage] = useState(1);
   const [canFetchMore, setCanFetchMore] = useState(responseHasNextPage(initialData));
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [continuationVersion, setContinuationVersion] = useState(0);
   const loadMoreControllerRef = useRef<AbortController | null>(null);
   const storiesSectionRef = useRef<HTMLElement>(null);
   const lastScrolledSearchRef = useRef("");
@@ -207,6 +211,7 @@ export function WorldNewsExplorer({
       })
       .then((responseData) => {
         setData(responseData);
+        setContinuationVersion((current) => current + 1);
         setLoadedPage(responseData.meta.page);
         setCanFetchMore(responseHasNextPage(responseData));
         setError(null);
@@ -266,6 +271,7 @@ export function WorldNewsExplorer({
             meta: responseData.meta,
           };
         });
+        setContinuationVersion((current) => current + 1);
         setLoadedPage(responseData.meta.page);
         setCanFetchMore(mergedPage.canFetchMore);
         setError(null);
@@ -447,6 +453,7 @@ export function WorldNewsExplorer({
               canFetchMore={canFetchMore}
               isFetchingMore={isLoadingMore}
               onRequestMore={loadNextPage}
+              continuationVersion={continuationVersion}
             />
           )}
         </section>

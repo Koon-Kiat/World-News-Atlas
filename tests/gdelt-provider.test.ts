@@ -64,4 +64,47 @@ describe("GDELT discovery planning", () => {
     expect(requestedUrls[0].searchParams.get("enddatetime")).toBe("20260831000000");
     expect(requestedUrls[1].searchParams.get("enddatetime")).toBe("20260830115959");
   });
+
+  it("tracks and exhausts each language discovery cursor independently", async () => {
+    const requestedUrls: URL[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL) => {
+      const url = new URL(String(input));
+      requestedUrls.push(url);
+      const query = url.searchParams.get("query") ?? "";
+      if (query.includes("sourcelang:english")) {
+        return new Response(JSON.stringify({ articles: [] }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ articles: [{
+        url: `https://example.jp/${requestedUrls.length}`,
+        title: "日本の最新ニュース",
+        seendate: "20260830T060000Z",
+        domain: "example.jp",
+        language: "Japanese",
+      }] }), { status: 200 });
+    }));
+
+    const provider = new GdeltProvider();
+    const request = {
+      countries: ["JP"],
+      from: new Date("2026-08-28T00:00:00Z"),
+      to: new Date("2026-08-31T00:00:00Z"),
+      limit: 1,
+    };
+    const first = await provider.search("Japan", request);
+    const cursors = first.continuation?.discoveryCursors ?? {};
+    const englishQuery = Object.keys(cursors).find((value) => value.includes("sourcelang:english"));
+    const japaneseQuery = Object.keys(cursors).find((value) => value.includes("sourcelang:japanese"));
+
+    expect(englishQuery && cursors[englishQuery]).toBeNull();
+    expect(japaneseQuery && cursors[japaneseQuery]).toBe("2026-08-30T05:59:59.999Z");
+
+    await provider.search("Japan", {
+      ...request,
+      continuation: first.continuation ?? undefined,
+    });
+
+    expect(requestedUrls).toHaveLength(3);
+    expect(requestedUrls[2].searchParams.get("query")).toContain("sourcelang:japanese");
+    expect(requestedUrls[2].searchParams.get("enddatetime")).toBe("20260830055959");
+  });
 });

@@ -95,16 +95,16 @@ const MAX_PROVIDER_CACHE_ENTRIES = 160;
 const providerResultCache = new MemoryTtlCache<ProviderOutcome>(MAX_PROVIDER_CACHE_ENTRIES);
 const providerRequestsInFlight = new Map<string, Promise<ProviderOutcome>>();
 
-function requestTimeBucket(value?: Date): number | null {
-  return value ? Math.floor(value.getTime() / (5 * 60_000)) : null;
+function requestTimestamp(value?: Date): string | null {
+  return value ? value.toISOString() : null;
 }
 
 function providerRequestKey(provider: NewsProvider, request: ProviderFetchRequest): string {
   return JSON.stringify({
     provider: provider.name,
     query: request.query?.trim() ?? null,
-    from: requestTimeBucket(request.from),
-    to: requestTimeBucket(request.to),
+    from: requestTimestamp(request.from),
+    to: requestTimestamp(request.to),
     countries: [...(request.countries ?? [])].sort(),
     language: request.language ?? null,
     sourceTargets: (request.sourceTargets ?? []).map(({ id }) => id).sort(),

@@ -136,6 +136,37 @@ describe("progressive story list", () => {
     expect(onRequestMore).toHaveBeenCalledTimes(2);
   });
 
+  it("continues prefetching after a duplicate-only stage leaves the story count unchanged", async () => {
+    vi.stubGlobal("IntersectionObserver", TestIntersectionObserver);
+    const onRequestMore = vi.fn();
+    const view = render(
+      <ProgressiveStoryList
+        stories={stories(12)}
+        canFetchMore
+        isFetchingMore={false}
+        onRequestMore={onRequestMore}
+        continuationVersion={0}
+      />,
+    );
+
+    await act(async () => observerCallback?.(
+      [{ isIntersecting: true } as IntersectionObserverEntry],
+      {} as IntersectionObserver,
+    ));
+    expect(onRequestMore).toHaveBeenCalledTimes(1);
+
+    await act(async () => view.rerender(
+      <ProgressiveStoryList
+        stories={stories(12)}
+        canFetchMore
+        isFetchingMore={false}
+        onRequestMore={onRequestMore}
+        continuationVersion={1}
+      />,
+    ));
+    expect(onRequestMore).toHaveBeenCalledTimes(2);
+  });
+
   it("stops requesting when the server reports no further usable page", async () => {
     vi.stubGlobal("IntersectionObserver", TestIntersectionObserver);
     const onRequestMore = vi.fn();
