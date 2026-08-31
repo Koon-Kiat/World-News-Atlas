@@ -188,8 +188,9 @@ describe("incremental live corpus", () => {
 
     await loadNewsDataset(query(1));
     await loadNewsDataset({ ...query(1), language: "ja" });
+    await loadNewsDataset({ ...query(1), sources: ["nhk"] });
 
-    expect(provider.offsets).toEqual([0, 0]);
+    expect(provider.offsets).toEqual([0, 0, 0]);
   });
 
   it("keeps worker stages bounded while growing past 200 stable stories to the corpus maximum", async () => {
@@ -267,6 +268,18 @@ describe("incremental live corpus", () => {
     expect(second.stories[0].id).toBe(firstId);
     expect(second.stories[0].articles).toHaveLength(2);
     expect(new Set(second.stories[0].articles.map(({ canonicalUrl }) => canonicalUrl)).size).toBe(2);
+    const response = buildNewsResponse(
+      second.stories,
+      query(1),
+      second.dataSource,
+      second.notice,
+      second,
+    );
+    expect(response.meta).toMatchObject({
+      total: 1,
+      materializedStoryCount: 1,
+      articleCount: 2,
+    });
   });
 
   it("preserves provider diversity and never requests an exhausted provider again", async () => {
@@ -275,10 +288,12 @@ describe("incremental live corpus", () => {
     setLiveProviderFactoryForTesting(() => [rss, bing]);
 
     const first = await loadNewsDataset(query(1, "popular"));
+    const originalOrder = first.stories.map(({ id }) => id);
     expect(first.stories.some((story) => story.articles[0].provider === "RSS")).toBe(true);
     expect(first.stories.some((story) => story.articles[0].provider === "OTHER")).toBe(true);
 
-    await loadNewsDataset(query(4, "popular"));
+    const expanded = await loadNewsDataset(query(4, "popular"));
+    expect(expanded.stories.slice(0, originalOrder.length).map(({ id }) => id)).toEqual(originalOrder);
     expect(rss.offsets).toEqual([0]);
     expect(bing.offsets).toEqual([0, 48]);
   });
