@@ -211,11 +211,12 @@ export class BingNewsProvider implements NewsProvider {
   }
 
   fetchLatest(request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
-    return this.requestOnce({
-      query: request.countries?.includes("JP") ? '"Japan" OR "日本" OR "日本国"' : "world OR international",
-      market: request.language?.startsWith("ja") ? "ja-JP" : "en-SG",
-      language: request.language?.startsWith("ja") ? "ja" : "en",
-    }, request).then((result) => ({ ...result, continuation: null, exhausted: true }));
+    return this.search(
+      request.query ?? (request.countries?.includes("JP")
+        ? '"Japan" OR "日本" OR "日本国"'
+        : "world OR international"),
+      request,
+    );
   }
 
   async search(query: string, request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {

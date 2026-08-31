@@ -6,6 +6,37 @@ afterEach(() => {
 });
 
 describe("Bing News RSS provider", () => {
+  it("continues global discovery across bounded query plans", async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      void input;
+      return new Response(
+        `<?xml version="1.0"?><rss version="2.0"><channel><title>News</title></channel></rss>`,
+        { status: 200, headers: { "Content-Type": "application/rss+xml" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const provider = new BingNewsProvider();
+    const first = await provider.fetchLatest({
+      from: new Date("2026-08-01T00:00:00Z"),
+      to: new Date("2026-08-31T00:00:00Z"),
+    });
+    const second = await provider.fetchLatest({
+      from: new Date("2026-08-01T00:00:00Z"),
+      to: new Date("2026-08-31T00:00:00Z"),
+      continuation: first.continuation ?? undefined,
+    });
+
+    expect(first).toMatchObject({ continuation: { offset: 2 }, exhausted: false });
+    expect(second).toMatchObject({ continuation: { offset: 4 }, exhausted: false });
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    const requestedQueries = fetchMock.mock.calls.map(([input]) =>
+      new URL(String(input)).searchParams.get("q")
+    );
+    expect(new Set(requestedQueries).size).toBe(4);
+    expect(requestedQueries[0]).toContain("world OR international");
+  });
+
   it("returns original publisher URLs, attribution, and secure thumbnails", async () => {
     vi.stubGlobal(
       "fetch",

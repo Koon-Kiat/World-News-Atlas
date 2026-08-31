@@ -77,6 +77,18 @@ class PagedProvider implements NewsProvider {
   }
 }
 
+class WindowRecordingProvider extends PagedProvider {
+  readonly windows: Array<{ from?: string; to?: string }> = [];
+
+  override fetchLatest(request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
+    this.windows.push({
+      from: request.from?.toISOString(),
+      to: request.to?.toISOString(),
+    });
+    return super.fetchLatest(request);
+  }
+}
+
 class SameStoryProvider implements NewsProvider {
   readonly name = "OTHER" as const;
   readonly capabilities = {
@@ -173,6 +185,7 @@ beforeEach(() => {
 afterEach(() => {
   setLiveProviderFactoryForTesting();
   resetProviderRequestCacheForTesting();
+  vi.useRealTimers();
   vi.unstubAllEnvs();
 });
 
@@ -191,6 +204,21 @@ describe("incremental live corpus", () => {
     await loadNewsDataset({ ...query(1), sources: ["nhk"] });
 
     expect(provider.offsets).toEqual([0, 0, 0]);
+  });
+
+  it("pins one exact provider time range for every stage in a live corpus lifecycle", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-31T00:00:00Z"));
+    const provider = new WindowRecordingProvider("OTHER", 300);
+    setLiveProviderFactoryForTesting(() => [provider]);
+
+    await loadNewsDataset(query(1));
+    vi.setSystemTime(new Date("2026-08-31T00:45:00Z"));
+    await loadNewsDataset(query(6));
+
+    expect(provider.windows).toHaveLength(2);
+    expect(provider.windows[0]).toEqual(provider.windows[1]);
+    expect(provider.windows[0].to).toBe("2026-08-31T00:00:00.000Z");
   });
 
   it("keeps worker stages bounded while growing past 200 stable stories to the corpus maximum", async () => {

@@ -28,6 +28,12 @@ export interface HybridClusteringOptions {
   embeddingProvider?: TextEmbeddingProvider | null;
 }
 
+export interface IncrementalClusteringResult {
+  clusters: StoryCandidate[];
+  /** Pairs examined while attaching incoming articles; existing pairs are never revisited. */
+  comparedPairCount: number;
+}
+
 function hoursBetween(first: NormalizedArticle, second: NormalizedArticle): number {
   return Math.abs(new Date(first.publishedAt).getTime() - new Date(second.publishedAt).getTime()) / 3_600_000;
 }
@@ -251,6 +257,46 @@ function buildClusters(
   return clusters.map((cluster) => toCandidate(cluster, pairScores));
 }
 
+function buildClustersIncrementally(
+  existingClusters: StoryCandidate[],
+  incomingArticles: NormalizedArticle[],
+  canCluster: (first: NormalizedArticle, second: NormalizedArticle) => boolean,
+  pairScores?: Map<string, number>,
+): IncrementalClusteringResult {
+  const clusters = existingClusters.map((cluster) => [...cluster.articles]);
+  const touchedClusters = new Set<number>();
+  let comparedPairCount = 0;
+
+  for (const article of incomingArticles) {
+    let matchingCluster = -1;
+    for (let clusterIndex = 0; clusterIndex < clusters.length && matchingCluster < 0; clusterIndex += 1) {
+      for (const existing of clusters[clusterIndex]) {
+        comparedPairCount += 1;
+        if (canCluster(existing, article)) {
+          matchingCluster = clusterIndex;
+          break;
+        }
+      }
+    }
+    if (matchingCluster >= 0) {
+      clusters[matchingCluster].push(article);
+      touchedClusters.add(matchingCluster);
+    } else {
+      clusters.push([article]);
+      touchedClusters.add(clusters.length - 1);
+    }
+  }
+
+  return {
+    clusters: clusters.map((articles, index) =>
+      index < existingClusters.length && !touchedClusters.has(index)
+        ? existingClusters[index]
+        : toCandidate(articles, pairScores)
+    ),
+    comparedPairCount,
+  };
+}
+
 export function clusterArticles(articles: NormalizedArticle[]): StoryCandidate[] {
   return buildClusters(articles, canClusterLexically);
 }
@@ -341,6 +387,131 @@ export async function clusterArticlesHybrid(
     storyClusterCount: clusters.length,
   });
   return clusters;
+}
+
+export async function clusterArticlesHybridIncremental(
+  existingClusters: StoryCandidate[],
+  incomingArticles: NormalizedArticle[],
+  options: HybridClusteringOptions = {},
+): Promise<IncrementalClusteringResult> {
+  if (incomingArticles.length === 0) {
+    return { clusters: existingClusters, comparedPairCount: 0 };
+  }
+
+  const provider = options.embeddingProvider === undefined
+    ? configuredTextEmbeddingProvider()
+    : options.embeddingProvider;
+  if (!provider) {
+    const incremental = buildClustersIncrementally(
+      existingClusters,
+      incomingArticles,
+      canClusterLexically,
+    );
+    logNews("info", "story_clustering_completed", {
+      semanticEnabled: false,
+      incremental: true,
+      existingStoryClusterCount: existingClusters.length,
+      incomingArticleCount: incomingArticles.length,
+      comparedPairCount: incremental.comparedPairCount,
+      lexicalFallbackCount: incomingArticles.length,
+      storyClusterCount: incremental.clusters.length,
+    });
+    return incremental;
+  }
+
+  const candidatePairs: Array<[NormalizedArticle, NormalizedArticle]> = [];
+  const candidatesForEmbedding = new Map<string, NormalizedArticle>();
+  const priorArticles = existingClusters.flatMap(({ articles }) => articles);
+  let comparedPairCount = 0;
+  for (const incoming of incomingArticles) {
+    for (const prior of priorArticles) {
+      comparedPairCount += 1;
+      if (!isCheapCandidate(prior, incoming)) continue;
+      candidatePairs.push([prior, incoming]);
+      candidatesForEmbedding.set(prior.canonicalUrl, prior);
+      candidatesForEmbedding.set(incoming.canonicalUrl, incoming);
+    }
+    priorArticles.push(incoming);
+  }
+
+  if (candidatePairs.length === 0) {
+    const incremental = buildClustersIncrementally(
+      existingClusters,
+      incomingArticles,
+      () => false,
+    );
+    logNews("info", "story_clustering_completed", {
+      semanticEnabled: true,
+      embeddingProvider: provider.id,
+      incremental: true,
+      existingStoryClusterCount: existingClusters.length,
+      incomingArticleCount: incomingArticles.length,
+      comparedPairCount,
+      candidatePairCount: 0,
+      lexicalFallbackCount: 0,
+      storyClusterCount: incremental.clusters.length,
+    });
+    return { clusters: incremental.clusters, comparedPairCount };
+  }
+
+  let embedded: Awaited<ReturnType<typeof embeddingsFor>>;
+  try {
+    embedded = await embeddingsFor([...candidatesForEmbedding.values()], provider);
+  } catch (error) {
+    const fallback = buildClustersIncrementally(
+      existingClusters,
+      incomingArticles,
+      canClusterLexically,
+    );
+    logNews("warn", "embedding_batch_failed", {
+      embeddingProvider: provider.id,
+      code: error instanceof Error ? error.name : "UNEXPECTED_FAILURE",
+      incremental: true,
+      lexicalFallbackCount: candidatePairs.length,
+    });
+    logNews("info", "story_clustering_completed", {
+      semanticEnabled: false,
+      incremental: true,
+      existingStoryClusterCount: existingClusters.length,
+      incomingArticleCount: incomingArticles.length,
+      comparedPairCount: fallback.comparedPairCount,
+      lexicalFallbackCount: candidatePairs.length,
+      storyClusterCount: fallback.clusters.length,
+    });
+    return fallback;
+  }
+
+  const pairScores = new Map<string, number>();
+  const pairDecisions = new Map<string, boolean>();
+  for (const [first, second] of candidatePairs) {
+    const firstEmbedding = embedded.vectors.get(first.canonicalUrl);
+    const secondEmbedding = embedded.vectors.get(second.canonicalUrl);
+    if (!firstEmbedding || !secondEmbedding) continue;
+    const features = hybridFeatures(first, second, firstEmbedding, secondEmbedding);
+    const key = pairKey(first, second);
+    pairScores.set(key, features.hybrid);
+    pairDecisions.set(key, canClusterSemantically(features));
+  }
+  const incremental = buildClustersIncrementally(
+    existingClusters,
+    incomingArticles,
+    (first, second) => pairDecisions.get(pairKey(first, second)) ?? false,
+    pairScores,
+  );
+  logNews("info", "story_clustering_completed", {
+    semanticEnabled: true,
+    embeddingProvider: provider.id,
+    incremental: true,
+    existingStoryClusterCount: existingClusters.length,
+    incomingArticleCount: incomingArticles.length,
+    comparedPairCount,
+    candidatePairCount: candidatePairs.length,
+    embeddingCacheHits: embedded.cacheHits,
+    embeddingsComputed: embedded.computed,
+    lexicalFallbackCount: 0,
+    storyClusterCount: incremental.clusters.length,
+  });
+  return { clusters: incremental.clusters, comparedPairCount };
 }
 
 export function resetEmbeddingCacheForTesting(): void {

@@ -19,7 +19,10 @@ afterEach(() => {
 
 describe("database candidate window", () => {
   it("passes a bounded take value to Prisma before application ranking", async () => {
-    const findMany = vi.fn(async () => []);
+    const findMany = vi.fn(async (arguments_: unknown) => {
+      void arguments_;
+      return [];
+    });
     const client = { story: { findMany } } as unknown as PrismaClient;
     await loadDatabaseStories(query, client);
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 1_000 }));
@@ -36,5 +39,24 @@ describe("database candidate window", () => {
     expect(providerSearchQuery({ ...query, countries: ["JP"] })).toBe(
       '("Japan" OR "日本" OR "日本国")',
     );
+  });
+
+  it("matches a stable domainless source name exactly in Prisma", async () => {
+    const findMany = vi.fn(async (arguments_: unknown) => {
+      void arguments_;
+      return [];
+    });
+    const client = { story: { findMany } } as unknown as PrismaClient;
+
+    await loadDatabaseStories({
+      ...query,
+      sources: ["name:example-news:global"],
+    }, client);
+
+    const invocation = findMany.mock.calls[0]?.[0] as { where: unknown } | undefined;
+    expect(invocation).toBeDefined();
+    const where = JSON.stringify(invocation?.where);
+    expect(where).toContain('"equals":"Example News"');
+    expect(where).not.toContain('"contains":"Example News"');
   });
 });
