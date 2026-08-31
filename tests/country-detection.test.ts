@@ -81,6 +81,13 @@ describe("country detection", () => {
     );
   });
 
+  it.each(["北海道", "沖縄", "福岡", "名古屋", "横浜"])(
+    "recognizes Japanese geographic signal %s without requiring 日本",
+    (place) => {
+      expect(detectCountries(`${place}で大雪 交通機関に影響`).map(({ code }) => code)).toContain("JP");
+    },
+  );
+
   it("uses capitals and major cities as medium-high confidence signals", () => {
     const countries = detectCountrySignals({ title: "Leaders meet in 서울 before talks move to Berlin" });
     expect(countries).toEqual(
@@ -133,6 +140,23 @@ describe("publisher country versus mentioned countries", () => {
     expect(article.source.countryCode).toBe("GB");
     expect(article.countries.map(({ code }) => code)).toContain("JP");
     expect(article.countries.map(({ code }) => code)).not.toContain("GB");
+  });
+
+  it("does not add Japan when a Japanese publisher reports only on France", () => {
+    const article = normalizeProviderArticle({
+      provider: "RSS",
+      providerArticleId: "nhk-france",
+      title: "フランス政府が新たな経済対策を発表",
+      description: "パリで閣僚が会見しました。",
+      url: "https://news.web.nhk/newsweb/na/na-k1000000099",
+      publishedAt: new Date().toISOString(),
+      language: "ja",
+      sourceName: "NHK",
+      sourceCountry: "JP",
+    });
+    expect(article.source.countryCode).toBe("JP");
+    expect(article.countries.map(({ code }) => code)).toContain("FR");
+    expect(article.countries.map(({ code }) => code)).not.toContain("JP");
   });
 });
 

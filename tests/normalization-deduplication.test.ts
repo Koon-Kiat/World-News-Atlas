@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { deduplicateArticles } from "@/lib/news/deduplicate";
 import { normalizeProviderArticle, normalizeProviderArticles } from "@/lib/news/normalize";
+import { inferArticleLanguage } from "@/lib/news/language";
 import { canonicalizeArticleUrl } from "@/lib/news/url";
 
 const providerArticle = (url: string, title = "Japan and Singapore launch digital trade corridor") =>
@@ -137,6 +138,16 @@ describe("provider normalization", () => {
       publishedAt: new Date().toISOString(),
       sourceName: "Example",
     }).language).toBe("und");
+  });
+
+  it("uses trusted metadata and avoids treating every long Latin sentence as English", () => {
+    expect(inferArticleLanguage("en", "Le gouvernement annonce de nouvelles mesures")).toBe("en");
+    expect(inferArticleLanguage(null, "日本政府が新政策を発表")).toBe("ja");
+    expect(inferArticleLanguage(null, "한국 정부가 새로운 정책을 발표했습니다")).toBe("ko");
+    expect(inferArticleLanguage(null, "Le gouvernement annonce de nouvelles mesures")).not.toBe("en");
+    expect(inferArticleLanguage(null, "Die Regierung kündigt neue Maßnahmen an")).not.toBe("en");
+    expect(inferArticleLanguage(null, "El gobierno anuncia nuevas medidas")).not.toBe("en");
+    expect(inferArticleLanguage(null, "政府宣布新政策")).toBe("und");
   });
 
   it("logs aggregate language, publisher-country, local-Japan, and source-resolution metrics", () => {

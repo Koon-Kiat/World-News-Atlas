@@ -6,6 +6,7 @@ import { fetchWithTimeout, type NewsProvider, ProviderError } from "./provider";
 const newsApiResponseSchema = z.object({
   status: z.string(),
   message: z.string().optional(),
+  totalResults: z.number().int().nonnegative().optional(),
   articles: z
     .array(
       z.object({
@@ -78,7 +79,10 @@ export class NewsApiProvider implements NewsProvider {
     const url = new URL("https://newsapi.org/v2/everything");
     url.searchParams.set("q", query);
     url.searchParams.set("sortBy", "publishedAt");
-    url.searchParams.set("pageSize", String(Math.min(100, request.limit ?? 100)));
+    const pageSize = Math.min(100, request.limit ?? 100);
+    const page = Math.max(1, request.continuation?.page ?? 1);
+    url.searchParams.set("pageSize", String(pageSize));
+    url.searchParams.set("page", String(page));
     const sourceIdentifiers = [...new Set((request.sourceTargets ?? []).flatMap(
       (target) => target.providerIdentifiers.NEWSAPI ?? [],
     ))];
@@ -135,7 +139,16 @@ export class NewsApiProvider implements NewsProvider {
       sourceIdentifier: article.source.id,
       sourceCountry: article.source.id ? sourceCountries.get(article.source.id) ?? null : null,
     }));
-    return { provider: this.name, articles, receivedAt: new Date().toISOString() };
+    const exhausted = articles.length < pageSize || (
+      parsed.data.totalResults !== undefined && page * pageSize >= parsed.data.totalResults
+    );
+    return {
+      provider: this.name,
+      articles,
+      receivedAt: new Date().toISOString(),
+      continuation: exhausted ? null : { page: page + 1 },
+      exhausted,
+    };
   }
 
   fetchLatest(request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {

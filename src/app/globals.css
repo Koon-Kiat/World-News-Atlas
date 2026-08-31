@@ -363,6 +363,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .source-filter-heading strong { font-size: .76rem; }
 .source-filter-heading small { margin-top: 3px; color: var(--muted); font-size: .62rem; }
 .source-filter-heading button { padding: 4px; color: var(--coral-dark); background: transparent; border: 0; cursor: pointer; font-size: .64rem; font-weight: 800; }
+.source-filter-limit { margin: 9px 4px 0; color: var(--coral-dark); font-size: .64rem; font-weight: 800; }
 .source-filter-search { min-height: 42px; display: flex; align-items: center; gap: 9px; margin: 10px 0 4px; padding: 0 10px; background: var(--paper); border: 1px solid var(--line); border-radius: 9px; }
 .source-filter-search svg { width: 16px; flex: 0 0 auto; fill: none; stroke: var(--muted); stroke-width: 1.8; }
 .source-filter-search input { width: 100%; min-width: 0; color: var(--ink); background: transparent; border: 0; outline: 0; font: inherit; font-size: .72rem; }
@@ -374,6 +375,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .source-filter-options label { min-height: 39px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; padding: 7px 6px; border-radius: 8px; cursor: pointer; font-size: .7rem; font-weight: 700; }
 .source-filter-options label:hover { background: var(--surface-hover); }
 .source-filter-options input { width: 16px; height: 16px; margin: 0; accent-color: var(--coral-dark); }
+.source-filter-options input:disabled + span { opacity: .48; }
+.source-filter-options label:has(input:disabled) { cursor: not-allowed; }
 .source-filter-options label span, .source-filter-options label strong, .source-filter-options label small { display: block; }
 .source-filter-options label strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .source-filter-options label small { margin-top: 2px; color: var(--muted); font-size: .56rem; font-weight: 500; }

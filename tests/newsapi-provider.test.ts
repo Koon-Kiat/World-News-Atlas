@@ -72,4 +72,38 @@ describe("NewsAPI provider", () => {
     expect(request.searchParams.get("domains")).toBe("bbc.com,bbc.co.uk");
     expect(request.searchParams.has("language")).toBe(false);
   });
+
+  it("advances supported result pages without requesting page 1 again", async () => {
+    const pages: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/sources")) {
+        return new Response(JSON.stringify({ status: "ok", sources: [] }), { status: 200 });
+      }
+      pages.push(url.searchParams.get("page") ?? "");
+      const page = Number(url.searchParams.get("page"));
+      return new Response(JSON.stringify({
+        status: "ok",
+        totalResults: 5,
+        articles: Array.from({ length: page === 3 ? 1 : 2 }, (_, index) => ({
+          source: { id: null, name: "Example News" },
+          title: `Report ${page}-${index}`,
+          description: null,
+          url: `https://example.com/${page}-${index}`,
+          urlToImage: null,
+          publishedAt: "2026-08-30T12:00:00Z",
+        })),
+      }), { status: 200 });
+    }));
+
+    const provider = new NewsApiProvider("test-key");
+    const first = await provider.search("world", { limit: 2 });
+    const second = await provider.search("world", { limit: 2, continuation: first.continuation ?? undefined });
+    const third = await provider.search("world", { limit: 2, continuation: second.continuation ?? undefined });
+
+    expect(pages).toEqual(["1", "2", "3"]);
+    expect(first.continuation).toEqual({ page: 2 });
+    expect(second.continuation).toEqual({ page: 3 });
+    expect(third).toMatchObject({ continuation: null, exhausted: true });
+  });
 });

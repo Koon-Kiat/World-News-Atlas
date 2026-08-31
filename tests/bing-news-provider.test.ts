@@ -58,11 +58,21 @@ describe("Bing News RSS provider", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await new BingNewsProvider().search('"Japan"', {
+    const provider = new BingNewsProvider();
+    let result = await provider.search('"Japan"', {
       countries: ["JP"],
       from: new Date("2026-08-01T00:00:00Z"),
     });
 
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.continuation).toEqual({ offset: 2 });
+    while (result.continuation) {
+      result = await provider.search('"Japan"', {
+        countries: ["JP"],
+        from: new Date("2026-08-01T00:00:00Z"),
+        continuation: result.continuation,
+      });
+    }
     expect(fetchMock).toHaveBeenCalledTimes(10);
     const requestedQueries = fetchMock.mock.calls.map(([input]) => new URL(String(input)).searchParams.get("q"));
     expect(requestedQueries).toContain('"Japan" site:reuters.com');
@@ -70,6 +80,7 @@ describe("Bing News RSS provider", () => {
     expect(requestedQueries.some((requestedQuery) => requestedQuery?.includes('"日本" OR "日本国"'))).toBe(true);
     expect(fetchMock.mock.calls.map(([input]) => new URL(String(input)).searchParams.get("mkt"))).toContain("ja-JP");
     expect(result.articles).toHaveLength(1);
+    expect(result.exhausted).toBe(true);
   });
 
   it("pushes selected publisher domains into every upstream discovery query", async () => {

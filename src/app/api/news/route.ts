@@ -24,9 +24,12 @@ export async function GET(request: Request): Promise<Response> {
     const response = await getNews(query);
     return Response.json(response, {
       headers: {
-        "Cache-Control": response.meta.dataSource === "fixtures"
-          ? "no-store"
-          : "public, max-age=20, s-maxage=60, stale-while-revalidate=180",
+        // Continuation requests can expand the server-side live corpus even
+        // when the internal page number repeats, so intermediary response
+        // caching must not freeze a partial discovery stage.
+        "Cache-Control": response.meta.dataSource === "database"
+          ? "public, max-age=20, s-maxage=60, stale-while-revalidate=180"
+          : "no-store",
         "X-RateLimit-Remaining": String(limit.remaining),
       },
     });

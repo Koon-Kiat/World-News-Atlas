@@ -10,6 +10,7 @@ import type { ProviderArticle, ProviderFetchRequest, ProviderFetchResult } from 
 import { type NewsProvider, ProviderError } from "./provider";
 
 const MAX_FEED_BYTES = 2 * 1024 * 1024;
+const FEEDS_PER_STAGE = 4;
 const REVIEWED_FEED_HOSTS = new Set([
   "feeds.bbci.co.uk",
   "www.theguardian.com",
@@ -177,14 +178,18 @@ export class RssProvider implements NewsProvider {
     const targets = request.sourceTargets ?? [];
     const targetedFeedIds = new Set(targets.map(({ id }) => id));
     const targetedDomains = new Set(targets.flatMap(({ domains }) => domains.map(registrableDomain)));
-    const feeds = targets.length === 0
+    const matchingFeeds = targets.length === 0
       ? this.feeds
       : this.feeds.filter((feed) => {
           const websiteDomain = registrableDomain(new URL(feed.websiteUrl).hostname);
           return targetedFeedIds.has(feed.sourceId) || targetedDomains.has(websiteDomain);
         });
+    const offset = Math.max(0, request.continuation?.offset ?? 0);
+    const feeds = matchingFeeds.slice(offset, offset + FEEDS_PER_STAGE);
     logNews("info", "rss_source_targeting", {
       provider_source_targeted_query_count: targets.length > 0 ? feeds.length : 0,
+      feedOffset: offset,
+      feedCount: feeds.length,
     });
     const settled = await Promise.allSettled(
       feeds.map(async (feed) => {
@@ -239,10 +244,14 @@ export class RssProvider implements NewsProvider {
     if (feeds.length > 0 && articles.length === 0 && settled.every((result) => result.status === "rejected")) {
       throw new ProviderError(this.name, "ALL_FEEDS_FAILED", "All configured RSS feeds failed");
     }
+    const nextOffset = offset + feeds.length;
+    const exhausted = nextOffset >= matchingFeeds.length;
     return {
       provider: this.name,
       articles,
       receivedAt: new Date().toISOString(),
+      continuation: exhausted ? null : { offset: nextOffset },
+      exhausted,
     };
   }
 

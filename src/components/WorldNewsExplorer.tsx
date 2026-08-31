@@ -20,6 +20,7 @@ import type { NewsPeriod, NewsResponse, NewsSort, SourcePerspective, StoryView }
 const QUICK_COUNTRIES = ["US", "CN", "JP", "GB", "FR", "DE", "SG"];
 const INITIAL_STORY_COUNT = 12;
 const STORY_BATCH_SIZE = 12;
+const STORY_PREFETCH_LOW_WATER = 24;
 
 export type ExplorerMode = "country" | "compare";
 
@@ -36,12 +37,31 @@ export function ProgressiveStoryList({
 }) {
   const [visibleStoryCount, setVisibleStoryCount] = useState(INITIAL_STORY_COUNT);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const prefetchedLengthRef = useRef(-1);
   const visibleStories = stories.slice(0, visibleStoryCount);
   const hasMoreRenderedStories = visibleStoryCount < stories.length;
   const hasMoreServerStories = canFetchMore;
   const hasMoreStories = hasMoreRenderedStories || hasMoreServerStories;
 
+  const requestMoreOnce = useCallback(() => {
+    if (
+      !hasMoreServerStories ||
+      isFetchingMore ||
+      prefetchedLengthRef.current === stories.length
+    ) return;
+    prefetchedLengthRef.current = stories.length;
+    onRequestMore();
+  }, [hasMoreServerStories, isFetchingMore, onRequestMore, stories.length]);
+
   const revealOrRequestMore = useCallback(() => {
+    if (hasMoreRenderedStories) {
+      setVisibleStoryCount((current) => Math.min(current + STORY_BATCH_SIZE, stories.length));
+    } else {
+      requestMoreOnce();
+    }
+  }, [hasMoreRenderedStories, requestMoreOnce, stories.length]);
+
+  const manualRevealOrRequestMore = useCallback(() => {
     if (hasMoreRenderedStories) {
       setVisibleStoryCount((current) => Math.min(current + STORY_BATCH_SIZE, stories.length));
     } else if (hasMoreServerStories && !isFetchingMore) {
@@ -63,6 +83,17 @@ export function ProgressiveStoryList({
     return () => observer.disconnect();
   }, [hasMoreStories, revealOrRequestMore]);
 
+  useEffect(() => {
+    const bufferedStories = Math.max(0, stories.length - visibleStoryCount);
+    if (
+      !hasMoreServerStories ||
+      isFetchingMore ||
+      bufferedStories > STORY_PREFETCH_LOW_WATER ||
+      prefetchedLengthRef.current === stories.length
+    ) return;
+    requestMoreOnce();
+  }, [hasMoreServerStories, isFetchingMore, requestMoreOnce, stories.length, visibleStoryCount]);
+
   return (
     <>
       <StoryList stories={visibleStories} />
@@ -79,12 +110,12 @@ export function ProgressiveStoryList({
                     : "Continue scrolling to fetch the next page of current coverage."}
                 </small>
               </div>
-              <button type="button" onClick={revealOrRequestMore} disabled={isFetchingMore}>
+              <button type="button" onClick={manualRevealOrRequestMore} disabled={isFetchingMore}>
                 {isFetchingMore ? "Loading…" : "Load more"}
               </button>
             </>
           ) : (
-            <p>All {visibleStories.length} available matching stories are loaded.</p>
+            <p>All available matching stories are loaded.</p>
           )}
         </div>
       )}
@@ -205,7 +236,6 @@ export function WorldNewsExplorer({
       isLoading ||
       isLoadingMore ||
       !canFetchMore ||
-      data.stories.length >= data.meta.total ||
       loadMoreControllerRef.current
     ) return;
     const nextPage = nextPageNumber({ ...data, meta: { ...data.meta, page: loadedPage } });
@@ -368,8 +398,8 @@ export function WorldNewsExplorer({
                 <span className="refreshing"><i aria-hidden="true" /> Checking live sources…</span>
               ) : (
                 <span>
-                  {data.meta.total} {data.meta.total === 1 ? "story" : "stories"}
-                  <small>{newsPeriodLabel(period)}</small>
+                  {data.meta.total}{data.meta.corpusComplete ? "" : "+"} {data.meta.total === 1 ? "story" : "stories"}
+                  <small>{data.meta.corpusComplete ? newsPeriodLabel(period) : `${newsPeriodLabel(period)} · live corpus expanding`}</small>
                 </span>
               )}
             </div>
