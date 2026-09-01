@@ -104,6 +104,14 @@ describe("country detection", () => {
     expect(detectCountries("IT teams meet IN the main office").map(({ code }) => code)).not.toEqual(
       expect.arrayContaining(["IT", "IN"]),
     );
+    expect(detectCountries("Nepal PM demands climate action").map(({ code }) => code)).not.toContain("PM");
+    expect(detectCountries("American company announces a North American venture").map(({ code }) => code)).not.toContain("MP");
+  });
+
+  it("retains reviewed country abbreviations without enabling arbitrary ISO codes", () => {
+    expect(detectCountries("US, UK and UAE officials meet").map(({ code }) => code)).toEqual(
+      expect.arrayContaining(["US", "GB", "AE"]),
+    );
   });
 
   it("prioritizes provider coverage and structured metadata over weaker inference", () => {

@@ -63,6 +63,30 @@ const overridesByCode = new Map(
 );
 const geographyByCode = (geographyData as { countries: Record<string, GeographyCountrySignal> }).countries;
 
+const curatedDemonymOwners = new Map<string, Set<string>>();
+const geographyDemonymOwners = new Map<string, Set<string>>();
+
+function registerDemonymOwner(index: Map<string, Set<string>>, code: string, value: string): void {
+  const key = normalizedSignal(value);
+  const owners = index.get(key) ?? new Set<string>();
+  owners.add(code);
+  index.set(key, owners);
+}
+
+for (const [code, entry] of [...curatedByCode, ...overridesByCode]) {
+  for (const demonym of entry.demonyms ?? []) registerDemonymOwner(curatedDemonymOwners, code, demonym);
+}
+for (const [code, entry] of Object.entries(geographyByCode)) {
+  for (const demonym of entry.demonyms ?? []) registerDemonymOwner(geographyDemonymOwners, code, demonym);
+}
+
+function safeGeneratedDemonym(code: string, value: string): boolean {
+  const key = normalizedSignal(value);
+  const reviewedOwners = curatedDemonymOwners.get(key);
+  if (reviewedOwners?.size) return reviewedOwners.has(code);
+  return geographyDemonymOwners.get(key)?.size === 1;
+}
+
 /**
  * Every ISO country is eligible for article tagging by its official English
  * name. Frequently covered countries retain richer hand-curated demonyms,
@@ -92,7 +116,7 @@ export const COUNTRY_SIGNALS: CountrySignals[] = listCountries().map(({ code, na
       ...(geography?.alternativeNames ?? []),
     ])],
     demonyms: [...new Set([
-      ...(geography?.demonyms ?? []),
+      ...(geography?.demonyms ?? []).filter((value) => safeGeneratedDemonym(code, value)),
       ...(curated?.demonyms ?? []),
       ...(override?.demonyms ?? []),
     ])],
