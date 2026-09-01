@@ -184,8 +184,28 @@ export class RssProvider implements NewsProvider {
           const websiteDomain = registrableDomain(new URL(feed.websiteUrl).hostname);
           return targetedFeedIds.has(feed.sourceId) || targetedDomains.has(websiteDomain);
         });
+    const perspectiveIndex = request.sourcePerspective === "second-country" ? 1 : 0;
+    const perspectiveCountry = ["local", "first-country", "second-country"].includes(request.sourcePerspective ?? "all")
+      ? request.countries?.[perspectiveIndex]
+      : null;
+    const perspectiveFeeds = perspectiveCountry
+      ? matchingFeeds.filter(({ countryCode }) => countryCode === perspectiveCountry)
+      : request.sourcePerspective === "international" && request.countries?.length
+        ? matchingFeeds.filter(({ countryCode }) => !countryCode || !request.countries?.includes(countryCode))
+        : [...matchingFeeds].sort((first, second) => {
+            const firstLocal = request.countries?.includes(first.countryCode ?? "") ? 1 : 0;
+            const secondLocal = request.countries?.includes(second.countryCode ?? "") ? 1 : 0;
+            return secondLocal - firstLocal;
+          });
+    const completedPlanIds = new Set(request.continuation?.completedPlanIds ?? []);
     const offset = Math.max(0, request.continuation?.offset ?? 0);
-    const feeds = matchingFeeds.slice(offset, offset + FEEDS_PER_STAGE);
+    if (completedPlanIds.size === 0 && offset > 0) {
+      perspectiveFeeds.slice(0, offset).forEach(({ feedUrl }) => completedPlanIds.add(feedUrl));
+    }
+    const pendingFeeds = completedPlanIds.size > 0
+      ? perspectiveFeeds.filter(({ feedUrl }) => !completedPlanIds.has(feedUrl))
+      : perspectiveFeeds.slice(offset);
+    const feeds = pendingFeeds.slice(0, FEEDS_PER_STAGE);
     logNews("info", "rss_source_targeting", {
       provider_source_targeted_query_count: targets.length > 0 ? feeds.length : 0,
       feedOffset: offset,
@@ -221,7 +241,7 @@ export class RssProvider implements NewsProvider {
             coverageCountries: feed.coverageCountries,
           }];
         });
-        return { feed, articles, truncatedDescriptionCount };
+        return { feed, articles, rawCount: parsed.items.length, truncatedDescriptionCount };
       }),
     );
     const successful = settled.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
@@ -244,14 +264,29 @@ export class RssProvider implements NewsProvider {
     if (feeds.length > 0 && articles.length === 0 && settled.every((result) => result.status === "rejected")) {
       throw new ProviderError(this.name, "ALL_FEEDS_FAILED", "All configured RSS feeds failed");
     }
+    feeds.forEach(({ feedUrl }) => completedPlanIds.add(feedUrl));
     const nextOffset = offset + feeds.length;
-    const exhausted = nextOffset >= matchingFeeds.length;
+    const exhausted = perspectiveFeeds.every(({ feedUrl }) => completedPlanIds.has(feedUrl));
     return {
       provider: this.name,
       articles,
       receivedAt: new Date().toISOString(),
-      continuation: exhausted ? null : { offset: nextOffset },
+      continuation: exhausted ? null : { offset: nextOffset, completedPlanIds: [...completedPlanIds] },
       exhausted,
+      coverage: {
+        archiveCapable: false,
+        windowStart: request.from?.toISOString(),
+        windowEnd: request.to?.toISOString(),
+        timeRangeCovered: false,
+        exhaustionReason: exhausted ? "feed_exhausted" : undefined,
+      },
+      diagnostics: {
+        received: successful.reduce((total, { rawCount }) => total + rawCount, 0),
+        plansAttempted: feeds.length,
+        plansCompleted: completedPlanIds.size,
+        languages: [...new Set(feeds.map(({ language }) => language))],
+        countryQueries: [],
+      },
     };
   }
 

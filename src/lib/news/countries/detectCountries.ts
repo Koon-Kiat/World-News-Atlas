@@ -9,6 +9,7 @@ export type CountryDetectionMethod =
   | "multilingual_name"
   | "demonym"
   | "city"
+  | "institution"
   | "iso_code"
   | "url_hint"
   | "english_fallback";
@@ -48,6 +49,7 @@ interface PreparedCountrySignal {
   englishNames: PreparedPhrase[];
   demonyms: PreparedPhrase[];
   locations: PreparedPhrase[];
+  institutions: PreparedPhrase[];
   ambiguousAliases: PreparedPhrase[];
   contextTerms: PreparedPhrase[];
   structuredPhrases: PreparedPhrase[];
@@ -167,6 +169,7 @@ const PREPARED_COUNTRY_SIGNALS: PreparedCountrySignal[] = COUNTRY_SIGNALS.map((s
     englishNames: preparePhrases(englishNames),
     demonyms: preparePhrases(signal.demonyms),
     locations: preparePhrases(signal.locations),
+    institutions: preparePhrases(signal.institutions),
     ambiguousAliases: preparePhrases(signal.ambiguousAliases),
     contextTerms: preparePhrases(signal.contextTerms),
     structuredPhrases: preparePhrases([
@@ -174,6 +177,7 @@ const PREPARED_COUNTRY_SIGNALS: PreparedCountrySignal[] = COUNTRY_SIGNALS.map((s
       ...englishNames,
       ...signal.demonyms,
       ...signal.locations,
+      ...signal.institutions,
     ]),
     urlPhrases: preparePhrases([...names, ...englishNames, ...signal.locations]),
     isoCodes: prepareIsoCodes([...signal.isoCodes, ...aliases]),
@@ -206,19 +210,21 @@ export function detectCountrySignals(options: CountryDetectionOptions): CountryD
     const multilingualHits = countMatches(preparedPrimary, prepared.names);
     const demonymHits = countMatches(preparedPrimary, prepared.demonyms);
     const cityHits = countMatches(preparedPrimary, prepared.locations);
+    const institutionHits = countMatches(preparedPrimary, prepared.institutions);
     const englishHits = countMatches(preparedPrimary, prepared.englishNames);
     const isoHits = prepared.isoCodes.filter((code) =>
       containsBounded(preparedPrimary.nfkc, code, true)
     ).length;
     const structuredHits = countMatches(preparedStructured, prepared.structuredPhrases);
     const urlHits = countMatches(preparedSupplemental, prepared.urlPhrases);
-    const corroborated = multilingualHits + demonymHits + cityHits + structuredHits > 0;
+    const corroborated = multilingualHits + demonymHits + cityHits + institutionHits + structuredHits > 0;
     const ambiguousHits = countMatches(preparedPrimary, prepared.ambiguousAliases);
 
     if (structuredHits > 0) register(signal.code, 0.96, "structured_location");
     if (multilingualHits > 0) register(signal.code, 0.91, "multilingual_name");
     if (demonymHits > 0) register(signal.code, 0.84, "demonym");
     if (cityHits > 0) register(signal.code, 0.79, "city");
+    if (institutionHits > 0) register(signal.code, 0.94, "institution");
     if (isoHits > 0) register(signal.code, 0.69, "iso_code");
     if (urlHits > 0) register(signal.code, 0.52, "url_hint");
     if (englishHits > 0) {

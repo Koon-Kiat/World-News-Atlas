@@ -1,0 +1,6015 @@
+{
+  "source": {
+    "project": "mledoze/countries",
+    "commit": "9eff32e4eef26715aa59d99b200127d1ef150e7a",
+    "url": "https://raw.githubusercontent.com/mledoze/countries/9eff32e4eef26715aa59d99b200127d1ef150e7a/countries.json",
+    "license": "ODbL-1.0",
+    "generatedAt": "2026-08-31T13:17:35.815Z"
+  },
+  "countries": {
+    "AD": {
+      "officialNames": [
+        "Andorra",
+        "Principality of Andorra"
+      ],
+      "nativeNames": [
+        "Andorra",
+        "Principat d'Andorra"
+      ],
+      "alternativeNames": [
+        "Principality of Andorra",
+        "Principat d'Andorra"
+      ],
+      "capitals": [
+        "Andorra la Vella"
+      ],
+      "demonyms": [
+        "Andorran"
+      ],
+      "languages": [
+        "Catalan"
+      ]
+    },
+    "AE": {
+      "officialNames": [
+        "United Arab Emirates"
+      ],
+      "nativeNames": [
+        "الإمارات",
+        "الإمارات العربية المتحدة"
+      ],
+      "alternativeNames": [
+        "Emirates"
+      ],
+      "capitals": [
+        "Abu Dhabi"
+      ],
+      "demonyms": [
+        "Emirati"
+      ],
+      "languages": [
+        "Arabic"
+      ]
+    },
+    "AF": {
+      "officialNames": [
+        "Afghanistan",
+        "Islamic Republic of Afghanistan"
+      ],
+      "nativeNames": [
+        "افغانستان",
+        "جمهوری اسلامی افغانستان",
+        "د افغانستان اسلامي جمهوریت",
+        "Owganystan",
+        "Owganystan Yslam Respublikasy"
+      ],
+      "alternativeNames": [
+        "Afġānistān"
+      ],
+      "capitals": [
+        "Kabul"
+      ],
+      "demonyms": [
+        "Afghan"
+      ],
+      "languages": [
+        "Dari",
+        "Pashto",
+        "Turkmen"
+      ]
+    },
+    "AG": {
+      "officialNames": [
+        "Antigua and Barbuda"
+      ],
+      "nativeNames": [
+        "Antigua and Barbuda"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Saint John's"
+      ],
+      "demonyms": [
+        "Antiguan, Barbudan"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "AI": {
+      "officialNames": [
+        "Anguilla"
+      ],
+      "nativeNames": [
+        "Anguilla"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "The Valley"
+      ],
+      "demonyms": [
+        "Anguillian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "AL": {
+      "officialNames": [
+        "Albania",
+        "Republic of Albania"
+      ],
+      "nativeNames": [
+        "Shqipëria",
+        "Republika e Shqipërisë"
+      ],
+      "alternativeNames": [
+        "Shqipëri",
+        "Shqipëria",
+        "Shqipnia"
+      ],
+      "capitals": [
+        "Tirana"
+      ],
+      "demonyms": [
+        "Albanian"
+      ],
+      "languages": [
+        "Albanian"
+      ]
+    },
+    "AM": {
+      "officialNames": [
+        "Armenia",
+        "Republic of Armenia"
+      ],
+      "nativeNames": [
+        "Հայաստան",
+        "Հայաստանի Հանրապետություն"
+      ],
+      "alternativeNames": [
+        "Hayastan",
+        "Republic of Armenia",
+        "Հայաստանի Հանրապետություն"
+      ],
+      "capitals": [
+        "Yerevan"
+      ],
+      "demonyms": [
+        "Armenian"
+      ],
+      "languages": [
+        "Armenian"
+      ]
+    },
+    "AO": {
+      "officialNames": [
+        "Angola",
+        "Republic of Angola"
+      ],
+      "nativeNames": [
+        "Angola",
+        "República de Angola"
+      ],
+      "alternativeNames": [
+        "República de Angola",
+        "ʁɛpublika de an'ɡɔla"
+      ],
+      "capitals": [
+        "Luanda"
+      ],
+      "demonyms": [
+        "Angolan"
+      ],
+      "languages": [
+        "Portuguese"
+      ]
+    },
+    "AQ": {
+      "officialNames": [
+        "Antarctica"
+      ],
+      "nativeNames": [],
+      "alternativeNames": [],
+      "capitals": [],
+      "demonyms": [
+        "Antarctican"
+      ],
+      "languages": []
+    },
+    "AR": {
+      "officialNames": [
+        "Argentina",
+        "Argentine Republic"
+      ],
+      "nativeNames": [
+        "Argentina",
+        "Argentine Republic",
+        "República Argentina"
+      ],
+      "alternativeNames": [
+        "Argentine Republic",
+        "República Argentina"
+      ],
+      "capitals": [
+        "Buenos Aires"
+      ],
+      "demonyms": [
+        "Argentine"
+      ],
+      "languages": [
+        "Guaraní",
+        "Spanish"
+      ]
+    },
+    "AS": {
+      "officialNames": [
+        "American Samoa"
+      ],
+      "nativeNames": [
+        "American Samoa",
+        "Sāmoa Amelika"
+      ],
+      "alternativeNames": [
+        "Amerika Sāmoa",
+        "Amelika Sāmoa",
+        "Sāmoa Amelika"
+      ],
+      "capitals": [
+        "Pago Pago"
+      ],
+      "demonyms": [
+        "American Samoan"
+      ],
+      "languages": [
+        "English",
+        "Samoan"
+      ]
+    },
+    "AT": {
+      "officialNames": [
+        "Austria",
+        "Republic of Austria"
+      ],
+      "nativeNames": [
+        "Österreich",
+        "Republik Österreich"
+      ],
+      "alternativeNames": [
+        "Osterreich",
+        "Oesterreich"
+      ],
+      "capitals": [
+        "Vienna"
+      ],
+      "demonyms": [
+        "Austrian"
+      ],
+      "languages": [
+        "Austro-Bavarian German"
+      ]
+    },
+    "AU": {
+      "officialNames": [
+        "Australia",
+        "Commonwealth of Australia"
+      ],
+      "nativeNames": [
+        "Australia",
+        "Commonwealth of Australia"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Canberra"
+      ],
+      "demonyms": [
+        "Australian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "AW": {
+      "officialNames": [
+        "Aruba"
+      ],
+      "nativeNames": [
+        "Aruba"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Oranjestad"
+      ],
+      "demonyms": [
+        "Aruban"
+      ],
+      "languages": [
+        "Dutch",
+        "Papiamento"
+      ]
+    },
+    "AX": {
+      "officialNames": [
+        "Åland Islands"
+      ],
+      "nativeNames": [
+        "Åland",
+        "Landskapet Åland"
+      ],
+      "alternativeNames": [
+        "Aaland",
+        "Aland",
+        "Ahvenanmaa"
+      ],
+      "capitals": [
+        "Mariehamn"
+      ],
+      "demonyms": [
+        "Ålandish"
+      ],
+      "languages": [
+        "Swedish"
+      ]
+    },
+    "AZ": {
+      "officialNames": [
+        "Azerbaijan",
+        "Republic of Azerbaijan"
+      ],
+      "nativeNames": [
+        "Azərbaycan",
+        "Azərbaycan Respublikası",
+        "Азербайджан",
+        "Азербайджанская Республика"
+      ],
+      "alternativeNames": [
+        "Republic of Azerbaijan",
+        "Azərbaycan Respublikası"
+      ],
+      "capitals": [
+        "Baku"
+      ],
+      "demonyms": [
+        "Azerbaijani"
+      ],
+      "languages": [
+        "Azerbaijani",
+        "Russian"
+      ]
+    },
+    "BA": {
+      "officialNames": [
+        "Bosnia and Herzegovina"
+      ],
+      "nativeNames": [
+        "Bosna i Hercegovina",
+        "Боснa и Херцеговина"
+      ],
+      "alternativeNames": [
+        "Bosnia-Herzegovina",
+        "Босна и Херцеговина"
+      ],
+      "capitals": [
+        "Sarajevo"
+      ],
+      "demonyms": [
+        "Bosnian, Herzegovinian"
+      ],
+      "languages": [
+        "Bosnian",
+        "Croatian",
+        "Serbian"
+      ]
+    },
+    "BB": {
+      "officialNames": [
+        "Barbados"
+      ],
+      "nativeNames": [
+        "Barbados"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Bridgetown"
+      ],
+      "demonyms": [
+        "Barbadian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "BD": {
+      "officialNames": [
+        "Bangladesh",
+        "People's Republic of Bangladesh"
+      ],
+      "nativeNames": [
+        "বাংলাদেশ",
+        "বাংলাদেশ গণপ্রজাতন্ত্রী"
+      ],
+      "alternativeNames": [
+        "People's Republic of Bangladesh",
+        "Gônôprôjatôntri Bangladesh"
+      ],
+      "capitals": [
+        "Dhaka"
+      ],
+      "demonyms": [
+        "Bangladeshi"
+      ],
+      "languages": [
+        "Bengali"
+      ]
+    },
+    "BE": {
+      "officialNames": [
+        "Belgium",
+        "Kingdom of Belgium"
+      ],
+      "nativeNames": [
+        "Belgien",
+        "Königreich Belgien",
+        "Belgique",
+        "Royaume de Belgique",
+        "België",
+        "Koninkrijk België"
+      ],
+      "alternativeNames": [
+        "België",
+        "Belgie",
+        "Belgien",
+        "Belgique",
+        "Kingdom of Belgium",
+        "Koninkrijk België",
+        "Royaume de Belgique",
+        "Königreich Belgien"
+      ],
+      "capitals": [
+        "Brussels"
+      ],
+      "demonyms": [
+        "Belgian"
+      ],
+      "languages": [
+        "German",
+        "French",
+        "Dutch"
+      ]
+    },
+    "BF": {
+      "officialNames": [
+        "Burkina Faso"
+      ],
+      "nativeNames": [
+        "Burkina Faso",
+        "République du Burkina"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Ouagadougou"
+      ],
+      "demonyms": [
+        "Burkinabe"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "BG": {
+      "officialNames": [
+        "Bulgaria",
+        "Republic of Bulgaria"
+      ],
+      "nativeNames": [
+        "България",
+        "Република България"
+      ],
+      "alternativeNames": [
+        "Republic of Bulgaria",
+        "Република България"
+      ],
+      "capitals": [
+        "Sofia"
+      ],
+      "demonyms": [
+        "Bulgarian"
+      ],
+      "languages": [
+        "Bulgarian"
+      ]
+    },
+    "BH": {
+      "officialNames": [
+        "Bahrain",
+        "Kingdom of Bahrain"
+      ],
+      "nativeNames": [
+        "البحرين",
+        "مملكة البحرين"
+      ],
+      "alternativeNames": [
+        "Kingdom of Bahrain",
+        "Mamlakat al-Baḥrayn"
+      ],
+      "capitals": [
+        "Manama"
+      ],
+      "demonyms": [
+        "Bahraini"
+      ],
+      "languages": [
+        "Arabic"
+      ]
+    },
+    "BI": {
+      "officialNames": [
+        "Burundi",
+        "Republic of Burundi"
+      ],
+      "nativeNames": [
+        "Burundi",
+        "République du Burundi",
+        "Uburundi",
+        "Republika y'Uburundi"
+      ],
+      "alternativeNames": [
+        "Republic of Burundi",
+        "Republika y'Uburundi",
+        "République du Burundi"
+      ],
+      "capitals": [
+        "Gitega"
+      ],
+      "demonyms": [
+        "Burundian"
+      ],
+      "languages": [
+        "French",
+        "Kirundi"
+      ]
+    },
+    "BJ": {
+      "officialNames": [
+        "Benin",
+        "Republic of Benin"
+      ],
+      "nativeNames": [
+        "Bénin",
+        "République du Bénin"
+      ],
+      "alternativeNames": [
+        "Republic of Benin",
+        "République du Bénin"
+      ],
+      "capitals": [
+        "Porto-Novo"
+      ],
+      "demonyms": [
+        "Beninese"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "BL": {
+      "officialNames": [
+        "Saint Barthélemy",
+        "Collectivity of Saint Barthélemy"
+      ],
+      "nativeNames": [
+        "Saint-Barthélemy",
+        "Collectivité de Saint-Barthélemy"
+      ],
+      "alternativeNames": [
+        "St. Barthelemy",
+        "Collectivity of Saint Barthélemy",
+        "Collectivité de Saint-Barthélemy"
+      ],
+      "capitals": [
+        "Gustavia"
+      ],
+      "demonyms": [
+        "Saint Barthélemy Islander"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "BM": {
+      "officialNames": [
+        "Bermuda"
+      ],
+      "nativeNames": [
+        "Bermuda"
+      ],
+      "alternativeNames": [
+        "The Islands of Bermuda",
+        "The Bermudas",
+        "Somers Isles"
+      ],
+      "capitals": [
+        "Hamilton"
+      ],
+      "demonyms": [
+        "Bermudian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "BN": {
+      "officialNames": [
+        "Brunei",
+        "Nation of Brunei, Abode of Peace"
+      ],
+      "nativeNames": [
+        "Negara Brunei Darussalam",
+        "Nation of Brunei, Abode Damai"
+      ],
+      "alternativeNames": [
+        "Brunei Darussalam",
+        "Nation of Brunei",
+        "the Abode of Peace"
+      ],
+      "capitals": [
+        "Bandar Seri Begawan"
+      ],
+      "demonyms": [
+        "Bruneian"
+      ],
+      "languages": [
+        "Malay"
+      ]
+    },
+    "BO": {
+      "officialNames": [
+        "Bolivia",
+        "Plurinational State of Bolivia"
+      ],
+      "nativeNames": [
+        "Wuliwya",
+        "Wuliwya Suyu",
+        "Volívia",
+        "Tetã Volívia",
+        "Buliwya",
+        "Buliwya Mamallaqta",
+        "Bolivia",
+        "Estado Plurinacional de Bolivia"
+      ],
+      "alternativeNames": [
+        "Buliwya",
+        "Wuliwya",
+        "Bolivia, Plurinational State of",
+        "Plurinational State of Bolivia",
+        "Estado Plurinacional de Bolivia",
+        "Buliwya Mamallaqta",
+        "Wuliwya Suyu",
+        "Tetã Volívia"
+      ],
+      "capitals": [
+        "Sucre"
+      ],
+      "demonyms": [
+        "Bolivian"
+      ],
+      "languages": [
+        "Aymara",
+        "Guaraní",
+        "Quechua",
+        "Spanish"
+      ]
+    },
+    "BQ": {
+      "officialNames": [
+        "Caribbean Netherlands",
+        "Bonaire, Sint Eustatius and Saba"
+      ],
+      "nativeNames": [
+        "Caribisch Nederland",
+        "Bonaire, Sint Eustatius en Saba",
+        "Boneiru, Sint Eustatius y Saba"
+      ],
+      "alternativeNames": [
+        "BES islands",
+        "Bonaire Sint Eustatius and Saba"
+      ],
+      "capitals": [
+        "Kralendijk",
+        "Oranjestad",
+        "The Bottom"
+      ],
+      "demonyms": [
+        "Dutch"
+      ],
+      "languages": [
+        "English",
+        "Dutch",
+        "Papiamento"
+      ]
+    },
+    "BR": {
+      "officialNames": [
+        "Brazil",
+        "Federative Republic of Brazil"
+      ],
+      "nativeNames": [
+        "Brasil",
+        "República Federativa do Brasil"
+      ],
+      "alternativeNames": [
+        "Brasil",
+        "Federative Republic of Brazil",
+        "República Federativa do Brasil"
+      ],
+      "capitals": [
+        "Brasília"
+      ],
+      "demonyms": [
+        "Brazilian"
+      ],
+      "languages": [
+        "Portuguese"
+      ]
+    },
+    "BS": {
+      "officialNames": [
+        "Bahamas",
+        "Commonwealth of the Bahamas"
+      ],
+      "nativeNames": [
+        "Bahamas",
+        "Commonwealth of the Bahamas"
+      ],
+      "alternativeNames": [
+        "Commonwealth of the Bahamas"
+      ],
+      "capitals": [
+        "Nassau"
+      ],
+      "demonyms": [
+        "Bahamian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "BT": {
+      "officialNames": [
+        "Bhutan",
+        "Kingdom of Bhutan"
+      ],
+      "nativeNames": [
+        "འབྲུག་ཡུལ་",
+        "འབྲུག་རྒྱལ་ཁབ་"
+      ],
+      "alternativeNames": [
+        "Kingdom of Bhutan"
+      ],
+      "capitals": [
+        "Thimphu"
+      ],
+      "demonyms": [
+        "Bhutanese"
+      ],
+      "languages": [
+        "Dzongkha"
+      ]
+    },
+    "BV": {
+      "officialNames": [
+        "Bouvet Island"
+      ],
+      "nativeNames": [
+        "Bouvetøya"
+      ],
+      "alternativeNames": [
+        "Bouvetøya",
+        "Bouvet-øya"
+      ],
+      "capitals": [],
+      "demonyms": [],
+      "languages": [
+        "Norwegian"
+      ]
+    },
+    "BW": {
+      "officialNames": [
+        "Botswana",
+        "Republic of Botswana"
+      ],
+      "nativeNames": [
+        "Botswana",
+        "Republic of Botswana",
+        "Lefatshe la Botswana"
+      ],
+      "alternativeNames": [
+        "Republic of Botswana",
+        "Lefatshe la Botswana"
+      ],
+      "capitals": [
+        "Gaborone"
+      ],
+      "demonyms": [
+        "Motswana"
+      ],
+      "languages": [
+        "English",
+        "Tswana"
+      ]
+    },
+    "BY": {
+      "officialNames": [
+        "Belarus",
+        "Republic of Belarus"
+      ],
+      "nativeNames": [
+        "Белару́сь",
+        "Рэспубліка Беларусь",
+        "Беларусь",
+        "Республика Беларусь"
+      ],
+      "alternativeNames": [
+        "Bielaruś",
+        "Republic of Belarus",
+        "Белоруссия",
+        "Республика Белоруссия"
+      ],
+      "capitals": [
+        "Minsk"
+      ],
+      "demonyms": [
+        "Belarusian"
+      ],
+      "languages": [
+        "Belarusian",
+        "Russian"
+      ]
+    },
+    "BZ": {
+      "officialNames": [
+        "Belize"
+      ],
+      "nativeNames": [
+        "Belize",
+        "Belice"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Belmopan"
+      ],
+      "demonyms": [
+        "Belizean"
+      ],
+      "languages": [
+        "Belizean Creole",
+        "English",
+        "Spanish"
+      ]
+    },
+    "CA": {
+      "officialNames": [
+        "Canada"
+      ],
+      "nativeNames": [
+        "Canada"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Ottawa"
+      ],
+      "demonyms": [
+        "Canadian"
+      ],
+      "languages": [
+        "English",
+        "French"
+      ]
+    },
+    "CC": {
+      "officialNames": [
+        "Cocos (Keeling) Islands",
+        "Territory of the Cocos (Keeling) Islands"
+      ],
+      "nativeNames": [
+        "Cocos (Keeling) Islands",
+        "Territory of the Cocos (Keeling) Islands"
+      ],
+      "alternativeNames": [
+        "Keeling Islands",
+        "Cocos Islands"
+      ],
+      "capitals": [
+        "West Island"
+      ],
+      "demonyms": [
+        "Cocos Islander"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "CD": {
+      "officialNames": [
+        "DR Congo",
+        "Democratic Republic of the Congo"
+      ],
+      "nativeNames": [
+        "RD Congo",
+        "République démocratique du Congo",
+        "Repubilika ya Kongo Demokratiki",
+        "Republiki ya Kongó Demokratiki",
+        "Ditunga dia Kongu wa Mungalaata",
+        "Jamhuri ya Kidemokrasia ya Kongo"
+      ],
+      "alternativeNames": [
+        "DR Congo",
+        "Congo-Kinshasa",
+        "Congo, the Democratic Republic of the",
+        "Democratic Republic of Congo"
+      ],
+      "capitals": [
+        "Kinshasa"
+      ],
+      "demonyms": [
+        "Congolese"
+      ],
+      "languages": [
+        "French",
+        "Kikongo",
+        "Lingala",
+        "Tshiluba",
+        "Swahili"
+      ]
+    },
+    "CF": {
+      "officialNames": [
+        "Central African Republic"
+      ],
+      "nativeNames": [
+        "République centrafricaine",
+        "Bêafrîka",
+        "Ködörösêse tî Bêafrîka"
+      ],
+      "alternativeNames": [
+        "Central African Republic",
+        "République centrafricaine"
+      ],
+      "capitals": [
+        "Bangui"
+      ],
+      "demonyms": [
+        "Central African"
+      ],
+      "languages": [
+        "French",
+        "Sango"
+      ]
+    },
+    "CG": {
+      "officialNames": [
+        "Congo",
+        "Republic of the Congo"
+      ],
+      "nativeNames": [
+        "République du Congo",
+        "Repubilika ya Kongo",
+        "Republíki ya Kongó"
+      ],
+      "alternativeNames": [
+        "Congo",
+        "Congo-Brazzaville"
+      ],
+      "capitals": [
+        "Brazzaville"
+      ],
+      "demonyms": [
+        "Congolese"
+      ],
+      "languages": [
+        "French",
+        "Kikongo",
+        "Lingala"
+      ]
+    },
+    "CH": {
+      "officialNames": [
+        "Switzerland",
+        "Swiss Confederation"
+      ],
+      "nativeNames": [
+        "Suisse",
+        "Confédération suisse",
+        "Schweiz",
+        "Schweizerische Eidgenossenschaft",
+        "Svizzera",
+        "Confederazione Svizzera",
+        "Svizra",
+        "Confederaziun svizra"
+      ],
+      "alternativeNames": [
+        "Swiss Confederation",
+        "Schweiz",
+        "Suisse",
+        "Svizzera",
+        "Svizra"
+      ],
+      "capitals": [
+        "Bern"
+      ],
+      "demonyms": [
+        "Swiss"
+      ],
+      "languages": [
+        "French",
+        "Swiss German",
+        "Italian",
+        "Romansh"
+      ]
+    },
+    "CI": {
+      "officialNames": [
+        "Ivory Coast",
+        "Republic of Côte d'Ivoire"
+      ],
+      "nativeNames": [
+        "Côte d'Ivoire",
+        "République de Côte d'Ivoire"
+      ],
+      "alternativeNames": [
+        "Côte d'Ivoire",
+        "Cote d'Ivoire",
+        "Ivory Coast",
+        "Republic of Côte d'Ivoire",
+        "République de Côte d'Ivoire"
+      ],
+      "capitals": [
+        "Yamoussoukro"
+      ],
+      "demonyms": [
+        "Ivorian"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "CK": {
+      "officialNames": [
+        "Cook Islands"
+      ],
+      "nativeNames": [
+        "Cook Islands",
+        "Kūki 'Āirani"
+      ],
+      "alternativeNames": [
+        "Kūki 'Āirani"
+      ],
+      "capitals": [
+        "Avarua"
+      ],
+      "demonyms": [
+        "Cook Islander"
+      ],
+      "languages": [
+        "English",
+        "Cook Islands Māori"
+      ]
+    },
+    "CL": {
+      "officialNames": [
+        "Chile",
+        "Republic of Chile"
+      ],
+      "nativeNames": [
+        "Chile",
+        "República de Chile"
+      ],
+      "alternativeNames": [
+        "Republic of Chile",
+        "República de Chile"
+      ],
+      "capitals": [
+        "Santiago"
+      ],
+      "demonyms": [
+        "Chilean"
+      ],
+      "languages": [
+        "Spanish"
+      ]
+    },
+    "CM": {
+      "officialNames": [
+        "Cameroon",
+        "Republic of Cameroon"
+      ],
+      "nativeNames": [
+        "Cameroon",
+        "Republic of Cameroon",
+        "Cameroun",
+        "République du Cameroun"
+      ],
+      "alternativeNames": [
+        "Republic of Cameroon",
+        "République du Cameroun"
+      ],
+      "capitals": [
+        "Yaoundé"
+      ],
+      "demonyms": [
+        "Cameroonian"
+      ],
+      "languages": [
+        "English",
+        "French"
+      ]
+    },
+    "CN": {
+      "officialNames": [
+        "China",
+        "People's Republic of China"
+      ],
+      "nativeNames": [
+        "中国",
+        "中华人民共和国"
+      ],
+      "alternativeNames": [
+        "Zhōngguó",
+        "Zhongguo",
+        "Zhonghua",
+        "People's Republic of China",
+        "中华人民共和国",
+        "Zhōnghuá Rénmín Gònghéguó"
+      ],
+      "capitals": [
+        "Beijing"
+      ],
+      "demonyms": [
+        "Chinese"
+      ],
+      "languages": [
+        "Chinese"
+      ]
+    },
+    "CO": {
+      "officialNames": [
+        "Colombia",
+        "Republic of Colombia"
+      ],
+      "nativeNames": [
+        "Colombia",
+        "República de Colombia"
+      ],
+      "alternativeNames": [
+        "Republic of Colombia",
+        "República de Colombia"
+      ],
+      "capitals": [
+        "Bogotá"
+      ],
+      "demonyms": [
+        "Colombian"
+      ],
+      "languages": [
+        "Spanish"
+      ]
+    },
+    "CR": {
+      "officialNames": [
+        "Costa Rica",
+        "Republic of Costa Rica"
+      ],
+      "nativeNames": [
+        "Costa Rica",
+        "República de Costa Rica"
+      ],
+      "alternativeNames": [
+        "Republic of Costa Rica",
+        "República de Costa Rica"
+      ],
+      "capitals": [
+        "San José"
+      ],
+      "demonyms": [
+        "Costa Rican"
+      ],
+      "languages": [
+        "Spanish"
+      ]
+    },
+    "CU": {
+      "officialNames": [
+        "Cuba",
+        "Republic of Cuba"
+      ],
+      "nativeNames": [
+        "Cuba",
+        "República de Cuba"
+      ],
+      "alternativeNames": [
+        "Republic of Cuba",
+        "República de Cuba"
+      ],
+      "capitals": [
+        "Havana"
+      ],
+      "demonyms": [
+        "Cuban"
+      ],
+      "languages": [
+        "Spanish"
+      ]
+    },
+    "CV": {
+      "officialNames": [
+        "Cape Verde",
+        "Republic of Cabo Verde"
+      ],
+      "nativeNames": [
+        "Cabo Verde",
+        "República de Cabo Verde"
+      ],
+      "alternativeNames": [
+        "Republic of Cabo Verde",
+        "República de Cabo Verde"
+      ],
+      "capitals": [
+        "Praia"
+      ],
+      "demonyms": [
+        "Cape Verdian"
+      ],
+      "languages": [
+        "Portuguese"
+      ]
+    },
+    "CW": {
+      "officialNames": [
+        "Curaçao",
+        "Country of Curaçao"
+      ],
+      "nativeNames": [
+        "Curaçao",
+        "Country of Curaçao",
+        "Land Curaçao",
+        "Pais Kòrsou"
+      ],
+      "alternativeNames": [
+        "Curacao",
+        "Kòrsou",
+        "Country of Curaçao",
+        "Land Curaçao",
+        "Pais Kòrsou"
+      ],
+      "capitals": [
+        "Willemstad"
+      ],
+      "demonyms": [
+        "Curaçaoan"
+      ],
+      "languages": [
+        "English",
+        "Dutch",
+        "Papiamento"
+      ]
+    },
+    "CX": {
+      "officialNames": [
+        "Christmas Island",
+        "Territory of Christmas Island"
+      ],
+      "nativeNames": [
+        "Christmas Island",
+        "Territory of Christmas Island"
+      ],
+      "alternativeNames": [
+        "Territory of Christmas Island"
+      ],
+      "capitals": [
+        "Flying Fish Cove"
+      ],
+      "demonyms": [
+        "Christmas Islander"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "CY": {
+      "officialNames": [
+        "Cyprus",
+        "Republic of Cyprus"
+      ],
+      "nativeNames": [
+        "Κύπρος",
+        "Δημοκρατία της Κύπρος",
+        "Kıbrıs",
+        "Kıbrıs Cumhuriyeti"
+      ],
+      "alternativeNames": [
+        "Kýpros",
+        "Kıbrıs",
+        "Republic of Cyprus",
+        "Κυπριακή Δημοκρατία",
+        "Kıbrıs Cumhuriyeti"
+      ],
+      "capitals": [
+        "Nicosia"
+      ],
+      "demonyms": [
+        "Cypriot"
+      ],
+      "languages": [
+        "Greek",
+        "Turkish"
+      ]
+    },
+    "CZ": {
+      "officialNames": [
+        "Czechia",
+        "Czech Republic"
+      ],
+      "nativeNames": [
+        "Česko",
+        "Česká republika"
+      ],
+      "alternativeNames": [
+        "Česká republika",
+        "Česko"
+      ],
+      "capitals": [
+        "Prague"
+      ],
+      "demonyms": [
+        "Czech"
+      ],
+      "languages": [
+        "Czech",
+        "Slovak"
+      ]
+    },
+    "DE": {
+      "officialNames": [
+        "Germany",
+        "Federal Republic of Germany"
+      ],
+      "nativeNames": [
+        "Deutschland",
+        "Bundesrepublik Deutschland"
+      ],
+      "alternativeNames": [
+        "Federal Republic of Germany",
+        "Bundesrepublik Deutschland"
+      ],
+      "capitals": [
+        "Berlin"
+      ],
+      "demonyms": [
+        "German"
+      ],
+      "languages": [
+        "German"
+      ]
+    },
+    "DJ": {
+      "officialNames": [
+        "Djibouti",
+        "Republic of Djibouti"
+      ],
+      "nativeNames": [
+        "جيبوتي",
+        "جمهورية جيبوتي",
+        "Djibouti",
+        "République de Djibouti"
+      ],
+      "alternativeNames": [
+        "Jabuuti",
+        "Gabuuti",
+        "Republic of Djibouti",
+        "République de Djibouti",
+        "Gabuutih Ummuuno",
+        "Jamhuuriyadda Jabuuti"
+      ],
+      "capitals": [
+        "Djibouti"
+      ],
+      "demonyms": [
+        "Djibouti"
+      ],
+      "languages": [
+        "Arabic",
+        "French"
+      ]
+    },
+    "DK": {
+      "officialNames": [
+        "Denmark",
+        "Kingdom of Denmark"
+      ],
+      "nativeNames": [
+        "Danmark",
+        "Kongeriget Danmark"
+      ],
+      "alternativeNames": [
+        "Danmark",
+        "Kingdom of Denmark",
+        "Kongeriget Danmark"
+      ],
+      "capitals": [
+        "Copenhagen"
+      ],
+      "demonyms": [
+        "Danish"
+      ],
+      "languages": [
+        "Danish"
+      ]
+    },
+    "DM": {
+      "officialNames": [
+        "Dominica",
+        "Commonwealth of Dominica"
+      ],
+      "nativeNames": [
+        "Dominica",
+        "Commonwealth of Dominica"
+      ],
+      "alternativeNames": [
+        "Dominique",
+        "Wai‘tu kubuli",
+        "Commonwealth of Dominica"
+      ],
+      "capitals": [
+        "Roseau"
+      ],
+      "demonyms": [
+        "Dominican"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "DO": {
+      "officialNames": [
+        "Dominican Republic"
+      ],
+      "nativeNames": [
+        "República Dominicana"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Santo Domingo"
+      ],
+      "demonyms": [
+        "Dominican"
+      ],
+      "languages": [
+        "Spanish"
+      ]
+    },
+    "DZ": {
+      "officialNames": [
+        "Algeria",
+        "People's Democratic Republic of Algeria"
+      ],
+      "nativeNames": [
+        "الجزائر",
+        "الجمهورية الديمقراطية الشعبية الجزائرية"
+      ],
+      "alternativeNames": [
+        "Dzayer",
+        "Algérie"
+      ],
+      "capitals": [
+        "Algiers"
+      ],
+      "demonyms": [
+        "Algerian"
+      ],
+      "languages": [
+        "Arabic"
+      ]
+    },
+    "EC": {
+      "officialNames": [
+        "Ecuador",
+        "Republic of Ecuador"
+      ],
+      "nativeNames": [
+        "Ecuador",
+        "República del Ecuador"
+      ],
+      "alternativeNames": [
+        "Republic of Ecuador",
+        "República del Ecuador"
+      ],
+      "capitals": [
+        "Quito"
+      ],
+      "demonyms": [
+        "Ecuadorean"
+      ],
+      "languages": [
+        "Spanish"
+      ]
+    },
+    "EE": {
+      "officialNames": [
+        "Estonia",
+        "Republic of Estonia"
+      ],
+      "nativeNames": [
+        "Eesti",
+        "Eesti Vabariik"
+      ],
+      "alternativeNames": [
+        "Eesti",
+        "Republic of Estonia",
+        "Eesti Vabariik"
+      ],
+      "capitals": [
+        "Tallinn"
+      ],
+      "demonyms": [
+        "Estonian"
+      ],
+      "languages": [
+        "Estonian"
+      ]
+    },
+    "EG": {
+      "officialNames": [
+        "Egypt",
+        "Arab Republic of Egypt"
+      ],
+      "nativeNames": [
+        "مصر",
+        "جمهورية مصر العربية"
+      ],
+      "alternativeNames": [
+        "Arab Republic of Egypt"
+      ],
+      "capitals": [
+        "Cairo"
+      ],
+      "demonyms": [
+        "Egyptian"
+      ],
+      "languages": [
+        "Arabic"
+      ]
+    },
+    "EH": {
+      "officialNames": [
+        "Western Sahara",
+        "Sahrawi Arab Democratic Republic"
+      ],
+      "nativeNames": [
+        "Western Sahara",
+        "Sahrawi Arab Democratic Republic",
+        "الصحراء الغربية",
+        "الجمهورية العربية الصحراوية الديمقراطية",
+        "Sahara Occidental",
+        "República Árabe Saharaui Democrática"
+      ],
+      "alternativeNames": [
+        "Taneẓroft Tutrimt"
+      ],
+      "capitals": [
+        "El Aaiún"
+      ],
+      "demonyms": [
+        "Sahrawi"
+      ],
+      "languages": [
+        "Berber",
+        "Hassaniya",
+        "Spanish"
+      ]
+    },
+    "ER": {
+      "officialNames": [
+        "Eritrea",
+        "State of Eritrea"
+      ],
+      "nativeNames": [
+        "إريتريا",
+        "دولة إريتريا",
+        "Eritrea",
+        "State of Eritrea",
+        "ኤርትራ",
+        "ሃገረ ኤርትራ"
+      ],
+      "alternativeNames": [
+        "State of Eritrea",
+        "ሃገረ ኤርትራ",
+        "Dawlat Iritriyá",
+        "ʾErtrā",
+        "Iritriyā"
+      ],
+      "capitals": [
+        "Asmara"
+      ],
+      "demonyms": [
+        "Eritrean"
+      ],
+      "languages": [
+        "Arabic",
+        "English",
+        "Tigrinya"
+      ]
+    },
+    "ES": {
+      "officialNames": [
+        "Spain",
+        "Kingdom of Spain"
+      ],
+      "nativeNames": [
+        "España",
+        "Reino de España"
+      ],
+      "alternativeNames": [
+        "Kingdom of Spain",
+        "Reino de España"
+      ],
+      "capitals": [
+        "Madrid"
+      ],
+      "demonyms": [
+        "Spanish"
+      ],
+      "languages": [
+        "Spanish"
+      ]
+    },
+    "ET": {
+      "officialNames": [
+        "Ethiopia",
+        "Federal Democratic Republic of Ethiopia"
+      ],
+      "nativeNames": [
+        "ኢትዮጵያ",
+        "የኢትዮጵያ ፌዴራላዊ ዲሞክራሲያዊ ሪፐብሊክ"
+      ],
+      "alternativeNames": [
+        "ʾĪtyōṗṗyā",
+        "Federal Democratic Republic of Ethiopia",
+        "የኢትዮጵያ ፌዴራላዊ ዲሞክራሲያዊ ሪፐብሊክ"
+      ],
+      "capitals": [
+        "Addis Ababa"
+      ],
+      "demonyms": [
+        "Ethiopian"
+      ],
+      "languages": [
+        "Amharic"
+      ]
+    },
+    "FI": {
+      "officialNames": [
+        "Finland",
+        "Republic of Finland"
+      ],
+      "nativeNames": [
+        "Suomi",
+        "Suomen tasavalta",
+        "Finland",
+        "Republiken Finland"
+      ],
+      "alternativeNames": [
+        "Suomi",
+        "Republic of Finland",
+        "Suomen tasavalta",
+        "Republiken Finland"
+      ],
+      "capitals": [
+        "Helsinki"
+      ],
+      "demonyms": [
+        "Finnish"
+      ],
+      "languages": [
+        "Finnish",
+        "Swedish"
+      ]
+    },
+    "FJ": {
+      "officialNames": [
+        "Fiji",
+        "Republic of Fiji"
+      ],
+      "nativeNames": [
+        "Fiji",
+        "Republic of Fiji",
+        "Viti",
+        "Matanitu Tugalala o Viti",
+        "फिजी",
+        "रिपब्लिक ऑफ फीजी"
+      ],
+      "alternativeNames": [
+        "Viti",
+        "Republic of Fiji",
+        "Matanitu ko Viti",
+        "Fijī Gaṇarājya"
+      ],
+      "capitals": [
+        "Suva"
+      ],
+      "demonyms": [
+        "Fijian"
+      ],
+      "languages": [
+        "English",
+        "Fijian",
+        "Fiji Hindi"
+      ]
+    },
+    "FK": {
+      "officialNames": [
+        "Falkland Islands"
+      ],
+      "nativeNames": [
+        "Falkland Islands"
+      ],
+      "alternativeNames": [
+        "Islas Malvinas",
+        "Falkland Islands (Malvinas)"
+      ],
+      "capitals": [
+        "Stanley"
+      ],
+      "demonyms": [
+        "Falkland Islander"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "FM": {
+      "officialNames": [
+        "Micronesia",
+        "Federated States of Micronesia"
+      ],
+      "nativeNames": [
+        "Micronesia",
+        "Federated States of Micronesia"
+      ],
+      "alternativeNames": [
+        "Federated States of Micronesia",
+        "Micronesia, Federated States of"
+      ],
+      "capitals": [
+        "Palikir"
+      ],
+      "demonyms": [
+        "Micronesian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "FO": {
+      "officialNames": [
+        "Faroe Islands"
+      ],
+      "nativeNames": [
+        "Færøerne",
+        "Føroyar"
+      ],
+      "alternativeNames": [
+        "Føroyar",
+        "Færøerne",
+        "Faeroe Islands"
+      ],
+      "capitals": [
+        "Tórshavn"
+      ],
+      "demonyms": [
+        "Faroese"
+      ],
+      "languages": [
+        "Danish",
+        "Faroese"
+      ]
+    },
+    "FR": {
+      "officialNames": [
+        "France",
+        "French Republic"
+      ],
+      "nativeNames": [
+        "France",
+        "République française"
+      ],
+      "alternativeNames": [
+        "French Republic",
+        "République française"
+      ],
+      "capitals": [
+        "Paris"
+      ],
+      "demonyms": [
+        "French"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "GA": {
+      "officialNames": [
+        "Gabon",
+        "Gabonese Republic"
+      ],
+      "nativeNames": [
+        "Gabon",
+        "République gabonaise"
+      ],
+      "alternativeNames": [
+        "Gabonese Republic",
+        "République Gabonaise"
+      ],
+      "capitals": [
+        "Libreville"
+      ],
+      "demonyms": [
+        "Gabonese"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "GB": {
+      "officialNames": [
+        "United Kingdom",
+        "United Kingdom of Great Britain and Northern Ireland"
+      ],
+      "nativeNames": [
+        "United Kingdom",
+        "United Kingdom of Great Britain and Northern Ireland"
+      ],
+      "alternativeNames": [
+        "Great Britain"
+      ],
+      "capitals": [
+        "London"
+      ],
+      "demonyms": [
+        "British"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "GD": {
+      "officialNames": [
+        "Grenada"
+      ],
+      "nativeNames": [
+        "Grenada"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "St. George's"
+      ],
+      "demonyms": [
+        "Grenadian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "GE": {
+      "officialNames": [
+        "Georgia"
+      ],
+      "nativeNames": [
+        "საქართველო"
+      ],
+      "alternativeNames": [
+        "Sakartvelo"
+      ],
+      "capitals": [
+        "Tbilisi"
+      ],
+      "demonyms": [
+        "Georgian"
+      ],
+      "languages": [
+        "Georgian"
+      ]
+    },
+    "GF": {
+      "officialNames": [
+        "French Guiana",
+        "Guiana"
+      ],
+      "nativeNames": [
+        "Guyane française",
+        "Guyane"
+      ],
+      "alternativeNames": [
+        "Guiana",
+        "Guyane"
+      ],
+      "capitals": [
+        "Cayenne"
+      ],
+      "demonyms": [
+        "Guianan"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "GG": {
+      "officialNames": [
+        "Guernsey",
+        "Bailiwick of Guernsey"
+      ],
+      "nativeNames": [
+        "Guernsey",
+        "Bailiwick of Guernsey",
+        "Guernesey",
+        "Bailliage de Guernesey",
+        "Dgèrnésiais"
+      ],
+      "alternativeNames": [
+        "Bailiwick of Guernsey",
+        "Bailliage de Guernesey"
+      ],
+      "capitals": [
+        "St. Peter Port"
+      ],
+      "demonyms": [
+        "Channel Islander"
+      ],
+      "languages": [
+        "English",
+        "French",
+        "Guernésiais"
+      ]
+    },
+    "GH": {
+      "officialNames": [
+        "Ghana",
+        "Republic of Ghana"
+      ],
+      "nativeNames": [
+        "Ghana",
+        "Republic of Ghana"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Accra"
+      ],
+      "demonyms": [
+        "Ghanaian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "GI": {
+      "officialNames": [
+        "Gibraltar"
+      ],
+      "nativeNames": [
+        "Gibraltar"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Gibraltar"
+      ],
+      "demonyms": [
+        "Gibraltar"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "GL": {
+      "officialNames": [
+        "Greenland"
+      ],
+      "nativeNames": [
+        "Kalaallit Nunaat"
+      ],
+      "alternativeNames": [
+        "Grønland"
+      ],
+      "capitals": [
+        "Nuuk"
+      ],
+      "demonyms": [
+        "Greenlandic"
+      ],
+      "languages": [
+        "Greenlandic"
+      ]
+    },
+    "GM": {
+      "officialNames": [
+        "Gambia",
+        "Republic of the Gambia"
+      ],
+      "nativeNames": [
+        "Gambia",
+        "Republic of the Gambia"
+      ],
+      "alternativeNames": [
+        "Republic of the Gambia"
+      ],
+      "capitals": [
+        "Banjul"
+      ],
+      "demonyms": [
+        "Gambian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "GN": {
+      "officialNames": [
+        "Guinea",
+        "Republic of Guinea"
+      ],
+      "nativeNames": [
+        "Guinée",
+        "République de Guinée"
+      ],
+      "alternativeNames": [
+        "Republic of Guinea",
+        "République de Guinée"
+      ],
+      "capitals": [
+        "Conakry"
+      ],
+      "demonyms": [
+        "Guinean"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "GP": {
+      "officialNames": [
+        "Guadeloupe"
+      ],
+      "nativeNames": [
+        "Guadeloupe"
+      ],
+      "alternativeNames": [
+        "Gwadloup"
+      ],
+      "capitals": [
+        "Basse-Terre"
+      ],
+      "demonyms": [
+        "Guadeloupian"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "GQ": {
+      "officialNames": [
+        "Equatorial Guinea",
+        "Republic of Equatorial Guinea"
+      ],
+      "nativeNames": [
+        "Guinée équatoriale",
+        "République de la Guinée Équatoriale",
+        "Guiné Equatorial",
+        "República da Guiné Equatorial",
+        "Guinea Ecuatorial",
+        "República de Guinea Ecuatorial"
+      ],
+      "alternativeNames": [
+        "Republic of Equatorial Guinea",
+        "República de Guinea Ecuatorial",
+        "République de Guinée équatoriale",
+        "República da Guiné Equatorial"
+      ],
+      "capitals": [
+        "Malabo"
+      ],
+      "demonyms": [
+        "Equatorial Guinean"
+      ],
+      "languages": [
+        "French",
+        "Portuguese",
+        "Spanish"
+      ]
+    },
+    "GR": {
+      "officialNames": [
+        "Greece",
+        "Hellenic Republic"
+      ],
+      "nativeNames": [
+        "Ελλάδα",
+        "Ελληνική Δημοκρατία"
+      ],
+      "alternativeNames": [
+        "Elláda",
+        "Hellenic Republic",
+        "Ελληνική Δημοκρατία"
+      ],
+      "capitals": [
+        "Athens"
+      ],
+      "demonyms": [
+        "Greek"
+      ],
+      "languages": [
+        "Greek"
+      ]
+    },
+    "GS": {
+      "officialNames": [
+        "South Georgia",
+        "South Georgia and the South Sandwich Islands"
+      ],
+      "nativeNames": [
+        "South Georgia",
+        "South Georgia and the South Sandwich Islands"
+      ],
+      "alternativeNames": [
+        "South Georgia and the South Sandwich Islands"
+      ],
+      "capitals": [
+        "King Edward Point"
+      ],
+      "demonyms": [
+        "South Georgian South Sandwich Islander"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "GT": {
+      "officialNames": [
+        "Guatemala",
+        "Republic of Guatemala"
+      ],
+      "nativeNames": [
+        "Guatemala",
+        "República de Guatemala"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Guatemala City"
+      ],
+      "demonyms": [
+        "Guatemalan"
+      ],
+      "languages": [
+        "Spanish"
+      ]
+    },
+    "GU": {
+      "officialNames": [
+        "Guam"
+      ],
+      "nativeNames": [
+        "Guåhån",
+        "Guam"
+      ],
+      "alternativeNames": [
+        "Guåhån"
+      ],
+      "capitals": [
+        "Hagåtña"
+      ],
+      "demonyms": [
+        "Guamanian"
+      ],
+      "languages": [
+        "Chamorro",
+        "English",
+        "Spanish"
+      ]
+    },
+    "GW": {
+      "officialNames": [
+        "Guinea-Bissau",
+        "Republic of Guinea-Bissau"
+      ],
+      "nativeNames": [
+        "Guiné-Bissau",
+        "República da Guiné-Bissau"
+      ],
+      "alternativeNames": [
+        "Republic of Guinea-Bissau",
+        "República da Guiné-Bissau"
+      ],
+      "capitals": [
+        "Bissau"
+      ],
+      "demonyms": [
+        "Guinea-Bissauan"
+      ],
+      "languages": [
+        "Portuguese",
+        "Upper Guinea Creole"
+      ]
+    },
+    "GY": {
+      "officialNames": [
+        "Guyana",
+        "Co-operative Republic of Guyana"
+      ],
+      "nativeNames": [
+        "Guyana",
+        "Co-operative Republic of Guyana"
+      ],
+      "alternativeNames": [
+        "Co-operative Republic of Guyana"
+      ],
+      "capitals": [
+        "Georgetown"
+      ],
+      "demonyms": [
+        "Guyanese"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "HK": {
+      "officialNames": [
+        "Hong Kong",
+        "Hong Kong Special Administrative Region of the People's Republic of China"
+      ],
+      "nativeNames": [
+        "Hong Kong",
+        "Hong Kong Special Administrative Region of the People's Republic of China",
+        "香港",
+        "中华人民共和国香港特别行政区"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "City of Victoria"
+      ],
+      "demonyms": [
+        "Hong Konger"
+      ],
+      "languages": [
+        "English",
+        "Chinese"
+      ]
+    },
+    "HM": {
+      "officialNames": [
+        "Heard Island and McDonald Islands"
+      ],
+      "nativeNames": [
+        "Heard Island and McDonald Islands"
+      ],
+      "alternativeNames": [
+        "Heard Island and McDonald Islands"
+      ],
+      "capitals": [],
+      "demonyms": [
+        "Heard and McDonald Islander"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "HN": {
+      "officialNames": [
+        "Honduras",
+        "Republic of Honduras"
+      ],
+      "nativeNames": [
+        "Honduras",
+        "República de Honduras"
+      ],
+      "alternativeNames": [
+        "Republic of Honduras",
+        "República de Honduras"
+      ],
+      "capitals": [
+        "Tegucigalpa"
+      ],
+      "demonyms": [
+        "Honduran"
+      ],
+      "languages": [
+        "Spanish"
+      ]
+    },
+    "HR": {
+      "officialNames": [
+        "Croatia",
+        "Republic of Croatia"
+      ],
+      "nativeNames": [
+        "Hrvatska",
+        "Republika Hrvatska"
+      ],
+      "alternativeNames": [
+        "Hrvatska",
+        "Republic of Croatia",
+        "Republika Hrvatska"
+      ],
+      "capitals": [
+        "Zagreb"
+      ],
+      "demonyms": [
+        "Croatian"
+      ],
+      "languages": [
+        "Croatian"
+      ]
+    },
+    "HT": {
+      "officialNames": [
+        "Haiti",
+        "Republic of Haiti"
+      ],
+      "nativeNames": [
+        "Haïti",
+        "République d'Haïti",
+        "Ayiti",
+        "Repiblik Ayiti"
+      ],
+      "alternativeNames": [
+        "Republic of Haiti",
+        "République d'Haïti",
+        "Repiblik Ayiti"
+      ],
+      "capitals": [
+        "Port-au-Prince"
+      ],
+      "demonyms": [
+        "Haitian"
+      ],
+      "languages": [
+        "French",
+        "Haitian Creole"
+      ]
+    },
+    "HU": {
+      "officialNames": [
+        "Hungary"
+      ],
+      "nativeNames": [
+        "Magyarország"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Budapest"
+      ],
+      "demonyms": [
+        "Hungarian"
+      ],
+      "languages": [
+        "Hungarian"
+      ]
+    },
+    "ID": {
+      "officialNames": [
+        "Indonesia",
+        "Republic of Indonesia"
+      ],
+      "nativeNames": [
+        "Indonesia",
+        "Republik Indonesia"
+      ],
+      "alternativeNames": [
+        "Republic of Indonesia",
+        "Republik Indonesia"
+      ],
+      "capitals": [
+        "Jakarta"
+      ],
+      "demonyms": [
+        "Indonesian"
+      ],
+      "languages": [
+        "Indonesian"
+      ]
+    },
+    "IE": {
+      "officialNames": [
+        "Ireland",
+        "Republic of Ireland"
+      ],
+      "nativeNames": [
+        "Ireland",
+        "Republic of Ireland",
+        "Éire",
+        "Poblacht na hÉireann"
+      ],
+      "alternativeNames": [
+        "Éire",
+        "Republic of Ireland",
+        "Poblacht na hÉireann"
+      ],
+      "capitals": [
+        "Dublin"
+      ],
+      "demonyms": [
+        "Irish"
+      ],
+      "languages": [
+        "English",
+        "Irish"
+      ]
+    },
+    "IL": {
+      "officialNames": [
+        "Israel",
+        "State of Israel"
+      ],
+      "nativeNames": [
+        "إسرائيل",
+        "دولة إسرائيل",
+        "ישראל",
+        "מדינת ישראל"
+      ],
+      "alternativeNames": [
+        "State of Israel",
+        "Medīnat Yisrā'el"
+      ],
+      "capitals": [
+        "Jerusalem"
+      ],
+      "demonyms": [
+        "Israeli"
+      ],
+      "languages": [
+        "Arabic",
+        "Hebrew"
+      ]
+    },
+    "IM": {
+      "officialNames": [
+        "Isle of Man"
+      ],
+      "nativeNames": [
+        "Isle of Man",
+        "Mannin",
+        "Ellan Vannin or Mannin"
+      ],
+      "alternativeNames": [
+        "Ellan Vannin",
+        "Mann",
+        "Mannin"
+      ],
+      "capitals": [
+        "Douglas"
+      ],
+      "demonyms": [
+        "Manx"
+      ],
+      "languages": [
+        "English",
+        "Manx"
+      ]
+    },
+    "IN": {
+      "officialNames": [
+        "India",
+        "Republic of India"
+      ],
+      "nativeNames": [
+        "India",
+        "Republic of India",
+        "भारत",
+        "भारत गणराज्य",
+        "இந்தியா",
+        "இந்தியக் குடியரசு"
+      ],
+      "alternativeNames": [
+        "Bhārat",
+        "Republic of India",
+        "Bharat Ganrajya",
+        "இந்தியா"
+      ],
+      "capitals": [
+        "New Delhi"
+      ],
+      "demonyms": [
+        "Indian"
+      ],
+      "languages": [
+        "English",
+        "Hindi",
+        "Tamil"
+      ]
+    },
+    "IO": {
+      "officialNames": [
+        "British Indian Ocean Territory"
+      ],
+      "nativeNames": [
+        "British Indian Ocean Territory"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Diego Garcia"
+      ],
+      "demonyms": [
+        "Indian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "IQ": {
+      "officialNames": [
+        "Iraq",
+        "Republic of Iraq"
+      ],
+      "nativeNames": [
+        "العراق",
+        "جمهورية العراق",
+        "ܩܘܼܛܢܵܐ",
+        "ܩܘܼܛܢܵܐ ܐܝܼܪܲܩ",
+        "کۆماری",
+        "کۆماری عێراق"
+      ],
+      "alternativeNames": [
+        "Republic of Iraq",
+        "Jumhūriyyat al-‘Irāq"
+      ],
+      "capitals": [
+        "Baghdad"
+      ],
+      "demonyms": [
+        "Iraqi"
+      ],
+      "languages": [
+        "Arabic",
+        "Aramaic",
+        "Sorani"
+      ]
+    },
+    "IR": {
+      "officialNames": [
+        "Iran",
+        "Islamic Republic of Iran"
+      ],
+      "nativeNames": [
+        "ایران",
+        "جمهوری اسلامی ایران"
+      ],
+      "alternativeNames": [
+        "Islamic Republic of Iran",
+        "Iran, Islamic Republic of",
+        "Jomhuri-ye Eslāmi-ye Irān"
+      ],
+      "capitals": [
+        "Tehran"
+      ],
+      "demonyms": [
+        "Iranian"
+      ],
+      "languages": [
+        "Persian (Farsi)"
+      ]
+    },
+    "IS": {
+      "officialNames": [
+        "Iceland"
+      ],
+      "nativeNames": [
+        "Ísland"
+      ],
+      "alternativeNames": [
+        "Island",
+        "Republic of Iceland",
+        "Lýðveldið Ísland"
+      ],
+      "capitals": [
+        "Reykjavik"
+      ],
+      "demonyms": [
+        "Icelander"
+      ],
+      "languages": [
+        "Icelandic"
+      ]
+    },
+    "IT": {
+      "officialNames": [
+        "Italy",
+        "Italian Republic"
+      ],
+      "nativeNames": [
+        "Italia",
+        "Repubblica italiana"
+      ],
+      "alternativeNames": [
+        "Italian Republic",
+        "Repubblica italiana"
+      ],
+      "capitals": [
+        "Rome"
+      ],
+      "demonyms": [
+        "Italian"
+      ],
+      "languages": [
+        "Italian"
+      ]
+    },
+    "JE": {
+      "officialNames": [
+        "Jersey",
+        "Bailiwick of Jersey"
+      ],
+      "nativeNames": [
+        "Jersey",
+        "Bailiwick of Jersey",
+        "Bailliage de Jersey",
+        "Jèrri",
+        "Bailliage dé Jèrri"
+      ],
+      "alternativeNames": [
+        "Bailiwick of Jersey",
+        "Bailliage de Jersey",
+        "Bailliage dé Jèrri"
+      ],
+      "capitals": [
+        "Saint Helier"
+      ],
+      "demonyms": [
+        "Channel Islander"
+      ],
+      "languages": [
+        "English",
+        "French",
+        "Jèrriais"
+      ]
+    },
+    "JM": {
+      "officialNames": [
+        "Jamaica"
+      ],
+      "nativeNames": [
+        "Jamaica"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Kingston"
+      ],
+      "demonyms": [
+        "Jamaican"
+      ],
+      "languages": [
+        "English",
+        "Jamaican Patois"
+      ]
+    },
+    "JO": {
+      "officialNames": [
+        "Jordan",
+        "Hashemite Kingdom of Jordan"
+      ],
+      "nativeNames": [
+        "الأردن",
+        "المملكة الأردنية الهاشمية"
+      ],
+      "alternativeNames": [
+        "Hashemite Kingdom of Jordan",
+        "al-Mamlakah al-Urdunīyah al-Hāshimīyah"
+      ],
+      "capitals": [
+        "Amman"
+      ],
+      "demonyms": [
+        "Jordanian"
+      ],
+      "languages": [
+        "Arabic"
+      ]
+    },
+    "JP": {
+      "officialNames": [
+        "Japan"
+      ],
+      "nativeNames": [
+        "日本"
+      ],
+      "alternativeNames": [
+        "Nippon",
+        "Nihon"
+      ],
+      "capitals": [
+        "Tokyo"
+      ],
+      "demonyms": [
+        "Japanese"
+      ],
+      "languages": [
+        "Japanese"
+      ]
+    },
+    "KE": {
+      "officialNames": [
+        "Kenya",
+        "Republic of Kenya"
+      ],
+      "nativeNames": [
+        "Kenya",
+        "Republic of Kenya"
+      ],
+      "alternativeNames": [
+        "Republic of Kenya",
+        "Jamhuri ya Kenya"
+      ],
+      "capitals": [
+        "Nairobi"
+      ],
+      "demonyms": [
+        "Kenyan"
+      ],
+      "languages": [
+        "English",
+        "Swahili"
+      ]
+    },
+    "KG": {
+      "officialNames": [
+        "Kyrgyzstan",
+        "Kyrgyz Republic"
+      ],
+      "nativeNames": [
+        "Кыргызстан",
+        "Кыргыз Республикасы",
+        "Киргизия",
+        "Кыргызская Республика"
+      ],
+      "alternativeNames": [
+        "Киргизия",
+        "Kyrgyz Republic",
+        "Кыргыз Республикасы",
+        "Kyrgyz Respublikasy"
+      ],
+      "capitals": [
+        "Bishkek"
+      ],
+      "demonyms": [
+        "Kirghiz"
+      ],
+      "languages": [
+        "Kyrgyz",
+        "Russian"
+      ]
+    },
+    "KH": {
+      "officialNames": [
+        "Cambodia",
+        "Kingdom of Cambodia"
+      ],
+      "nativeNames": [
+        "Kâmpŭchéa",
+        "ព្រះរាជាណាចក្រកម្ពុជា"
+      ],
+      "alternativeNames": [
+        "Kingdom of Cambodia"
+      ],
+      "capitals": [
+        "Phnom Penh"
+      ],
+      "demonyms": [
+        "Cambodian"
+      ],
+      "languages": [
+        "Khmer"
+      ]
+    },
+    "KI": {
+      "officialNames": [
+        "Kiribati",
+        "Independent and Sovereign Republic of Kiribati"
+      ],
+      "nativeNames": [
+        "Kiribati",
+        "Independent and Sovereign Republic of Kiribati",
+        "Ribaberiki Kiribati"
+      ],
+      "alternativeNames": [
+        "Republic of Kiribati",
+        "Ribaberiki Kiribati"
+      ],
+      "capitals": [
+        "South Tarawa"
+      ],
+      "demonyms": [
+        "I-Kiribati"
+      ],
+      "languages": [
+        "English",
+        "Gilbertese"
+      ]
+    },
+    "KM": {
+      "officialNames": [
+        "Comoros",
+        "Union of the Comoros"
+      ],
+      "nativeNames": [
+        "جزر القمر",
+        "الاتحاد القمري",
+        "Comores",
+        "Union des Comores",
+        "Komori",
+        "Udzima wa Komori"
+      ],
+      "alternativeNames": [
+        "Union of the Comoros",
+        "Union des Comores",
+        "Udzima wa Komori",
+        "al-Ittiḥād al-Qumurī"
+      ],
+      "capitals": [
+        "Moroni"
+      ],
+      "demonyms": [
+        "Comoran"
+      ],
+      "languages": [
+        "Arabic",
+        "French",
+        "Comorian"
+      ]
+    },
+    "KN": {
+      "officialNames": [
+        "Saint Kitts and Nevis",
+        "Federation of Saint Christopher and Nevis"
+      ],
+      "nativeNames": [
+        "Saint Kitts and Nevis",
+        "Federation of Saint Christopher and Nevis"
+      ],
+      "alternativeNames": [
+        "Federation of Saint Christopher and Nevis"
+      ],
+      "capitals": [
+        "Basseterre"
+      ],
+      "demonyms": [
+        "Kittitian or Nevisian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "KP": {
+      "officialNames": [
+        "North Korea",
+        "Democratic People's Republic of Korea"
+      ],
+      "nativeNames": [
+        "조선",
+        "조선민주주의인민공화국"
+      ],
+      "alternativeNames": [
+        "Democratic People's Republic of Korea",
+        "DPRK",
+        "조선민주주의인민공화국",
+        "Chosŏn Minjujuŭi Inmin Konghwaguk",
+        "Korea, Democratic People's Republic of",
+        "북조선"
+      ],
+      "capitals": [
+        "Pyongyang"
+      ],
+      "demonyms": [
+        "North Korean"
+      ],
+      "languages": [
+        "Korean"
+      ]
+    },
+    "KR": {
+      "officialNames": [
+        "South Korea",
+        "Republic of Korea"
+      ],
+      "nativeNames": [
+        "한국",
+        "대한민국"
+      ],
+      "alternativeNames": [
+        "Korea, Republic of",
+        "Republic of Korea",
+        "남조선"
+      ],
+      "capitals": [
+        "Seoul"
+      ],
+      "demonyms": [
+        "South Korean"
+      ],
+      "languages": [
+        "Korean"
+      ]
+    },
+    "KW": {
+      "officialNames": [
+        "Kuwait",
+        "State of Kuwait"
+      ],
+      "nativeNames": [
+        "الكويت",
+        "دولة الكويت"
+      ],
+      "alternativeNames": [
+        "State of Kuwait",
+        "Dawlat al-Kuwait"
+      ],
+      "capitals": [
+        "Kuwait City"
+      ],
+      "demonyms": [
+        "Kuwaiti"
+      ],
+      "languages": [
+        "Arabic"
+      ]
+    },
+    "KY": {
+      "officialNames": [
+        "Cayman Islands"
+      ],
+      "nativeNames": [
+        "Cayman Islands"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "George Town"
+      ],
+      "demonyms": [
+        "Caymanian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "KZ": {
+      "officialNames": [
+        "Kazakhstan",
+        "Republic of Kazakhstan"
+      ],
+      "nativeNames": [
+        "Қазақстан",
+        "Қазақстан Республикасы",
+        "Казахстан",
+        "Республика Казахстан"
+      ],
+      "alternativeNames": [
+        "Qazaqstan",
+        "Казахстан",
+        "Republic of Kazakhstan",
+        "Қазақстан Республикасы",
+        "Qazaqstan Respublïkası",
+        "Республика Казахстан",
+        "Respublika Kazakhstan"
+      ],
+      "capitals": [
+        "Astana"
+      ],
+      "demonyms": [
+        "Kazakhstani"
+      ],
+      "languages": [
+        "Kazakh",
+        "Russian"
+      ]
+    },
+    "LA": {
+      "officialNames": [
+        "Laos",
+        "Lao People's Democratic Republic"
+      ],
+      "nativeNames": [
+        "ສປປລາວ",
+        "ສາທາລະນະ ຊາທິປະໄຕ ຄົນລາວ ຂອງ"
+      ],
+      "alternativeNames": [
+        "Lao",
+        "Lao People's Democratic Republic",
+        "Sathalanalat Paxathipatai Paxaxon Lao"
+      ],
+      "capitals": [
+        "Vientiane"
+      ],
+      "demonyms": [
+        "Laotian"
+      ],
+      "languages": [
+        "Lao"
+      ]
+    },
+    "LB": {
+      "officialNames": [
+        "Lebanon",
+        "Lebanese Republic"
+      ],
+      "nativeNames": [
+        "لبنان",
+        "الجمهورية اللبنانية",
+        "Liban",
+        "République libanaise"
+      ],
+      "alternativeNames": [
+        "Lebanese Republic",
+        "Al-Jumhūrīyah Al-Libnānīyah"
+      ],
+      "capitals": [
+        "Beirut"
+      ],
+      "demonyms": [
+        "Lebanese"
+      ],
+      "languages": [
+        "Arabic",
+        "French"
+      ]
+    },
+    "LC": {
+      "officialNames": [
+        "Saint Lucia"
+      ],
+      "nativeNames": [
+        "Saint Lucia"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Castries"
+      ],
+      "demonyms": [
+        "Saint Lucian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "LI": {
+      "officialNames": [
+        "Liechtenstein",
+        "Principality of Liechtenstein"
+      ],
+      "nativeNames": [
+        "Liechtenstein",
+        "Fürstentum Liechtenstein"
+      ],
+      "alternativeNames": [
+        "Principality of Liechtenstein",
+        "Fürstentum Liechtenstein"
+      ],
+      "capitals": [
+        "Vaduz"
+      ],
+      "demonyms": [
+        "Liechtensteiner"
+      ],
+      "languages": [
+        "German"
+      ]
+    },
+    "LK": {
+      "officialNames": [
+        "Sri Lanka",
+        "Democratic Socialist Republic of Sri Lanka"
+      ],
+      "nativeNames": [
+        "ශ්‍රී ලංකාව",
+        "ශ්‍රී ලංකා ප්‍රජාතාන්ත්‍රික සමාජවාදී ජනරජය",
+        "இலங்கை",
+        "இலங்கை சனநாயக சோசலிசக் குடியரசு"
+      ],
+      "alternativeNames": [
+        "ilaṅkai",
+        "Democratic Socialist Republic of Sri Lanka"
+      ],
+      "capitals": [
+        "Colombo"
+      ],
+      "demonyms": [
+        "Sri Lankan"
+      ],
+      "languages": [
+        "Sinhala",
+        "Tamil"
+      ]
+    },
+    "LR": {
+      "officialNames": [
+        "Liberia",
+        "Republic of Liberia"
+      ],
+      "nativeNames": [
+        "Liberia",
+        "Republic of Liberia"
+      ],
+      "alternativeNames": [
+        "Republic of Liberia"
+      ],
+      "capitals": [
+        "Monrovia"
+      ],
+      "demonyms": [
+        "Liberian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "LS": {
+      "officialNames": [
+        "Lesotho",
+        "Kingdom of Lesotho"
+      ],
+      "nativeNames": [
+        "Lesotho",
+        "Kingdom of Lesotho"
+      ],
+      "alternativeNames": [
+        "Kingdom of Lesotho",
+        "Muso oa Lesotho"
+      ],
+      "capitals": [
+        "Maseru"
+      ],
+      "demonyms": [
+        "Mosotho"
+      ],
+      "languages": [
+        "English",
+        "Sotho"
+      ]
+    },
+    "LT": {
+      "officialNames": [
+        "Lithuania",
+        "Republic of Lithuania"
+      ],
+      "nativeNames": [
+        "Lietuva",
+        "Lietuvos Respublikos"
+      ],
+      "alternativeNames": [
+        "Republic of Lithuania",
+        "Lietuvos Respublika"
+      ],
+      "capitals": [
+        "Vilnius"
+      ],
+      "demonyms": [
+        "Lithuanian"
+      ],
+      "languages": [
+        "Lithuanian"
+      ]
+    },
+    "LU": {
+      "officialNames": [
+        "Luxembourg",
+        "Grand Duchy of Luxembourg"
+      ],
+      "nativeNames": [
+        "Luxemburg",
+        "Großherzogtum Luxemburg",
+        "Luxembourg",
+        "Grand-Duché de Luxembourg",
+        "Lëtzebuerg",
+        "Groussherzogtum Lëtzebuerg"
+      ],
+      "alternativeNames": [
+        "Grand Duchy of Luxembourg",
+        "Grand-Duché de Luxembourg",
+        "Großherzogtum Luxemburg",
+        "Groussherzogtum Lëtzebuerg"
+      ],
+      "capitals": [
+        "Luxembourg"
+      ],
+      "demonyms": [
+        "Luxembourger"
+      ],
+      "languages": [
+        "German",
+        "French",
+        "Luxembourgish"
+      ]
+    },
+    "LV": {
+      "officialNames": [
+        "Latvia",
+        "Republic of Latvia"
+      ],
+      "nativeNames": [
+        "Latvija",
+        "Latvijas Republikas"
+      ],
+      "alternativeNames": [
+        "Republic of Latvia",
+        "Latvijas Republika"
+      ],
+      "capitals": [
+        "Riga"
+      ],
+      "demonyms": [
+        "Latvian"
+      ],
+      "languages": [
+        "Latvian"
+      ]
+    },
+    "LY": {
+      "officialNames": [
+        "Libya",
+        "State of Libya"
+      ],
+      "nativeNames": [
+        "ليبيا",
+        "دولة ليبيا"
+      ],
+      "alternativeNames": [
+        "State of Libya",
+        "Dawlat Libya"
+      ],
+      "capitals": [
+        "Tripoli"
+      ],
+      "demonyms": [
+        "Libyan"
+      ],
+      "languages": [
+        "Arabic"
+      ]
+    },
+    "MA": {
+      "officialNames": [
+        "Morocco",
+        "Kingdom of Morocco"
+      ],
+      "nativeNames": [
+        "المغرب",
+        "المملكة المغربية",
+        "ⵍⵎⴰⵖⵔⵉⴱ",
+        "ⵜⴰⴳⵍⴷⵉⵜ ⵏ ⵍⵎⵖⵔⵉⴱ"
+      ],
+      "alternativeNames": [
+        "Kingdom of Morocco",
+        "Al-Mamlakah al-Maġribiyah"
+      ],
+      "capitals": [
+        "Rabat"
+      ],
+      "demonyms": [
+        "Moroccan"
+      ],
+      "languages": [
+        "Arabic",
+        "Berber"
+      ]
+    },
+    "MC": {
+      "officialNames": [
+        "Monaco",
+        "Principality of Monaco"
+      ],
+      "nativeNames": [
+        "Monaco",
+        "Principauté de Monaco"
+      ],
+      "alternativeNames": [
+        "Principality of Monaco",
+        "Principauté de Monaco"
+      ],
+      "capitals": [
+        "Monaco"
+      ],
+      "demonyms": [
+        "Monegasque"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "MD": {
+      "officialNames": [
+        "Moldova",
+        "Republic of Moldova"
+      ],
+      "nativeNames": [
+        "Moldova",
+        "Republica Moldova"
+      ],
+      "alternativeNames": [
+        "Moldova, Republic of",
+        "Republic of Moldova",
+        "Republica Moldova"
+      ],
+      "capitals": [
+        "Chișinău"
+      ],
+      "demonyms": [
+        "Moldovan"
+      ],
+      "languages": [
+        "Moldavian"
+      ]
+    },
+    "ME": {
+      "officialNames": [
+        "Montenegro"
+      ],
+      "nativeNames": [
+        "Црна Гора"
+      ],
+      "alternativeNames": [
+        "Crna Gora"
+      ],
+      "capitals": [
+        "Podgorica"
+      ],
+      "demonyms": [
+        "Montenegrin"
+      ],
+      "languages": [
+        "Montenegrin"
+      ]
+    },
+    "MF": {
+      "officialNames": [
+        "Saint Martin"
+      ],
+      "nativeNames": [
+        "Saint-Martin"
+      ],
+      "alternativeNames": [
+        "Collectivity of Saint Martin",
+        "Collectivité de Saint-Martin",
+        "Saint Martin (French part)"
+      ],
+      "capitals": [
+        "Marigot"
+      ],
+      "demonyms": [
+        "Saint Martin Islander"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "MG": {
+      "officialNames": [
+        "Madagascar",
+        "Republic of Madagascar"
+      ],
+      "nativeNames": [
+        "Madagascar",
+        "République de Madagascar",
+        "Madagasikara",
+        "Repoblikan'i Madagasikara"
+      ],
+      "alternativeNames": [
+        "Republic of Madagascar",
+        "Repoblikan'i Madagasikara",
+        "République de Madagascar"
+      ],
+      "capitals": [
+        "Antananarivo"
+      ],
+      "demonyms": [
+        "Malagasy"
+      ],
+      "languages": [
+        "French",
+        "Malagasy"
+      ]
+    },
+    "MH": {
+      "officialNames": [
+        "Marshall Islands",
+        "Republic of the Marshall Islands"
+      ],
+      "nativeNames": [
+        "Marshall Islands",
+        "Republic of the Marshall Islands",
+        "M̧ajeļ"
+      ],
+      "alternativeNames": [
+        "Republic of the Marshall Islands",
+        "Aolepān Aorōkin M̧ajeļ"
+      ],
+      "capitals": [
+        "Majuro"
+      ],
+      "demonyms": [
+        "Marshallese"
+      ],
+      "languages": [
+        "English",
+        "Marshallese"
+      ]
+    },
+    "MK": {
+      "officialNames": [
+        "North Macedonia",
+        "Republic of North Macedonia"
+      ],
+      "nativeNames": [
+        "Македонија",
+        "Република Северна Македонија"
+      ],
+      "alternativeNames": [
+        "The former Yugoslav Republic of Macedonia",
+        "Republic of North Macedonia",
+        "Macedonia, The Former Yugoslav Republic of",
+        "Република Северна Македонија",
+        "Macedonia"
+      ],
+      "capitals": [
+        "Skopje"
+      ],
+      "demonyms": [
+        "Macedonian"
+      ],
+      "languages": [
+        "Macedonian"
+      ]
+    },
+    "ML": {
+      "officialNames": [
+        "Mali",
+        "Republic of Mali"
+      ],
+      "nativeNames": [
+        "Mali",
+        "République du Mali"
+      ],
+      "alternativeNames": [
+        "Republic of Mali",
+        "République du Mali"
+      ],
+      "capitals": [
+        "Bamako"
+      ],
+      "demonyms": [
+        "Malian"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "MM": {
+      "officialNames": [
+        "Myanmar",
+        "Republic of the Union of Myanmar"
+      ],
+      "nativeNames": [
+        "မြန်မာ",
+        "ပြည်ထောင်စု သမ္မတ မြန်မာနိုင်ငံတော်"
+      ],
+      "alternativeNames": [
+        "Burma",
+        "Republic of the Union of Myanmar",
+        "Pyidaunzu Thanmăda Myăma Nainngandaw"
+      ],
+      "capitals": [
+        "Naypyidaw"
+      ],
+      "demonyms": [
+        "Burmese"
+      ],
+      "languages": [
+        "Burmese"
+      ]
+    },
+    "MN": {
+      "officialNames": [
+        "Mongolia"
+      ],
+      "nativeNames": [
+        "Монгол улс"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Ulan Bator"
+      ],
+      "demonyms": [
+        "Mongolian"
+      ],
+      "languages": [
+        "Mongolian"
+      ]
+    },
+    "MO": {
+      "officialNames": [
+        "Macau",
+        "Macao Special Administrative Region of the People's Republic of China"
+      ],
+      "nativeNames": [
+        "Macau",
+        "Região Administrativa Especial de Macau da República Popular da China",
+        "澳门",
+        "中华人民共和国澳门特别行政区"
+      ],
+      "alternativeNames": [
+        "Macao",
+        "Macao Special Administrative Region of the People's Republic of China",
+        "中華人民共和國澳門特別行政區",
+        "Região Administrativa Especial de Macau da República Popular da China"
+      ],
+      "capitals": [],
+      "demonyms": [
+        "Macanese"
+      ],
+      "languages": [
+        "Portuguese",
+        "Chinese"
+      ]
+    },
+    "MP": {
+      "officialNames": [
+        "Northern Mariana Islands",
+        "Commonwealth of the Northern Mariana Islands"
+      ],
+      "nativeNames": [
+        "Northern Mariana Islands",
+        "Commonwealth of the Northern Mariana Islands",
+        "Na Islas Mariånas",
+        "Sankattan Siha Na Islas Mariånas"
+      ],
+      "alternativeNames": [
+        "Commonwealth of the Northern Mariana Islands",
+        "Sankattan Siha Na Islas Mariånas"
+      ],
+      "capitals": [
+        "Saipan"
+      ],
+      "demonyms": [
+        "American"
+      ],
+      "languages": [
+        "Carolinian",
+        "Chamorro",
+        "English"
+      ]
+    },
+    "MQ": {
+      "officialNames": [
+        "Martinique"
+      ],
+      "nativeNames": [
+        "Martinique"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Fort-de-France"
+      ],
+      "demonyms": [
+        "Martinican"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "MR": {
+      "officialNames": [
+        "Mauritania",
+        "Islamic Republic of Mauritania"
+      ],
+      "nativeNames": [
+        "موريتانيا",
+        "الجمهورية الإسلامية الموريتانية"
+      ],
+      "alternativeNames": [
+        "Islamic Republic of Mauritania",
+        "al-Jumhūriyyah al-ʾIslāmiyyah al-Mūrītāniyyah"
+      ],
+      "capitals": [
+        "Nouakchott"
+      ],
+      "demonyms": [
+        "Mauritanian"
+      ],
+      "languages": [
+        "Arabic"
+      ]
+    },
+    "MS": {
+      "officialNames": [
+        "Montserrat"
+      ],
+      "nativeNames": [
+        "Montserrat"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Plymouth"
+      ],
+      "demonyms": [
+        "Montserratian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "MT": {
+      "officialNames": [
+        "Malta",
+        "Republic of Malta"
+      ],
+      "nativeNames": [
+        "Malta",
+        "Republic of Malta",
+        "Repubblika ta ' Malta"
+      ],
+      "alternativeNames": [
+        "Republic of Malta",
+        "Repubblika ta' Malta"
+      ],
+      "capitals": [
+        "Valletta"
+      ],
+      "demonyms": [
+        "Maltese"
+      ],
+      "languages": [
+        "English",
+        "Maltese"
+      ]
+    },
+    "MU": {
+      "officialNames": [
+        "Mauritius",
+        "Republic of Mauritius"
+      ],
+      "nativeNames": [
+        "Mauritius",
+        "Republic of Mauritius",
+        "Maurice",
+        "République de Maurice",
+        "Moris",
+        "Republik Moris"
+      ],
+      "alternativeNames": [
+        "Republic of Mauritius",
+        "République de Maurice"
+      ],
+      "capitals": [
+        "Port Louis"
+      ],
+      "demonyms": [
+        "Mauritian"
+      ],
+      "languages": [
+        "English",
+        "French",
+        "Mauritian Creole"
+      ]
+    },
+    "MV": {
+      "officialNames": [
+        "Maldives",
+        "Republic of the Maldives"
+      ],
+      "nativeNames": [
+        "ދިވެހިރާއްޖޭގެ",
+        "ދިވެހިރާއްޖޭގެ ޖުމްހޫރިއްޔާ"
+      ],
+      "alternativeNames": [
+        "Maldive Islands",
+        "Republic of the Maldives",
+        "Dhivehi Raajjeyge Jumhooriyya"
+      ],
+      "capitals": [
+        "Malé"
+      ],
+      "demonyms": [
+        "Maldivan"
+      ],
+      "languages": [
+        "Maldivian"
+      ]
+    },
+    "MW": {
+      "officialNames": [
+        "Malawi",
+        "Republic of Malawi"
+      ],
+      "nativeNames": [
+        "Malawi",
+        "Republic of Malawi",
+        "Malaŵi",
+        "Chalo cha Malawi, Dziko la Malaŵi"
+      ],
+      "alternativeNames": [
+        "Republic of Malawi"
+      ],
+      "capitals": [
+        "Lilongwe"
+      ],
+      "demonyms": [
+        "Malawian"
+      ],
+      "languages": [
+        "English",
+        "Chewa"
+      ]
+    },
+    "MX": {
+      "officialNames": [
+        "Mexico",
+        "United Mexican States"
+      ],
+      "nativeNames": [
+        "México",
+        "Estados Unidos Mexicanos"
+      ],
+      "alternativeNames": [
+        "Mexicanos",
+        "United Mexican States",
+        "Estados Unidos Mexicanos"
+      ],
+      "capitals": [
+        "Mexico City"
+      ],
+      "demonyms": [
+        "Mexican"
+      ],
+      "languages": [
+        "Spanish"
+      ]
+    },
+    "MY": {
+      "officialNames": [
+        "Malaysia"
+      ],
+      "nativeNames": [
+        "Malaysia",
+        "مليسيا"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Kuala Lumpur"
+      ],
+      "demonyms": [
+        "Malaysian"
+      ],
+      "languages": [
+        "English",
+        "Malay"
+      ]
+    },
+    "MZ": {
+      "officialNames": [
+        "Mozambique",
+        "Republic of Mozambique"
+      ],
+      "nativeNames": [
+        "Moçambique",
+        "República de Moçambique"
+      ],
+      "alternativeNames": [
+        "Republic of Mozambique",
+        "República de Moçambique"
+      ],
+      "capitals": [
+        "Maputo"
+      ],
+      "demonyms": [
+        "Mozambican"
+      ],
+      "languages": [
+        "Portuguese"
+      ]
+    },
+    "NA": {
+      "officialNames": [
+        "Namibia",
+        "Republic of Namibia"
+      ],
+      "nativeNames": [
+        "Namibië",
+        "Republiek van Namibië",
+        "Namibia",
+        "Republik Namibia",
+        "Republic of Namibia",
+        "Lefatshe la Namibia"
+      ],
+      "alternativeNames": [
+        "Namibië",
+        "Republic of Namibia"
+      ],
+      "capitals": [
+        "Windhoek"
+      ],
+      "demonyms": [
+        "Namibian"
+      ],
+      "languages": [
+        "Afrikaans",
+        "German",
+        "English",
+        "Herero",
+        "Khoekhoe",
+        "Kwangali",
+        "Lozi",
+        "Ndonga",
+        "Tswana"
+      ]
+    },
+    "NC": {
+      "officialNames": [
+        "New Caledonia"
+      ],
+      "nativeNames": [
+        "Nouvelle-Calédonie"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Nouméa"
+      ],
+      "demonyms": [
+        "New Caledonian"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "NE": {
+      "officialNames": [
+        "Niger",
+        "Republic of Niger"
+      ],
+      "nativeNames": [
+        "Niger",
+        "République du Niger"
+      ],
+      "alternativeNames": [
+        "Nijar"
+      ],
+      "capitals": [
+        "Niamey"
+      ],
+      "demonyms": [
+        "Nigerien"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "NF": {
+      "officialNames": [
+        "Norfolk Island",
+        "Territory of Norfolk Island"
+      ],
+      "nativeNames": [
+        "Norfolk Island",
+        "Territory of Norfolk Island",
+        "Norf'k Ailen",
+        "Teratri of Norf'k Ailen"
+      ],
+      "alternativeNames": [
+        "Territory of Norfolk Island",
+        "Teratri of Norf'k Ailen"
+      ],
+      "capitals": [
+        "Kingston"
+      ],
+      "demonyms": [
+        "Norfolk Islander"
+      ],
+      "languages": [
+        "English",
+        "Norfuk"
+      ]
+    },
+    "NG": {
+      "officialNames": [
+        "Nigeria",
+        "Federal Republic of Nigeria"
+      ],
+      "nativeNames": [
+        "Nigeria",
+        "Federal Republic of Nigeria"
+      ],
+      "alternativeNames": [
+        "Nijeriya",
+        "Naíjíríà",
+        "Federal Republic of Nigeria"
+      ],
+      "capitals": [
+        "Abuja"
+      ],
+      "demonyms": [
+        "Nigerian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "NI": {
+      "officialNames": [
+        "Nicaragua",
+        "Republic of Nicaragua"
+      ],
+      "nativeNames": [
+        "Nicaragua",
+        "República de Nicaragua"
+      ],
+      "alternativeNames": [
+        "Republic of Nicaragua",
+        "República de Nicaragua"
+      ],
+      "capitals": [
+        "Managua"
+      ],
+      "demonyms": [
+        "Nicaraguan"
+      ],
+      "languages": [
+        "Spanish"
+      ]
+    },
+    "NL": {
+      "officialNames": [
+        "Netherlands",
+        "Kingdom of the Netherlands"
+      ],
+      "nativeNames": [
+        "Nederland",
+        "Koninkrijk der Nederlanden"
+      ],
+      "alternativeNames": [
+        "Holland",
+        "Nederland",
+        "The Netherlands"
+      ],
+      "capitals": [
+        "Amsterdam"
+      ],
+      "demonyms": [
+        "Dutch"
+      ],
+      "languages": [
+        "Dutch"
+      ]
+    },
+    "NO": {
+      "officialNames": [
+        "Norway",
+        "Kingdom of Norway"
+      ],
+      "nativeNames": [
+        "Noreg",
+        "Kongeriket Noreg",
+        "Norge",
+        "Kongeriket Norge",
+        "Norgga",
+        "Norgga gonagasriika"
+      ],
+      "alternativeNames": [
+        "Norge",
+        "Noreg",
+        "Kingdom of Norway",
+        "Kongeriket Norge",
+        "Kongeriket Noreg"
+      ],
+      "capitals": [
+        "Oslo"
+      ],
+      "demonyms": [
+        "Norwegian"
+      ],
+      "languages": [
+        "Norwegian Nynorsk",
+        "Norwegian Bokmål",
+        "Sami"
+      ]
+    },
+    "NP": {
+      "officialNames": [
+        "Nepal",
+        "Federal Democratic Republic of Nepal"
+      ],
+      "nativeNames": [
+        "नेपाल",
+        "नेपाल संघीय लोकतान्त्रिक गणतन्त्र"
+      ],
+      "alternativeNames": [
+        "Federal Democratic Republic of Nepal",
+        "Loktāntrik Ganatantra Nepāl"
+      ],
+      "capitals": [
+        "Kathmandu"
+      ],
+      "demonyms": [
+        "Nepalese"
+      ],
+      "languages": [
+        "Nepali"
+      ]
+    },
+    "NR": {
+      "officialNames": [
+        "Nauru",
+        "Republic of Nauru"
+      ],
+      "nativeNames": [
+        "Nauru",
+        "Republic of Nauru"
+      ],
+      "alternativeNames": [
+        "Naoero",
+        "Pleasant Island",
+        "Republic of Nauru",
+        "Ripublik Naoero"
+      ],
+      "capitals": [
+        "Yaren"
+      ],
+      "demonyms": [
+        "Nauruan"
+      ],
+      "languages": [
+        "English",
+        "Nauru"
+      ]
+    },
+    "NU": {
+      "officialNames": [
+        "Niue"
+      ],
+      "nativeNames": [
+        "Niue",
+        "Niuē"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Alofi"
+      ],
+      "demonyms": [
+        "Niuean"
+      ],
+      "languages": [
+        "English",
+        "Niuean"
+      ]
+    },
+    "NZ": {
+      "officialNames": [
+        "New Zealand"
+      ],
+      "nativeNames": [
+        "New Zealand",
+        "Aotearoa"
+      ],
+      "alternativeNames": [
+        "Aotearoa"
+      ],
+      "capitals": [
+        "Wellington"
+      ],
+      "demonyms": [
+        "New Zealander"
+      ],
+      "languages": [
+        "English",
+        "Māori",
+        "New Zealand Sign Language"
+      ]
+    },
+    "OM": {
+      "officialNames": [
+        "Oman",
+        "Sultanate of Oman"
+      ],
+      "nativeNames": [
+        "عمان",
+        "سلطنة عمان"
+      ],
+      "alternativeNames": [
+        "Sultanate of Oman",
+        "Salṭanat ʻUmān"
+      ],
+      "capitals": [
+        "Muscat"
+      ],
+      "demonyms": [
+        "Omani"
+      ],
+      "languages": [
+        "Arabic"
+      ]
+    },
+    "PA": {
+      "officialNames": [
+        "Panama",
+        "Republic of Panama"
+      ],
+      "nativeNames": [
+        "Panamá",
+        "República de Panamá"
+      ],
+      "alternativeNames": [
+        "Republic of Panama",
+        "República de Panamá"
+      ],
+      "capitals": [
+        "Panama City"
+      ],
+      "demonyms": [
+        "Panamanian"
+      ],
+      "languages": [
+        "Spanish"
+      ]
+    },
+    "PE": {
+      "officialNames": [
+        "Peru",
+        "Republic of Peru"
+      ],
+      "nativeNames": [
+        "Piruw",
+        "Piruw Suyu",
+        "Piruw Ripuwlika",
+        "Perú",
+        "República del Perú"
+      ],
+      "alternativeNames": [
+        "Republic of Peru",
+        "República del Perú"
+      ],
+      "capitals": [
+        "Lima"
+      ],
+      "demonyms": [
+        "Peruvian"
+      ],
+      "languages": [
+        "Aymara",
+        "Quechua",
+        "Spanish"
+      ]
+    },
+    "PF": {
+      "officialNames": [
+        "French Polynesia"
+      ],
+      "nativeNames": [
+        "Polynésie française"
+      ],
+      "alternativeNames": [
+        "Polynésie française",
+        "French Polynesia",
+        "Pōrīnetia Farāni"
+      ],
+      "capitals": [
+        "Papeetē"
+      ],
+      "demonyms": [
+        "French Polynesian"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "PG": {
+      "officialNames": [
+        "Papua New Guinea",
+        "Independent State of Papua New Guinea"
+      ],
+      "nativeNames": [
+        "Papua New Guinea",
+        "Independent State of Papua New Guinea",
+        "Papua Niu Gini",
+        "Independen Stet bilong Papua Niugini",
+        "Papua Niugini"
+      ],
+      "alternativeNames": [
+        "Independent State of Papua New Guinea",
+        "Independen Stet bilong Papua Niugini"
+      ],
+      "capitals": [
+        "Port Moresby"
+      ],
+      "demonyms": [
+        "Papua New Guinean"
+      ],
+      "languages": [
+        "English",
+        "Hiri Motu",
+        "Tok Pisin"
+      ]
+    },
+    "PH": {
+      "officialNames": [
+        "Philippines",
+        "Republic of the Philippines"
+      ],
+      "nativeNames": [
+        "Philippines",
+        "Republic of the Philippines",
+        "Pilipinas"
+      ],
+      "alternativeNames": [
+        "Republic of the Philippines",
+        "Repúblika ng Pilipinas"
+      ],
+      "capitals": [
+        "Manila"
+      ],
+      "demonyms": [
+        "Filipino"
+      ],
+      "languages": [
+        "English",
+        "Filipino"
+      ]
+    },
+    "PK": {
+      "officialNames": [
+        "Pakistan",
+        "Islamic Republic of Pakistan"
+      ],
+      "nativeNames": [
+        "Pakistan",
+        "Islamic Republic of Pakistan",
+        "پاكستان",
+        "اسلامی جمہوریۂ پاكستان"
+      ],
+      "alternativeNames": [
+        "Pākistān",
+        "Islamic Republic of Pakistan",
+        "Islāmī Jumhūriya'eh Pākistān"
+      ],
+      "capitals": [
+        "Islamabad"
+      ],
+      "demonyms": [
+        "Pakistani"
+      ],
+      "languages": [
+        "English",
+        "Urdu"
+      ]
+    },
+    "PL": {
+      "officialNames": [
+        "Poland",
+        "Republic of Poland"
+      ],
+      "nativeNames": [
+        "Polska",
+        "Rzeczpospolita Polska"
+      ],
+      "alternativeNames": [
+        "Republic of Poland",
+        "Rzeczpospolita Polska"
+      ],
+      "capitals": [
+        "Warsaw"
+      ],
+      "demonyms": [
+        "Polish"
+      ],
+      "languages": [
+        "Polish"
+      ]
+    },
+    "PM": {
+      "officialNames": [
+        "Saint Pierre and Miquelon"
+      ],
+      "nativeNames": [
+        "Saint-Pierre-et-Miquelon",
+        "Collectivité territoriale de Saint-Pierre-et-Miquelon"
+      ],
+      "alternativeNames": [
+        "Collectivité territoriale de Saint-Pierre-et-Miquelon"
+      ],
+      "capitals": [
+        "Saint-Pierre"
+      ],
+      "demonyms": [
+        "Saint-Pierrais, Miquelonnais"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "PN": {
+      "officialNames": [
+        "Pitcairn Islands",
+        "Pitcairn Group of Islands"
+      ],
+      "nativeNames": [
+        "Pitcairn Islands",
+        "Pitcairn Group of Islands"
+      ],
+      "alternativeNames": [
+        "Pitcairn",
+        "Pitcairn Henderson Ducie and Oeno Islands"
+      ],
+      "capitals": [
+        "Adamstown"
+      ],
+      "demonyms": [
+        "Pitcairn Islander"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "PR": {
+      "officialNames": [
+        "Puerto Rico",
+        "Commonwealth of Puerto Rico"
+      ],
+      "nativeNames": [
+        "Puerto Rico",
+        "Commonwealth of Puerto Rico",
+        "Estado Libre Asociado de Puerto Rico"
+      ],
+      "alternativeNames": [
+        "Commonwealth of Puerto Rico",
+        "Estado Libre Asociado de Puerto Rico"
+      ],
+      "capitals": [
+        "San Juan"
+      ],
+      "demonyms": [
+        "Puerto Rican"
+      ],
+      "languages": [
+        "English",
+        "Spanish"
+      ]
+    },
+    "PS": {
+      "officialNames": [
+        "Palestine",
+        "State of Palestine"
+      ],
+      "nativeNames": [
+        "فلسطين",
+        "دولة فلسطين"
+      ],
+      "alternativeNames": [
+        "Palestine, State of",
+        "State of Palestine",
+        "Dawlat Filasṭin"
+      ],
+      "capitals": [
+        "Ramallah"
+      ],
+      "demonyms": [
+        "Palestinian"
+      ],
+      "languages": [
+        "Arabic"
+      ]
+    },
+    "PT": {
+      "officialNames": [
+        "Portugal",
+        "Portuguese Republic"
+      ],
+      "nativeNames": [
+        "Portugal",
+        "República português"
+      ],
+      "alternativeNames": [
+        "Portuguesa",
+        "Portuguese Republic",
+        "República Portuguesa"
+      ],
+      "capitals": [
+        "Lisbon"
+      ],
+      "demonyms": [
+        "Portuguese"
+      ],
+      "languages": [
+        "Portuguese"
+      ]
+    },
+    "PW": {
+      "officialNames": [
+        "Palau",
+        "Republic of Palau"
+      ],
+      "nativeNames": [
+        "Palau",
+        "Republic of Palau",
+        "Belau",
+        "Beluu er a Belau"
+      ],
+      "alternativeNames": [
+        "Republic of Palau",
+        "Beluu er a Belau"
+      ],
+      "capitals": [
+        "Ngerulmud"
+      ],
+      "demonyms": [
+        "Palauan"
+      ],
+      "languages": [
+        "English",
+        "Palauan"
+      ]
+    },
+    "PY": {
+      "officialNames": [
+        "Paraguay",
+        "Republic of Paraguay"
+      ],
+      "nativeNames": [
+        "Paraguái",
+        "Tetã Paraguái",
+        "Paraguay",
+        "República de Paraguay"
+      ],
+      "alternativeNames": [
+        "Republic of Paraguay",
+        "República del Paraguay",
+        "Tetã Paraguái"
+      ],
+      "capitals": [
+        "Asunción"
+      ],
+      "demonyms": [
+        "Paraguayan"
+      ],
+      "languages": [
+        "Guaraní",
+        "Spanish"
+      ]
+    },
+    "QA": {
+      "officialNames": [
+        "Qatar",
+        "State of Qatar"
+      ],
+      "nativeNames": [
+        "قطر",
+        "دولة قطر"
+      ],
+      "alternativeNames": [
+        "State of Qatar",
+        "Dawlat Qaṭar"
+      ],
+      "capitals": [
+        "Doha"
+      ],
+      "demonyms": [
+        "Qatari"
+      ],
+      "languages": [
+        "Arabic"
+      ]
+    },
+    "RE": {
+      "officialNames": [
+        "Réunion",
+        "Réunion Island"
+      ],
+      "nativeNames": [
+        "La Réunion",
+        "Ile de la Réunion"
+      ],
+      "alternativeNames": [
+        "Reunion"
+      ],
+      "capitals": [
+        "Saint-Denis"
+      ],
+      "demonyms": [
+        "Réunionese"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "RO": {
+      "officialNames": [
+        "Romania"
+      ],
+      "nativeNames": [
+        "România"
+      ],
+      "alternativeNames": [
+        "Rumania",
+        "Roumania",
+        "România"
+      ],
+      "capitals": [
+        "Bucharest"
+      ],
+      "demonyms": [
+        "Romanian"
+      ],
+      "languages": [
+        "Romanian"
+      ]
+    },
+    "RS": {
+      "officialNames": [
+        "Serbia",
+        "Republic of Serbia"
+      ],
+      "nativeNames": [
+        "Србија",
+        "Република Србија"
+      ],
+      "alternativeNames": [
+        "Srbija",
+        "Republika Srbija",
+        "Србија",
+        "Република Србија",
+        "Republic of Serbia"
+      ],
+      "capitals": [
+        "Belgrade"
+      ],
+      "demonyms": [
+        "Serbian"
+      ],
+      "languages": [
+        "Serbian"
+      ]
+    },
+    "RU": {
+      "officialNames": [
+        "Russia",
+        "Russian Federation"
+      ],
+      "nativeNames": [
+        "Россия",
+        "Российская Федерация"
+      ],
+      "alternativeNames": [
+        "Russian Federation",
+        "Российская Федерация"
+      ],
+      "capitals": [
+        "Moscow"
+      ],
+      "demonyms": [
+        "Russian"
+      ],
+      "languages": [
+        "Russian"
+      ]
+    },
+    "RW": {
+      "officialNames": [
+        "Rwanda",
+        "Republic of Rwanda"
+      ],
+      "nativeNames": [
+        "Rwanda",
+        "Republic of Rwanda",
+        "République rwandaise",
+        "Repubulika y'u Rwanda"
+      ],
+      "alternativeNames": [
+        "Republic of Rwanda",
+        "Repubulika y'u Rwanda",
+        "République du Rwanda"
+      ],
+      "capitals": [
+        "Kigali"
+      ],
+      "demonyms": [
+        "Rwandan"
+      ],
+      "languages": [
+        "English",
+        "French",
+        "Kinyarwanda"
+      ]
+    },
+    "SA": {
+      "officialNames": [
+        "Saudi Arabia",
+        "Kingdom of Saudi Arabia"
+      ],
+      "nativeNames": [
+        "السعودية",
+        "المملكة العربية السعودية"
+      ],
+      "alternativeNames": [
+        "Saudi",
+        "Kingdom of Saudi Arabia",
+        "Al-Mamlakah al-‘Arabiyyah as-Su‘ūdiyyah"
+      ],
+      "capitals": [
+        "Riyadh"
+      ],
+      "demonyms": [
+        "Saudi Arabian"
+      ],
+      "languages": [
+        "Arabic"
+      ]
+    },
+    "SB": {
+      "officialNames": [
+        "Solomon Islands"
+      ],
+      "nativeNames": [
+        "Solomon Islands"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Honiara"
+      ],
+      "demonyms": [
+        "Solomon Islander"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "SC": {
+      "officialNames": [
+        "Seychelles",
+        "Republic of Seychelles"
+      ],
+      "nativeNames": [
+        "Sesel",
+        "Repiblik Sesel",
+        "Seychelles",
+        "Republic of Seychelles",
+        "République des Seychelles"
+      ],
+      "alternativeNames": [
+        "Republic of Seychelles",
+        "Repiblik Sesel",
+        "République des Seychelles"
+      ],
+      "capitals": [
+        "Victoria"
+      ],
+      "demonyms": [
+        "Seychellois"
+      ],
+      "languages": [
+        "Seychellois Creole",
+        "English",
+        "French"
+      ]
+    },
+    "SD": {
+      "officialNames": [
+        "Sudan",
+        "Republic of the Sudan"
+      ],
+      "nativeNames": [
+        "السودان",
+        "جمهورية السودان",
+        "Sudan",
+        "Republic of the Sudan"
+      ],
+      "alternativeNames": [
+        "Republic of the Sudan",
+        "Jumhūrīyat as-Sūdān"
+      ],
+      "capitals": [
+        "Khartoum"
+      ],
+      "demonyms": [
+        "Sudanese"
+      ],
+      "languages": [
+        "Arabic",
+        "English"
+      ]
+    },
+    "SE": {
+      "officialNames": [
+        "Sweden",
+        "Kingdom of Sweden"
+      ],
+      "nativeNames": [
+        "Sverige",
+        "Konungariket Sverige"
+      ],
+      "alternativeNames": [
+        "Kingdom of Sweden",
+        "Konungariket Sverige"
+      ],
+      "capitals": [
+        "Stockholm"
+      ],
+      "demonyms": [
+        "Swedish"
+      ],
+      "languages": [
+        "Swedish"
+      ]
+    },
+    "SG": {
+      "officialNames": [
+        "Singapore",
+        "Republic of Singapore"
+      ],
+      "nativeNames": [
+        "Singapore",
+        "Republic of Singapore",
+        "Singapura",
+        "Republik Singapura",
+        "சிங்கப்பூர்",
+        "சிங்கப்பூர் குடியரசு",
+        "新加坡",
+        "新加坡共和国"
+      ],
+      "alternativeNames": [
+        "Singapura",
+        "Republik Singapura",
+        "新加坡共和国"
+      ],
+      "capitals": [
+        "Singapore"
+      ],
+      "demonyms": [
+        "Singaporean"
+      ],
+      "languages": [
+        "English",
+        "Malay",
+        "Tamil",
+        "Chinese"
+      ]
+    },
+    "SH": {
+      "officialNames": [
+        "Saint Helena, Ascension and Tristan da Cunha"
+      ],
+      "nativeNames": [
+        "Saint Helena, Ascension and Tristan da Cunha"
+      ],
+      "alternativeNames": [
+        "Saint Helena",
+        "St. Helena, Ascension and Tristan da Cunha"
+      ],
+      "capitals": [
+        "Jamestown"
+      ],
+      "demonyms": [
+        "Saint Helenian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "SI": {
+      "officialNames": [
+        "Slovenia",
+        "Republic of Slovenia"
+      ],
+      "nativeNames": [
+        "Slovenija",
+        "Republika Slovenija"
+      ],
+      "alternativeNames": [
+        "Republic of Slovenia",
+        "Republika Slovenija"
+      ],
+      "capitals": [
+        "Ljubljana"
+      ],
+      "demonyms": [
+        "Slovene"
+      ],
+      "languages": [
+        "Slovene"
+      ]
+    },
+    "SJ": {
+      "officialNames": [
+        "Svalbard and Jan Mayen",
+        "Svalbard og Jan Mayen"
+      ],
+      "nativeNames": [
+        "Svalbard og Jan Mayen"
+      ],
+      "alternativeNames": [
+        "Svalbard and Jan Mayen Islands"
+      ],
+      "capitals": [
+        "Longyearbyen"
+      ],
+      "demonyms": [
+        "Norwegian"
+      ],
+      "languages": [
+        "Norwegian"
+      ]
+    },
+    "SK": {
+      "officialNames": [
+        "Slovakia",
+        "Slovak Republic"
+      ],
+      "nativeNames": [
+        "Slovensko",
+        "Slovenská republika"
+      ],
+      "alternativeNames": [
+        "Slovak Republic",
+        "Slovenská republika"
+      ],
+      "capitals": [
+        "Bratislava"
+      ],
+      "demonyms": [
+        "Slovak"
+      ],
+      "languages": [
+        "Slovak"
+      ]
+    },
+    "SL": {
+      "officialNames": [
+        "Sierra Leone",
+        "Republic of Sierra Leone"
+      ],
+      "nativeNames": [
+        "Sierra Leone",
+        "Republic of Sierra Leone"
+      ],
+      "alternativeNames": [
+        "Republic of Sierra Leone"
+      ],
+      "capitals": [
+        "Freetown"
+      ],
+      "demonyms": [
+        "Sierra Leonean"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "SM": {
+      "officialNames": [
+        "San Marino",
+        "Most Serene Republic of San Marino"
+      ],
+      "nativeNames": [
+        "San Marino",
+        "Serenissima Repubblica di San Marino"
+      ],
+      "alternativeNames": [
+        "Republic of San Marino",
+        "Repubblica di San Marino"
+      ],
+      "capitals": [
+        "City of San Marino"
+      ],
+      "demonyms": [
+        "Sammarinese"
+      ],
+      "languages": [
+        "Italian"
+      ]
+    },
+    "SN": {
+      "officialNames": [
+        "Senegal",
+        "Republic of Senegal"
+      ],
+      "nativeNames": [
+        "Sénégal",
+        "République du Sénégal"
+      ],
+      "alternativeNames": [
+        "Republic of Senegal",
+        "République du Sénégal"
+      ],
+      "capitals": [
+        "Dakar"
+      ],
+      "demonyms": [
+        "Senegalese"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "SO": {
+      "officialNames": [
+        "Somalia",
+        "Federal Republic of Somalia"
+      ],
+      "nativeNames": [
+        "الصومال",
+        "جمهورية الصومال الفيدرالية",
+        "Soomaaliya",
+        "Jamhuuriyadda Federaalka Soomaaliya"
+      ],
+      "alternativeNames": [
+        "aṣ-Ṣūmāl",
+        "Federal Republic of Somalia",
+        "Jamhuuriyadda Federaalka Soomaaliya",
+        "Jumhūriyyat aṣ-Ṣūmāl al-Fiderāliyya"
+      ],
+      "capitals": [
+        "Mogadishu"
+      ],
+      "demonyms": [
+        "Somali"
+      ],
+      "languages": [
+        "Arabic",
+        "Somali"
+      ]
+    },
+    "SR": {
+      "officialNames": [
+        "Suriname",
+        "Republic of Suriname"
+      ],
+      "nativeNames": [
+        "Suriname",
+        "Republiek Suriname"
+      ],
+      "alternativeNames": [
+        "Sarnam",
+        "Sranangron",
+        "Republic of Suriname",
+        "Republiek Suriname"
+      ],
+      "capitals": [
+        "Paramaribo"
+      ],
+      "demonyms": [
+        "Surinamer"
+      ],
+      "languages": [
+        "Dutch"
+      ]
+    },
+    "SS": {
+      "officialNames": [
+        "South Sudan",
+        "Republic of South Sudan"
+      ],
+      "nativeNames": [
+        "South Sudan",
+        "Republic of South Sudan"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Juba"
+      ],
+      "demonyms": [
+        "South Sudanese"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "ST": {
+      "officialNames": [
+        "São Tomé and Príncipe",
+        "Democratic Republic of São Tomé and Príncipe"
+      ],
+      "nativeNames": [
+        "São Tomé e Príncipe",
+        "República Democrática do São Tomé e Príncipe"
+      ],
+      "alternativeNames": [
+        "Democratic Republic of São Tomé and Príncipe",
+        "Sao Tome and Principe",
+        "República Democrática de São Tomé e Príncipe"
+      ],
+      "capitals": [
+        "São Tomé"
+      ],
+      "demonyms": [
+        "Sao Tomean"
+      ],
+      "languages": [
+        "Portuguese"
+      ]
+    },
+    "SV": {
+      "officialNames": [
+        "El Salvador",
+        "Republic of El Salvador"
+      ],
+      "nativeNames": [
+        "El Salvador",
+        "República de El Salvador"
+      ],
+      "alternativeNames": [
+        "Republic of El Salvador",
+        "República de El Salvador"
+      ],
+      "capitals": [
+        "San Salvador"
+      ],
+      "demonyms": [
+        "Salvadoran"
+      ],
+      "languages": [
+        "Spanish"
+      ]
+    },
+    "SX": {
+      "officialNames": [
+        "Sint Maarten"
+      ],
+      "nativeNames": [
+        "Sint Maarten",
+        "Saint-Martin"
+      ],
+      "alternativeNames": [
+        "Sint Maarten (Dutch part)"
+      ],
+      "capitals": [
+        "Philipsburg"
+      ],
+      "demonyms": [
+        "St. Maartener"
+      ],
+      "languages": [
+        "English",
+        "French",
+        "Dutch"
+      ]
+    },
+    "SY": {
+      "officialNames": [
+        "Syria",
+        "Syrian Arab Republic"
+      ],
+      "nativeNames": [
+        "سوريا",
+        "الجمهورية العربية السورية"
+      ],
+      "alternativeNames": [
+        "Syrian Arab Republic",
+        "Al-Jumhūrīyah Al-ʻArabīyah As-Sūrīyah"
+      ],
+      "capitals": [
+        "Damascus"
+      ],
+      "demonyms": [
+        "Syrian"
+      ],
+      "languages": [
+        "Arabic"
+      ]
+    },
+    "SZ": {
+      "officialNames": [
+        "Eswatini",
+        "Kingdom of Eswatini"
+      ],
+      "nativeNames": [
+        "Eswatini",
+        "Kingdom of Eswatini",
+        "eSwatini",
+        "Umbuso weSwatini"
+      ],
+      "alternativeNames": [
+        "Swaziland",
+        "weSwatini",
+        "Swatini",
+        "Ngwane",
+        "Kingdom of Eswatini",
+        "Umbuso weSwatini"
+      ],
+      "capitals": [
+        "Lobamba"
+      ],
+      "demonyms": [
+        "Swazi"
+      ],
+      "languages": [
+        "English",
+        "Swazi"
+      ]
+    },
+    "TC": {
+      "officialNames": [
+        "Turks and Caicos Islands"
+      ],
+      "nativeNames": [
+        "Turks and Caicos Islands"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Cockburn Town"
+      ],
+      "demonyms": [
+        "Turks and Caicos Islander"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "TD": {
+      "officialNames": [
+        "Chad",
+        "Republic of Chad"
+      ],
+      "nativeNames": [
+        "تشاد",
+        "جمهورية تشاد",
+        "Tchad",
+        "République du Tchad"
+      ],
+      "alternativeNames": [
+        "Tchad",
+        "Republic of Chad",
+        "République du Tchad"
+      ],
+      "capitals": [
+        "N'Djamena"
+      ],
+      "demonyms": [
+        "Chadian"
+      ],
+      "languages": [
+        "Arabic",
+        "French"
+      ]
+    },
+    "TF": {
+      "officialNames": [
+        "French Southern and Antarctic Lands",
+        "Territory of the French Southern and Antarctic Lands"
+      ],
+      "nativeNames": [
+        "Terres australes et antarctiques françaises",
+        "Territoire des Terres australes et antarctiques françaises"
+      ],
+      "alternativeNames": [
+        "French Southern Territories"
+      ],
+      "capitals": [
+        "Port-aux-Français"
+      ],
+      "demonyms": [
+        "French"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "TG": {
+      "officialNames": [
+        "Togo",
+        "Togolese Republic"
+      ],
+      "nativeNames": [
+        "Togo",
+        "République togolaise"
+      ],
+      "alternativeNames": [
+        "Togolese",
+        "Togolese Republic",
+        "République Togolaise"
+      ],
+      "capitals": [
+        "Lomé"
+      ],
+      "demonyms": [
+        "Togolese"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "TH": {
+      "officialNames": [
+        "Thailand",
+        "Kingdom of Thailand"
+      ],
+      "nativeNames": [
+        "ประเทศไทย",
+        "ราชอาณาจักรไทย"
+      ],
+      "alternativeNames": [
+        "Prathet",
+        "Thai",
+        "Kingdom of Thailand",
+        "ราชอาณาจักรไทย",
+        "Ratcha Anachak Thai"
+      ],
+      "capitals": [
+        "Bangkok"
+      ],
+      "demonyms": [
+        "Thai"
+      ],
+      "languages": [
+        "Thai"
+      ]
+    },
+    "TJ": {
+      "officialNames": [
+        "Tajikistan",
+        "Republic of Tajikistan"
+      ],
+      "nativeNames": [
+        "Таджикистан",
+        "Республика Таджикистан",
+        "Тоҷикистон",
+        "Ҷумҳурии Тоҷикистон"
+      ],
+      "alternativeNames": [
+        "Toçikiston",
+        "Republic of Tajikistan",
+        "Ҷумҳурии Тоҷикистон",
+        "Çumhuriyi Toçikiston"
+      ],
+      "capitals": [
+        "Dushanbe"
+      ],
+      "demonyms": [
+        "Tadzhik"
+      ],
+      "languages": [
+        "Russian",
+        "Tajik"
+      ]
+    },
+    "TK": {
+      "officialNames": [
+        "Tokelau"
+      ],
+      "nativeNames": [
+        "Tokelau"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Fakaofo"
+      ],
+      "demonyms": [
+        "Tokelauan"
+      ],
+      "languages": [
+        "English",
+        "Samoan",
+        "Tokelauan"
+      ]
+    },
+    "TL": {
+      "officialNames": [
+        "Timor-Leste",
+        "Democratic Republic of Timor-Leste"
+      ],
+      "nativeNames": [
+        "Timor-Leste",
+        "República Democrática de Timor-Leste",
+        "Timór-Leste",
+        "Repúblika Demokrátika Timór-Leste"
+      ],
+      "alternativeNames": [
+        "East Timor",
+        "Timor",
+        "Democratic Republic of Timor-Leste",
+        "República Democrática de Timor-Leste",
+        "Repúblika Demokrátika Timór-Leste",
+        "Timór Lorosa'e",
+        "Timor Lorosae"
+      ],
+      "capitals": [
+        "Dili"
+      ],
+      "demonyms": [
+        "East Timorese"
+      ],
+      "languages": [
+        "Portuguese",
+        "Tetum"
+      ]
+    },
+    "TM": {
+      "officialNames": [
+        "Turkmenistan"
+      ],
+      "nativeNames": [
+        "Туркмения",
+        "Туркменистан",
+        "Türkmenistan"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Ashgabat"
+      ],
+      "demonyms": [
+        "Turkmen"
+      ],
+      "languages": [
+        "Russian",
+        "Turkmen"
+      ]
+    },
+    "TN": {
+      "officialNames": [
+        "Tunisia",
+        "Tunisian Republic"
+      ],
+      "nativeNames": [
+        "تونس",
+        "الجمهورية التونسية"
+      ],
+      "alternativeNames": [
+        "Republic of Tunisia",
+        "al-Jumhūriyyah at-Tūnisiyyah"
+      ],
+      "capitals": [
+        "Tunis"
+      ],
+      "demonyms": [
+        "Tunisian"
+      ],
+      "languages": [
+        "Arabic"
+      ]
+    },
+    "TO": {
+      "officialNames": [
+        "Tonga",
+        "Kingdom of Tonga"
+      ],
+      "nativeNames": [
+        "Tonga",
+        "Kingdom of Tonga"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Nuku'alofa"
+      ],
+      "demonyms": [
+        "Tongan"
+      ],
+      "languages": [
+        "English",
+        "Tongan"
+      ]
+    },
+    "TR": {
+      "officialNames": [
+        "Türkiye",
+        "Republic of Türkiye"
+      ],
+      "nativeNames": [
+        "Türkiye",
+        "Türkiye Cumhuriyeti"
+      ],
+      "alternativeNames": [
+        "Turkiye",
+        "Republic of Turkey",
+        "Türkiye Cumhuriyeti"
+      ],
+      "capitals": [
+        "Ankara"
+      ],
+      "demonyms": [
+        "Turkish"
+      ],
+      "languages": [
+        "Turkish"
+      ]
+    },
+    "TT": {
+      "officialNames": [
+        "Trinidad and Tobago",
+        "Republic of Trinidad and Tobago"
+      ],
+      "nativeNames": [
+        "Trinidad and Tobago",
+        "Republic of Trinidad and Tobago"
+      ],
+      "alternativeNames": [
+        "Republic of Trinidad and Tobago"
+      ],
+      "capitals": [
+        "Port of Spain"
+      ],
+      "demonyms": [
+        "Trinidadian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "TV": {
+      "officialNames": [
+        "Tuvalu"
+      ],
+      "nativeNames": [
+        "Tuvalu"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Funafuti"
+      ],
+      "demonyms": [
+        "Tuvaluan"
+      ],
+      "languages": [
+        "English",
+        "Tuvaluan"
+      ]
+    },
+    "TW": {
+      "officialNames": [
+        "Taiwan",
+        "Republic of China (Taiwan)"
+      ],
+      "nativeNames": [
+        "台灣",
+        "中華民國"
+      ],
+      "alternativeNames": [
+        "Táiwān",
+        "Republic of China",
+        "中華民國",
+        "Zhōnghuá Mínguó",
+        "Chinese Taipei"
+      ],
+      "capitals": [
+        "Taipei"
+      ],
+      "demonyms": [
+        "Taiwanese"
+      ],
+      "languages": [
+        "Chinese"
+      ]
+    },
+    "TZ": {
+      "officialNames": [
+        "Tanzania",
+        "United Republic of Tanzania"
+      ],
+      "nativeNames": [
+        "Tanzania",
+        "United Republic of Tanzania",
+        "Jamhuri ya Muungano wa Tanzania"
+      ],
+      "alternativeNames": [
+        "Tanzania, United Republic of",
+        "United Republic of Tanzania",
+        "Jamhuri ya Muungano wa Tanzania"
+      ],
+      "capitals": [
+        "Dodoma"
+      ],
+      "demonyms": [
+        "Tanzanian"
+      ],
+      "languages": [
+        "English",
+        "Swahili"
+      ]
+    },
+    "UA": {
+      "officialNames": [
+        "Ukraine"
+      ],
+      "nativeNames": [
+        "Україна"
+      ],
+      "alternativeNames": [
+        "Ukrayina"
+      ],
+      "capitals": [
+        "Kyiv"
+      ],
+      "demonyms": [
+        "Ukrainian"
+      ],
+      "languages": [
+        "Ukrainian"
+      ]
+    },
+    "UG": {
+      "officialNames": [
+        "Uganda",
+        "Republic of Uganda"
+      ],
+      "nativeNames": [
+        "Uganda",
+        "Republic of Uganda"
+      ],
+      "alternativeNames": [
+        "Republic of Uganda",
+        "Jamhuri ya Uganda"
+      ],
+      "capitals": [
+        "Kampala"
+      ],
+      "demonyms": [
+        "Ugandan"
+      ],
+      "languages": [
+        "English",
+        "Swahili"
+      ]
+    },
+    "UM": {
+      "officialNames": [
+        "United States Minor Outlying Islands"
+      ],
+      "nativeNames": [
+        "United States Minor Outlying Islands"
+      ],
+      "alternativeNames": [],
+      "capitals": [],
+      "demonyms": [
+        "American Islander"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "US": {
+      "officialNames": [
+        "United States",
+        "United States of America"
+      ],
+      "nativeNames": [
+        "United States",
+        "United States of America"
+      ],
+      "alternativeNames": [
+        "United States of America"
+      ],
+      "capitals": [
+        "Washington D.C."
+      ],
+      "demonyms": [
+        "American"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "UY": {
+      "officialNames": [
+        "Uruguay",
+        "Oriental Republic of Uruguay"
+      ],
+      "nativeNames": [
+        "Uruguay",
+        "República Oriental del Uruguay"
+      ],
+      "alternativeNames": [
+        "Oriental Republic of Uruguay",
+        "República Oriental del Uruguay"
+      ],
+      "capitals": [
+        "Montevideo"
+      ],
+      "demonyms": [
+        "Uruguayan"
+      ],
+      "languages": [
+        "Spanish"
+      ]
+    },
+    "UZ": {
+      "officialNames": [
+        "Uzbekistan",
+        "Republic of Uzbekistan"
+      ],
+      "nativeNames": [
+        "Узбекистан",
+        "Республика Узбекистан",
+        "O‘zbekiston",
+        "O'zbekiston Respublikasi"
+      ],
+      "alternativeNames": [
+        "Republic of Uzbekistan",
+        "O‘zbekiston Respublikasi",
+        "Ўзбекистон Республикаси"
+      ],
+      "capitals": [
+        "Tashkent"
+      ],
+      "demonyms": [
+        "Uzbekistani"
+      ],
+      "languages": [
+        "Russian",
+        "Uzbek"
+      ]
+    },
+    "VA": {
+      "officialNames": [
+        "Vatican City",
+        "Vatican City State"
+      ],
+      "nativeNames": [
+        "Vaticano",
+        "Stato della Città del Vaticano",
+        "Vaticanæ",
+        "Status Civitatis Vaticanæ"
+      ],
+      "alternativeNames": [
+        "Holy See (Vatican City State)",
+        "Vatican City State",
+        "Vatican",
+        "Stato della Città del Vaticano"
+      ],
+      "capitals": [
+        "Vatican City"
+      ],
+      "demonyms": [
+        "Vatican"
+      ],
+      "languages": [
+        "Italian",
+        "Latin"
+      ]
+    },
+    "VC": {
+      "officialNames": [
+        "Saint Vincent and the Grenadines"
+      ],
+      "nativeNames": [
+        "Saint Vincent and the Grenadines"
+      ],
+      "alternativeNames": [],
+      "capitals": [
+        "Kingstown"
+      ],
+      "demonyms": [
+        "Saint Vincentian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "VE": {
+      "officialNames": [
+        "Venezuela",
+        "Bolivarian Republic of Venezuela"
+      ],
+      "nativeNames": [
+        "Venezuela",
+        "República Bolivariana de Venezuela"
+      ],
+      "alternativeNames": [
+        "Bolivarian Republic of Venezuela",
+        "Venezuela, Bolivarian Republic of",
+        "República Bolivariana de Venezuela"
+      ],
+      "capitals": [
+        "Caracas"
+      ],
+      "demonyms": [
+        "Venezuelan"
+      ],
+      "languages": [
+        "Spanish"
+      ]
+    },
+    "VG": {
+      "officialNames": [
+        "British Virgin Islands",
+        "Virgin Islands"
+      ],
+      "nativeNames": [
+        "British Virgin Islands",
+        "Virgin Islands"
+      ],
+      "alternativeNames": [
+        "Virgin Islands, British"
+      ],
+      "capitals": [
+        "Road Town"
+      ],
+      "demonyms": [
+        "Virgin Islander"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "VI": {
+      "officialNames": [
+        "United States Virgin Islands",
+        "Virgin Islands of the United States"
+      ],
+      "nativeNames": [
+        "United States Virgin Islands",
+        "Virgin Islands of the United States"
+      ],
+      "alternativeNames": [
+        "Virgin Islands, U.S."
+      ],
+      "capitals": [
+        "Charlotte Amalie"
+      ],
+      "demonyms": [
+        "Virgin Islander"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "VN": {
+      "officialNames": [
+        "Vietnam",
+        "Socialist Republic of Vietnam"
+      ],
+      "nativeNames": [
+        "Việt Nam",
+        "Cộng hòa xã hội chủ nghĩa Việt Nam"
+      ],
+      "alternativeNames": [
+        "Socialist Republic of Vietnam",
+        "Cộng hòa Xã hội chủ nghĩa Việt Nam",
+        "Viet Nam"
+      ],
+      "capitals": [
+        "Hanoi"
+      ],
+      "demonyms": [
+        "Vietnamese"
+      ],
+      "languages": [
+        "Vietnamese"
+      ]
+    },
+    "VU": {
+      "officialNames": [
+        "Vanuatu",
+        "Republic of Vanuatu"
+      ],
+      "nativeNames": [
+        "Vanuatu",
+        "Ripablik blong Vanuatu",
+        "Republic of Vanuatu",
+        "République de Vanuatu"
+      ],
+      "alternativeNames": [
+        "Republic of Vanuatu",
+        "Ripablik blong Vanuatu",
+        "République de Vanuatu"
+      ],
+      "capitals": [
+        "Port Vila"
+      ],
+      "demonyms": [
+        "Ni-Vanuatu"
+      ],
+      "languages": [
+        "Bislama",
+        "English",
+        "French"
+      ]
+    },
+    "WF": {
+      "officialNames": [
+        "Wallis and Futuna",
+        "Territory of the Wallis and Futuna Islands"
+      ],
+      "nativeNames": [
+        "Wallis et Futuna",
+        "Territoire des îles Wallis et Futuna"
+      ],
+      "alternativeNames": [
+        "Territory of the Wallis and Futuna Islands",
+        "Territoire des îles Wallis et Futuna"
+      ],
+      "capitals": [
+        "Mata-Utu"
+      ],
+      "demonyms": [
+        "Wallis and Futuna Islander"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "WS": {
+      "officialNames": [
+        "Samoa",
+        "Independent State of Samoa"
+      ],
+      "nativeNames": [
+        "Samoa",
+        "Independent State of Samoa",
+        "Sāmoa",
+        "Malo Saʻoloto Tutoʻatasi o Sāmoa"
+      ],
+      "alternativeNames": [
+        "Independent State of Samoa",
+        "Malo Saʻoloto Tutoʻatasi o Sāmoa"
+      ],
+      "capitals": [
+        "Apia"
+      ],
+      "demonyms": [
+        "Samoan"
+      ],
+      "languages": [
+        "English",
+        "Samoan"
+      ]
+    },
+    "XK": {
+      "officialNames": [
+        "Kosovo",
+        "Republic of Kosovo"
+      ],
+      "nativeNames": [
+        "Kosova",
+        "Republika e Kosovës",
+        "Косово",
+        "Република Косово"
+      ],
+      "alternativeNames": [
+        "Република Косово"
+      ],
+      "capitals": [
+        "Pristina"
+      ],
+      "demonyms": [
+        "Kosovar"
+      ],
+      "languages": [
+        "Albanian",
+        "Serbian"
+      ]
+    },
+    "YE": {
+      "officialNames": [
+        "Yemen",
+        "Republic of Yemen"
+      ],
+      "nativeNames": [
+        "اليمن",
+        "الجمهورية اليمنية"
+      ],
+      "alternativeNames": [
+        "Yemeni Republic",
+        "al-Jumhūriyyah al-Yamaniyyah"
+      ],
+      "capitals": [
+        "Sana'a"
+      ],
+      "demonyms": [
+        "Yemeni"
+      ],
+      "languages": [
+        "Arabic"
+      ]
+    },
+    "YT": {
+      "officialNames": [
+        "Mayotte",
+        "Department of Mayotte"
+      ],
+      "nativeNames": [
+        "Mayotte",
+        "Département de Mayotte"
+      ],
+      "alternativeNames": [
+        "Department of Mayotte",
+        "Département de Mayotte"
+      ],
+      "capitals": [
+        "Mamoudzou"
+      ],
+      "demonyms": [
+        "Mahoran"
+      ],
+      "languages": [
+        "French"
+      ]
+    },
+    "ZA": {
+      "officialNames": [
+        "South Africa",
+        "Republic of South Africa"
+      ],
+      "nativeNames": [
+        "South Africa",
+        "Republiek van Suid-Afrika",
+        "Republic of South Africa",
+        "Sewula Afrika",
+        "IRiphabliki yeSewula Afrika",
+        "Afrika-Borwa",
+        "Rephaboliki ya Afrika-Borwa",
+        "Afrika Borwa",
+        "Rephaboliki ya Afrika Borwa",
+        "Ningizimu Afrika",
+        "IRiphabhulikhi yeNingizimu Afrika",
+        "Aforika Borwa",
+        "Rephaboliki ya Aforika Borwa",
+        "Afrika Dzonga",
+        "Riphabliki ra Afrika Dzonga",
+        "Afurika Tshipembe",
+        "Riphabuḽiki ya Afurika Tshipembe",
+        "Mzantsi Afrika",
+        "IRiphabliki yaseMzantsi Afrika",
+        "IRiphabliki yaseNingizimu Afrika"
+      ],
+      "alternativeNames": [
+        "Suid-Afrika",
+        "Republic of South Africa"
+      ],
+      "capitals": [
+        "Pretoria",
+        "Bloemfontein",
+        "Cape Town"
+      ],
+      "demonyms": [
+        "South African"
+      ],
+      "languages": [
+        "Afrikaans",
+        "English",
+        "Southern Ndebele",
+        "Northern Sotho",
+        "Southern Sotho",
+        "Swazi",
+        "Tswana",
+        "Tsonga",
+        "Venda",
+        "Xhosa",
+        "Zulu"
+      ]
+    },
+    "ZM": {
+      "officialNames": [
+        "Zambia",
+        "Republic of Zambia"
+      ],
+      "nativeNames": [
+        "Zambia",
+        "Republic of Zambia"
+      ],
+      "alternativeNames": [
+        "Republic of Zambia"
+      ],
+      "capitals": [
+        "Lusaka"
+      ],
+      "demonyms": [
+        "Zambian"
+      ],
+      "languages": [
+        "English"
+      ]
+    },
+    "ZW": {
+      "officialNames": [
+        "Zimbabwe",
+        "Republic of Zimbabwe"
+      ],
+      "nativeNames": [
+        "Zimbabwe",
+        "Republic of Zimbabwe"
+      ],
+      "alternativeNames": [
+        "Republic of Zimbabwe"
+      ],
+      "capitals": [
+        "Harare"
+      ],
+      "demonyms": [
+        "Zimbabwean"
+      ],
+      "languages": [
+        "Chibarwe",
+        "English",
+        "Kalanga",
+        "Khoisan",
+        "Ndau",
+        "Northern Ndebele",
+        "Chewa",
+        "Shona",
+        "Sotho",
+        "Tonga",
+        "Tswana",
+        "Tsonga",
+        "Venda",
+        "Xhosa",
+        "Zimbabwean Sign Language"
+      ]
+    }
+  }
+}

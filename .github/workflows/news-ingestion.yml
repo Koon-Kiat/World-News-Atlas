@@ -1,0 +1,48 @@
+name: News ingestion
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      period:
+        description: Discovery period
+        required: false
+        default: latest
+        type: choice
+        options: [latest, 24h, 7d, 30d]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-news-ingestion
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+      GDELT_MODE: auto
+      NEWS_FIXTURES_ENABLED: "false"
+      NEWS_INGESTION_STAGE_LIMIT: "24"
+      NEWS_INGESTION_COUNTRY_BATCH_SIZE: "8"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24.15.0
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Require production database secret
+        run: test -n "$DATABASE_URL"
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
+      - name: Run bounded resumable ingestion
+        run: npm run ingest:news -- --period=${{ github.event_name == 'schedule' && '30d' || inputs.period || 'latest' }}

@@ -1,9 +1,10 @@
-import { loadEnvConfig } from "@next/env";
+import nextEnv from "@next/env";
 import { runNewsIngestion } from "../src/lib/news/ingest";
+import { parseNewsCliOptions } from "./news-cli-options";
 
-loadEnvConfig(process.cwd());
+nextEnv.loadEnvConfig(process.cwd());
 
-runNewsIngestion()
+runNewsIngestion(parseNewsCliOptions("latest"))
   .then((summary) => {
     console.info(JSON.stringify({ event: "ingestion_summary", ...summary }, null, 2));
   })

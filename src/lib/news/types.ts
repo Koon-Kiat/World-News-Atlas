@@ -17,6 +17,67 @@ export type NewsPeriod = "latest" | "24h" | "7d" | "30d";
 
 export type NewsSort = "newest" | "popular";
 
+export type CoverageStatus = "complete" | "expanding" | "limited" | "degraded";
+export type ProviderHealthStatus =
+  | "active"
+  | "disabled"
+  | "missing_credential"
+  | "timeout"
+  | "rate_limited"
+  | "terminal_error"
+  | "exhausted"
+  | "partial";
+
+export type ProviderExhaustionReason =
+  | "normal"
+  | "empty"
+  | "provider_limit"
+  | "time_range_covered"
+  | "plan_exhausted"
+  | "feed_exhausted";
+
+export interface ProviderCoverageProgress {
+  archiveCapable: boolean;
+  windowStart?: string;
+  windowEnd?: string;
+  coveredFrom?: string;
+  coveredTo?: string;
+  timeRangeCovered: boolean;
+  exhaustionReason?: ProviderExhaustionReason;
+}
+
+export interface ProviderDiscoveryDiagnostics {
+  provider: ProviderName;
+  health: ProviderHealthStatus;
+  received: number;
+  normalized: number;
+  accepted: number;
+  outOfWindow: number;
+  duplicates: number;
+  countryIrrelevant: number;
+  languageFiltered: number;
+  topicFiltered: number;
+  sourceFiltered: number;
+  searchFiltered: number;
+  plansAttempted: number;
+  plansCompleted: number;
+  markets: string[];
+  languages: string[];
+  countryQueries: string[];
+  archiveWindowStart?: string;
+  archiveWindowEnd?: string;
+  archiveCoveredFrom?: string;
+  exhaustionReason?: string;
+}
+
+export interface CoverageDiagnostics {
+  rawArticleCount: number;
+  normalizedArticleCount: number;
+  relevantArticleCount: number;
+  duplicateArticleCount: number;
+  providerContributions: ProviderDiscoveryDiagnostics[];
+}
+
 export interface CountryReference {
   code: string;
   name: string;
@@ -94,6 +155,7 @@ export interface NewsQuery {
   search?: string;
   page: number;
   pageSize: number;
+  continuationId?: string;
 }
 
 export interface NewsResponse {
@@ -108,13 +170,26 @@ export interface NewsResponse {
     materializedStoryCount: number;
     /** Cached stories or provider discovery can still produce continuation. */
     hasMore: boolean;
-    /** True only after provider discovery is exhausted or the corpus limit is reached. */
+    /** Compatibility field: provider discovery can no longer return another stage. */
     corpusComplete: boolean;
+    /** All finite provider plans currently available to this corpus have ended. */
+    discoveryExhausted: boolean;
+    /** Configured archive discovery demonstrably covered the requested publication window. */
+    archiveCoverageComplete: boolean;
+    /** Requested coverage is fresh and complete according to provider/database watermarks. */
+    coverageComplete: boolean;
+    coverageDegraded: boolean;
+    coverageStatus: CoverageStatus;
+    coverageReasons: string[];
+    corpusLimitReached: boolean;
+    continuationId?: string;
+    continuationReset?: boolean;
+    diagnostics?: CoverageDiagnostics;
     /** Internal continuation page used by the infinite-scroll client. */
     nextPage: number | null;
     page: number;
     pageSize: number;
-    dataSource: "database" | "live" | "fixtures";
+    dataSource: "database" | "live" | "hybrid" | "fixtures";
     sourceFacets: SourceFacet[];
     languageFacets: LanguageFacet[];
     generatedAt: string;
@@ -135,6 +210,10 @@ export interface ProviderContinuationState {
    * branch as exhausted; a missing branch remains retryable.
    */
   discoveryCursors?: Record<string, string | null>;
+  /** Deterministic Bing/RSS plan identifiers already attempted. */
+  completedPlanIds?: string[];
+  /** Provider-specific reason continuation ended before historical coverage completed. */
+  exhaustionReason?: string;
 }
 
 export interface ProviderArticle {
@@ -164,6 +243,8 @@ export interface ProviderFetchRequest {
   countries?: string[];
   language?: string;
   sourceTargets?: ProviderSourceTarget[];
+  sourcePerspective?: SourcePerspective;
+  period?: NewsPeriod;
   limit?: number;
   continuation?: ProviderContinuationState;
 }
@@ -182,6 +263,16 @@ export interface ProviderFetchResult {
   receivedAt: string;
   continuation?: ProviderContinuationState | null;
   exhausted?: boolean;
+  coverage?: ProviderCoverageProgress;
+  diagnostics?: {
+    received?: number;
+    plansAttempted?: number;
+    plansCompleted?: number;
+    markets?: string[];
+    languages?: string[];
+    countryQueries?: string[];
+    outOfWindow?: number;
+  };
 }
 
 export interface NormalizedArticle extends ArticleView {

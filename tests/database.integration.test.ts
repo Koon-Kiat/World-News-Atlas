@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clusterArticles } from "@/lib/news/cluster";
-import { loadDatabaseStories } from "@/lib/news/data-store";
+import { loadDatabaseCoverage, loadDatabaseStories } from "@/lib/news/data-store";
 import { persistStoryCandidates } from "@/lib/news/persistence";
 import { buildNewsResponse } from "@/lib/news/query";
 import type { NewsQuery, NormalizedArticle } from "@/lib/news/types";
@@ -57,6 +57,8 @@ function article(
 
 async function clearDatabase(): Promise<void> {
   await prisma.providerIngestionRun.deleteMany();
+  await prisma.providerIngestionCheckpoint.deleteMany();
+  await prisma.ingestionSchedulerState.deleteMany();
   await prisma.story.deleteMany();
   await prisma.article.deleteMany();
   await prisma.sourceProviderIdentifier.deleteMany();
@@ -67,6 +69,7 @@ async function clearDatabase(): Promise<void> {
 
 describe.skipIf(!databaseTestsEnabled)("PostgreSQL news integration", () => {
   beforeEach(clearDatabase);
+  afterEach(() => vi.unstubAllEnvs());
 
   afterAll(async () => {
     await clearDatabase();
@@ -321,5 +324,52 @@ describe.skipIf(!databaseTestsEnabled)("PostgreSQL news integration", () => {
     expect(stored.description).toBe("東京で新しい技術政策を説明しました。");
     const stories = await loadDatabaseStories({ ...baseQuery, countries: ["JP"], language: "ja" }, prisma);
     expect(stories[0].articles[0].source.id).toBe("nhk");
+  });
+
+  it("requires fresh checkpoints for every enabled provider before declaring database coverage complete", async () => {
+    vi.stubEnv("GDELT_MODE", "on");
+    vi.stubEnv("NEWSAPI_KEY", "");
+    const now = new Date("2026-08-31T00:00:00Z");
+    const windowStart = new Date("2026-08-01T00:00:00Z");
+    const common = {
+      discoveryKey: "backfill:JP:30d:all",
+      countryCode: "JP",
+      mode: "backfill",
+      status: "SUCCEEDED" as const,
+      windowStart,
+      windowEnd: now,
+      cursor: undefined,
+      lastSuccessfulAt: now,
+    };
+    await prisma.providerIngestionCheckpoint.createMany({
+      data: [
+        { ...common, provider: "OTHER", exhausted: true, coverageComplete: false },
+        { ...common, provider: "RSS", exhausted: true, coverageComplete: false },
+        {
+          ...common,
+          provider: "GDELT",
+          exhausted: true,
+          coverageComplete: true,
+          coveredFrom: windowStart,
+          coveredTo: now,
+        },
+      ],
+    });
+
+    const query = { ...baseQuery, countries: ["JP"] };
+    await expect(loadDatabaseCoverage(query, prisma, now)).resolves.toMatchObject({
+      complete: true,
+      archiveComplete: true,
+      checkpointCount: 3,
+    });
+
+    await prisma.providerIngestionCheckpoint.delete({
+      where: { provider_discoveryKey: { provider: "GDELT", discoveryKey: common.discoveryKey } },
+    });
+    await expect(loadDatabaseCoverage(query, prisma, now)).resolves.toMatchObject({
+      complete: false,
+      archiveComplete: false,
+      reasons: expect.arrayContaining(["DATABASE_WINDOW_PARTIAL", "DATABASE_ARCHIVE_PARTIAL"]),
+    });
   });
 });

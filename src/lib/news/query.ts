@@ -132,6 +132,12 @@ export function parseNewsQuery(searchParams: URLSearchParams): NewsQuery {
     search: rawSearch || undefined,
     page: positiveInteger(searchParams.get("page"), 1, 100),
     pageSize: positiveInteger(searchParams.get("pageSize"), 12, 250),
+    continuationId: parseOptionalToken(
+      searchParams.get("continuation"),
+      "continuation",
+      /^[a-f0-9]{16,64}$/,
+      64,
+    ),
   };
 }
 
@@ -204,6 +210,34 @@ function visibleStoryTopics(story: StoryView, articles: ArticleView[], selectedT
   return [selectedTopic, ...topics.filter((topic) => topic !== selectedTopic)];
 }
 
+function projectStoryToPublicationWindow(
+  story: StoryView,
+  cutoff: number,
+  windowEnd: number,
+): StoryView | null {
+  const articles = story.articles.filter(({ publishedAt }) => {
+    const timestamp = new Date(publishedAt).getTime();
+    return Number.isFinite(timestamp) && timestamp >= cutoff && timestamp <= windowEnd;
+  });
+  if (articles.length === 0) return null;
+  const countries = new Map<string, StoryView["countries"][number]>();
+  for (const country of articles.flatMap((article) => article.countries)) {
+    const current = countries.get(country.code);
+    if (!current || country.relevanceScore > current.relevanceScore) countries.set(country.code, country);
+  }
+  const timestamps = articles.map(({ publishedAt }) => new Date(publishedAt).getTime());
+  return {
+    ...story,
+    articles,
+    countries: [...countries.values()].sort((first, second) =>
+      second.relevanceScore - first.relevanceScore || first.code.localeCompare(second.code)
+    ),
+    topics: [...new Set(articles.flatMap((article) => article.topics))],
+    firstPublishedAt: new Date(Math.min(...timestamps)).toISOString(),
+    lastUpdatedAt: new Date(Math.max(...timestamps)).toISOString(),
+  };
+}
+
 export function queryStories(
   stories: StoryView[],
   query: NewsQuery,
@@ -217,7 +251,8 @@ export function queryStories(
 } {
   const cutoff = now.getTime() - newsPeriodHours(query.period) * 3_600_000;
   const candidates = stories
-    .filter((story) => new Date(story.lastUpdatedAt).getTime() >= cutoff)
+    .map((story) => projectStoryToPublicationWindow(story, cutoff, now.getTime()))
+    .filter((story): story is StoryView => story !== null)
     .filter((story) => {
       if (query.countries.length !== 2) {
         return query.countries.every((code) => storyMatchesCountry(story, code));
@@ -307,11 +342,30 @@ export function buildNewsResponse(
   query: NewsQuery,
   dataSource: NewsResponse["meta"]["dataSource"],
   notice?: string,
-  corpus: { articleCount?: number; corpusComplete?: boolean } = {},
+  corpus: {
+    articleCount?: number;
+    corpusComplete?: boolean;
+    discoveryExhausted?: boolean;
+    archiveCoverageComplete?: boolean;
+    coverageComplete?: boolean;
+    coverageDegraded?: boolean;
+    coverageStatus?: NewsResponse["meta"]["coverageStatus"];
+    coverageReasons?: string[];
+    corpusLimitReached?: boolean;
+    diagnostics?: NewsResponse["meta"]["diagnostics"];
+    continuationId?: string;
+    continuationReset?: boolean;
+  } = {},
 ): NewsResponse {
   const preserveOrder = dataSource === "live";
   const result = queryStories(stories, query, new Date(), { preserveOrder });
   const corpusComplete = corpus.corpusComplete ?? true;
+  const discoveryExhausted = corpus.discoveryExhausted ?? corpusComplete;
+  const archiveCoverageComplete = corpus.archiveCoverageComplete ?? true;
+  const coverageComplete = corpus.coverageComplete ?? corpusComplete;
+  const coverageDegraded = corpus.coverageDegraded ?? false;
+  const coverageStatus = corpus.coverageStatus ?? (coverageComplete ? "complete" : "limited");
+  const corpusLimitReached = corpus.corpusLimitReached ?? false;
   const cachedStoriesRemain = query.page * query.pageSize < result.total;
   const hasMore = cachedStoriesRemain || !corpusComplete;
   const partialPage = result.stories.length < query.pageSize;
@@ -329,6 +383,16 @@ export function buildNewsResponse(
       materializedStoryCount: result.total,
       hasMore,
       corpusComplete,
+      discoveryExhausted,
+      archiveCoverageComplete,
+      coverageComplete,
+      coverageDegraded,
+      coverageStatus,
+      coverageReasons: corpus.coverageReasons ?? [],
+      corpusLimitReached,
+      diagnostics: corpus.diagnostics,
+      continuationId: corpus.continuationId,
+      continuationReset: corpus.continuationReset,
       nextPage,
       page: query.page,
       pageSize: query.pageSize,

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { logNews } from "../logger";
+import { publicationDateInRange, trustedPublicationDate } from "../publication-date";
 import type { ProviderArticle, ProviderFetchRequest, ProviderFetchResult } from "../types";
 import { fetchWithTimeout, type NewsProvider, ProviderError } from "./provider";
 
@@ -44,6 +45,8 @@ export class NewsApiProvider implements NewsProvider {
     sourceMetadata: true,
     requiresCredentials: true,
   } as const;
+  private sourceCountriesCache?: { expiresAt: number; value: Map<string, string> };
+  private sourceCountriesInFlight?: Promise<Map<string, string>>;
 
   constructor(
     private readonly apiKey: string,
@@ -53,22 +56,36 @@ export class NewsApiProvider implements NewsProvider {
   }
 
   private async fetchSourceCountries(): Promise<Map<string, string>> {
+    if (this.sourceCountriesCache && this.sourceCountriesCache.expiresAt > Date.now()) {
+      return this.sourceCountriesCache.value;
+    }
+    if (this.sourceCountriesInFlight) return this.sourceCountriesInFlight;
+    const pending = (async () => {
+      try {
+        const response = await fetchWithTimeout(
+          "https://newsapi.org/v2/top-headlines/sources",
+          { headers: { "X-Api-Key": this.apiKey, Accept: "application/json" } },
+          this.timeoutMs,
+        );
+        if (!response.ok) return new Map<string, string>();
+        const parsed = newsApiSourcesSchema.safeParse(await response.json());
+        if (!parsed.success || parsed.data.status !== "ok") return new Map<string, string>();
+        return new Map(
+          parsed.data.sources.flatMap((source) =>
+            source.country ? [[source.id, source.country.toUpperCase()] as const] : [],
+          ),
+        );
+      } catch {
+        return new Map<string, string>();
+      }
+    })();
+    this.sourceCountriesInFlight = pending;
     try {
-      const response = await fetchWithTimeout(
-        "https://newsapi.org/v2/top-headlines/sources",
-        { headers: { "X-Api-Key": this.apiKey, Accept: "application/json" } },
-        this.timeoutMs,
-      );
-      if (!response.ok) return new Map();
-      const parsed = newsApiSourcesSchema.safeParse(await response.json());
-      if (!parsed.success || parsed.data.status !== "ok") return new Map();
-      return new Map(
-        parsed.data.sources.flatMap((source) =>
-          source.country ? [[source.id, source.country.toUpperCase()] as const] : [],
-        ),
-      );
-    } catch {
-      return new Map();
+      const value = await pending;
+      this.sourceCountriesCache = { value, expiresAt: Date.now() + 30 * 60_000 };
+      return value;
+    } finally {
+      if (this.sourceCountriesInFlight === pending) this.sourceCountriesInFlight = undefined;
     }
   }
 
@@ -76,6 +93,7 @@ export class NewsApiProvider implements NewsProvider {
     query: string,
     request: ProviderFetchRequest = {},
   ): Promise<ProviderFetchResult> {
+    const sourceCountries = await this.fetchSourceCountries();
     const url = new URL("https://newsapi.org/v2/everything");
     url.searchParams.set("q", query);
     url.searchParams.set("sortBy", "publishedAt");
@@ -83,9 +101,19 @@ export class NewsApiProvider implements NewsProvider {
     const page = Math.max(1, request.continuation?.page ?? 1);
     url.searchParams.set("pageSize", String(pageSize));
     url.searchParams.set("page", String(page));
-    const sourceIdentifiers = [...new Set((request.sourceTargets ?? []).flatMap(
+    const selectedSourceIdentifiers = [...new Set((request.sourceTargets ?? []).flatMap(
       (target) => target.providerIdentifiers.NEWSAPI ?? [],
     ))];
+    const perspectiveIndex = request.sourcePerspective === "second-country" ? 1 : 0;
+    const perspectiveCountry = ["local", "first-country", "second-country"].includes(request.sourcePerspective ?? "all")
+      ? request.countries?.[perspectiveIndex]
+      : undefined;
+    const localSourceIdentifiers = perspectiveCountry
+      ? [...sourceCountries].flatMap(([identifier, countryCode]) => countryCode === perspectiveCountry ? [identifier] : [])
+      : [];
+    const sourceIdentifiers = request.sourceTargets?.length
+      ? selectedSourceIdentifiers
+      : localSourceIdentifiers;
     const domains = [...new Set((request.sourceTargets ?? []).flatMap(({ domains: values }) => values))];
     if (sourceIdentifiers.length > 0) url.searchParams.set("sources", sourceIdentifiers.slice(0, 20).join(","));
     if (domains.length > 0) url.searchParams.set("domains", domains.slice(0, 20).join(","));
@@ -100,6 +128,7 @@ export class NewsApiProvider implements NewsProvider {
       domainCount: domains.length,
     });
     let response: Response;
+    let retriedWithoutHostedDates = false;
     try {
       response = await fetchWithTimeout(
         url,
@@ -109,6 +138,7 @@ export class NewsApiProvider implements NewsProvider {
       if (response.status === 400 && (url.searchParams.has("from") || url.searchParams.has("to"))) {
         url.searchParams.delete("from");
         url.searchParams.delete("to");
+        retriedWithoutHostedDates = true;
         response = await fetchWithTimeout(
           url,
           { headers: { "X-Api-Key": this.apiKey, Accept: "application/json" } },
@@ -119,27 +149,52 @@ export class NewsApiProvider implements NewsProvider {
       throw new ProviderError(this.name, "REQUEST_FAILED", "NewsAPI request failed");
     }
     if (!response.ok) {
+      if (response.status === 426) {
+        throw new ProviderError(this.name, "PROVIDER_LIMIT", "NewsAPI plan result limit was reached");
+      }
       throw new ProviderError(this.name, `HTTP_${response.status}`, "NewsAPI returned an error");
     }
     const parsed = newsApiResponseSchema.safeParse(await response.json());
     if (!parsed.success || parsed.data.status !== "ok") {
       throw new ProviderError(this.name, "INVALID_RESPONSE", "NewsAPI response was not usable");
     }
+    if (retriedWithoutHostedDates) {
+      logNews("warn", "newsapi_hosted_date_filter_unavailable", {
+        localPublicationWindowEnforced: true,
+      });
+    }
 
-    const sourceCountries = await this.fetchSourceCountries();
-    const articles: ProviderArticle[] = (parsed.data.articles ?? []).map((article) => ({
-      provider: this.name,
-      providerArticleId: article.url,
-      title: article.title,
-      description: article.description,
-      url: article.url,
-      imageUrl: article.urlToImage,
-      publishedAt: article.publishedAt,
-      sourceName: article.source.name,
-      sourceIdentifier: article.source.id,
-      sourceCountry: article.source.id ? sourceCountries.get(article.source.id) ?? null : null,
+    const rawArticles = parsed.data.articles ?? [];
+    let outOfWindow = 0;
+    const datedArticles = rawArticles.map((article) => ({
+      article,
+      publishedAt: trustedPublicationDate([article.publishedAt]),
     }));
-    const exhausted = articles.length < pageSize || (
+    const articles: ProviderArticle[] = datedArticles.flatMap(({ article, publishedAt }) => {
+      if (!publishedAt || !publicationDateInRange(publishedAt, request.from, request.to)) {
+        outOfWindow += 1;
+        return [];
+      }
+      return [{
+        provider: this.name,
+        providerArticleId: article.url,
+        title: article.title,
+        description: article.description,
+        url: article.url,
+        imageUrl: article.urlToImage,
+        publishedAt,
+        sourceName: article.source.name,
+        sourceIdentifier: article.source.id,
+        sourceCountry: article.source.id ? sourceCountries.get(article.source.id) ?? null : null,
+      }];
+    });
+    const oldestRaw = datedArticles.reduce<number | null>((current, { publishedAt }) => {
+      if (!publishedAt) return current;
+      const timestamp = new Date(publishedAt).getTime();
+      return current === null || timestamp < current ? timestamp : current;
+    }, null);
+    const reachedWindowStart = Boolean(request.from && oldestRaw !== null && oldestRaw <= request.from.getTime());
+    const exhausted = rawArticles.length < pageSize || reachedWindowStart || (
       parsed.data.totalResults !== undefined && page * pageSize >= parsed.data.totalResults
     );
     return {
@@ -148,6 +203,27 @@ export class NewsApiProvider implements NewsProvider {
       receivedAt: new Date().toISOString(),
       continuation: exhausted ? null : { page: page + 1 },
       exhausted,
+      coverage: {
+        archiveCapable: true,
+        windowStart: request.from?.toISOString(),
+        windowEnd: request.to?.toISOString(),
+        coveredFrom: exhausted
+          ? request.from?.toISOString()
+          : oldestRaw === null
+            ? undefined
+            : new Date(oldestRaw).toISOString(),
+        coveredTo: request.to?.toISOString(),
+        timeRangeCovered: exhausted,
+        exhaustionReason: exhausted ? "time_range_covered" : undefined,
+      },
+      diagnostics: {
+        received: rawArticles.length,
+        plansAttempted: 1,
+        plansCompleted: exhausted ? page : Math.max(0, page - 1),
+        languages: language ? [language] : [],
+        countryQueries: [query],
+        outOfWindow,
+      },
     };
   }
 

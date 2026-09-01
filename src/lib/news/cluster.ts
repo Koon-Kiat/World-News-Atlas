@@ -250,11 +250,46 @@ function buildClusters(
 ): StoryCandidate[] {
   const clusters: NormalizedArticle[][] = [];
   for (const article of articles) {
-    const cluster = clusters.find((candidate) => candidate.some((existing) => canCluster(existing, article)));
+    const cluster = clusters.find((candidate) => clusterAccepts(candidate, article, canCluster));
     if (cluster) cluster.push(article);
     else clusters.push([article]);
   }
   return clusters.map((cluster) => toCandidate(cluster, pairScores));
+}
+
+function representativeForCluster(cluster: NormalizedArticle[]): NormalizedArticle {
+  return [...cluster].sort(
+    (first, second) =>
+      second.importanceScore - first.importanceScore ||
+      new Date(first.publishedAt).getTime() - new Date(second.publishedAt).getTime(),
+  )[0];
+}
+
+/**
+ * Prevent single-link chain merging: every new member must match the stable
+ * representative and, once a cluster has depth, at least one third of the
+ * remaining members. This still permits true cross-language event pairs when
+ * their semantic decision matches the representative.
+ */
+function clusterAccepts(
+  cluster: NormalizedArticle[],
+  article: NormalizedArticle,
+  canCluster: (first: NormalizedArticle, second: NormalizedArticle) => boolean,
+  onCompare?: () => void,
+): boolean {
+  const representative = representativeForCluster(cluster);
+  onCompare?.();
+  if (!canCluster(representative, article)) return false;
+  if (cluster.length <= 2) return true;
+  const peers = cluster.filter((member) => member !== representative);
+  let support = 0;
+  const required = Math.max(1, Math.ceil(peers.length / 3));
+  for (const peer of peers) {
+    onCompare?.();
+    if (canCluster(peer, article)) support += 1;
+    if (support >= required) return true;
+  }
+  return false;
 }
 
 function buildClustersIncrementally(
@@ -270,13 +305,12 @@ function buildClustersIncrementally(
   for (const article of incomingArticles) {
     let matchingCluster = -1;
     for (let clusterIndex = 0; clusterIndex < clusters.length && matchingCluster < 0; clusterIndex += 1) {
-      for (const existing of clusters[clusterIndex]) {
-        comparedPairCount += 1;
-        if (canCluster(existing, article)) {
-          matchingCluster = clusterIndex;
-          break;
-        }
-      }
+      if (clusterAccepts(
+        clusters[clusterIndex],
+        article,
+        canCluster,
+        () => { comparedPairCount += 1; },
+      )) matchingCluster = clusterIndex;
     }
     if (matchingCluster >= 0) {
       clusters[matchingCluster].push(article);

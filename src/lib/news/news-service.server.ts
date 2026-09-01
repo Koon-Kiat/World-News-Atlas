@@ -5,14 +5,27 @@ import { loadNewsDataset } from "./data-store";
 
 export async function getNews(query: NewsQuery): Promise<NewsResponse> {
   const dataset = await loadNewsDataset(query);
+  const responseQuery = dataset.continuationReset ? { ...query, page: 1 } : query;
   return buildNewsResponse(
     dataset.stories,
-    query,
+    responseQuery,
     dataset.dataSource,
-    dataset.notice,
+    dataset.notice ?? (dataset.continuationReset
+      ? "Live coverage restarted because the previous continuation expired."
+      : undefined),
     {
       articleCount: dataset.articleCount,
       corpusComplete: dataset.corpusComplete,
+      discoveryExhausted: dataset.discoveryExhausted,
+      archiveCoverageComplete: dataset.archiveCoverageComplete,
+      coverageComplete: dataset.coverageComplete,
+      coverageDegraded: dataset.coverageDegraded,
+      coverageStatus: dataset.coverageStatus,
+      coverageReasons: dataset.coverageReasons,
+      corpusLimitReached: dataset.corpusLimitReached,
+      diagnostics: dataset.diagnostics,
+      continuationId: dataset.continuationId,
+      continuationReset: dataset.continuationReset,
     },
   );
 }

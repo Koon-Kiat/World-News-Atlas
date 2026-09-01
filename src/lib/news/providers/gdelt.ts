@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { countryNameToCode } from "../countries/metadata";
+import {
+  buildCountryDiscoveryQuery,
+  discoveryProfilesForCountries,
+  localPublisherTargetsForCountries,
+} from "../countries/discovery";
+import { countryNameToCode, getCountryName } from "../countries/metadata";
 import { logNews } from "../logger";
 import { publicationDateInRange, trustedPublicationDate } from "../publication-date";
 import type { ProviderArticle, ProviderFetchRequest, ProviderFetchResult } from "../types";
@@ -22,12 +27,32 @@ const gdeltResponseSchema = z.object({
 });
 
 const LANGUAGE_CODES: Record<string, string> = {
-  english: "en",
-  japanese: "ja",
-  chinese: "zh",
-  french: "fr",
-  german: "de",
-  spanish: "es",
+  afrikaans: "af", albanian: "sq", arabic: "ar", armenian: "hy", azerbaijani: "az",
+  bengali: "bn", bosnian: "bs", bulgarian: "bg", catalan: "ca", chinese: "zh",
+  croatian: "hr", czech: "cs", danish: "da", dutch: "nl", english: "en",
+  estonian: "et", finnish: "fi", french: "fr", galician: "gl", georgian: "ka",
+  german: "de", greek: "el", gujarati: "gu", hebrew: "he", hindi: "hi",
+  hungarian: "hu", icelandic: "is", indonesian: "id", italian: "it", japanese: "ja",
+  kannada: "kn", kazakh: "kk", korean: "ko", latvian: "lv", lithuanian: "lt",
+  macedonian: "mk", malay: "ms", malayalam: "ml", marathi: "mr", mongolian: "mn",
+  nepali: "ne", norwegian: "no", persian: "fa", polish: "pl", portuguese: "pt",
+  punjabi: "pa", romanian: "ro", russian: "ru", serbian: "sr", sinhalese: "si",
+  slovak: "sk", slovenian: "sl", somali: "so", spanish: "es", swahili: "sw",
+  swedish: "sv", tamil: "ta", telugu: "te", thai: "th", turkish: "tr",
+  ukrainian: "uk", vietnamese: "vi",
+};
+
+const GDELT_LANGUAGE_NAMES_BY_CODE: Record<string, string> = Object.fromEntries(
+  Object.entries(LANGUAGE_CODES).map(([name, code]) => [code, name]),
+);
+
+const GDELT_SOURCE_COUNTRY_NAMES: Readonly<Record<string, string>> = {
+  US: "unitedstates",
+  GB: "unitedkingdom",
+  KR: "southkorea",
+  KP: "northkorea",
+  CZ: "czechrepublic",
+  CI: "ivorycoast",
 };
 
 function gdeltDate(value?: string): string | null {
@@ -48,29 +73,56 @@ function gdeltApiDate(value: Date): string {
 }
 
 function gdeltLanguageNames(request: ProviderFetchRequest): string[] {
-  const language = request.language?.toLowerCase();
-  if (language?.startsWith("ja")) return ["japanese"];
-  if (language?.startsWith("en")) return ["english"];
-  if (request.countries?.includes("JP")) return ["english", "japanese"];
-  return [];
+  const language = request.language?.toLowerCase().split("-")[0];
+  if (language) return GDELT_LANGUAGE_NAMES_BY_CODE[language]
+    ? [GDELT_LANGUAGE_NAMES_BY_CODE[language]]
+    : [];
+  return [...new Set(
+    discoveryProfilesForCountries(request.countries ?? []).flatMap(({ gdeltLanguages }) => gdeltLanguages),
+  )].slice(0, 3);
+}
+
+function gdeltSourceCountry(request: ProviderFetchRequest): string | null {
+  const countries = request.countries ?? [];
+  const index = request.sourcePerspective === "second-country" ? 1 : 0;
+  if (!["local", "first-country", "second-country"].includes(request.sourcePerspective ?? "all")) return null;
+  const code = countries[index];
+  if (!code) return null;
+  if (GDELT_SOURCE_COUNTRY_NAMES[code]) return GDELT_SOURCE_COUNTRY_NAMES[code];
+  return getCountryName(code).normalize("NFKD").replace(/\p{Diacritic}/gu, "").replace(/[^\p{L}\p{N}]+/gu, "").toLocaleLowerCase("en");
 }
 
 export function buildGdeltDiscoveryQueries(
   query: string,
   request: ProviderFetchRequest = {},
 ): string[] {
-  const targetDomains = [...new Set((request.sourceTargets ?? []).flatMap((target) => [
+  const explicitTargetDomains = [...new Set((request.sourceTargets ?? []).flatMap((target) => [
     ...target.domains,
     ...(target.providerIdentifiers.GDELT ?? []),
   ]))];
-  const domainFilter = targetDomains.length > 0
-    ? `(${targetDomains.map((domain) => `domainis:${domain}`).join(" OR ")})`
+  const domainFilter = explicitTargetDomains.length > 0
+    ? `(${explicitTargetDomains.map((domain) => `domainis:${domain}`).join(" OR ")})`
     : "";
-  const base = [query, domainFilter].filter(Boolean).join(" AND ");
+  const sourceCountry = gdeltSourceCountry(request);
+  const sourceCountryFilter = sourceCountry ? `sourcecountry:${sourceCountry}` : "";
+  const base = [query, domainFilter, sourceCountryFilter].filter(Boolean).join(" AND ");
   const languages = gdeltLanguageNames(request);
-  return languages.length > 0
+  const primaryBranches = languages.length > 0
     ? languages.map((language) => `${base} sourcelang:${language}`)
     : [base];
+  if (request.sourceTargets?.length) return primaryBranches.slice(0, 3);
+
+  const localDomains = request.sourcePerspective === "all"
+    ? [...new Set(localPublisherTargetsForCountries(request.countries ?? []).flatMap(({ domains }) => domains))].slice(0, 8)
+    : [];
+  const localFilter = sourceCountryFilter || (localDomains.length > 0
+    ? `(${localDomains.map((domain) => `domainis:${domain}`).join(" OR ")})`
+    : "");
+  const localLanguage = languages.find((language) => language !== "english") ?? languages[0];
+  const localBranch = localFilter
+    ? [localFilter, localLanguage ? `sourcelang:${localLanguage}` : ""].filter(Boolean).join(" ")
+    : "";
+  return [...new Set([...primaryBranches, localBranch].filter(Boolean))].slice(0, 3);
 }
 
 export class GdeltProvider implements NewsProvider {
@@ -119,9 +171,13 @@ export class GdeltProvider implements NewsProvider {
     if (!parsed.success) {
       throw new ProviderError(this.name, "INVALID_RESPONSE", "GDELT response was not usable");
     }
-    const articles: ProviderArticle[] = parsed.data.articles.flatMap((article) => {
-      const publishedAt = gdeltDate(article.seendate);
-      if (!publishedAt || !publicationDateInRange(publishedAt, request.from, request.to)) return [];
+    let outOfWindow = 0;
+    const datedArticles = parsed.data.articles.map((article) => ({ article, publishedAt: gdeltDate(article.seendate) }));
+    const articles: ProviderArticle[] = datedArticles.flatMap(({ article, publishedAt }) => {
+      if (!publishedAt || !publicationDateInRange(publishedAt, request.from, request.to)) {
+        outOfWindow += 1;
+        return [];
+      }
       return [{
         provider: this.name,
         providerArticleId: article.url,
@@ -135,23 +191,37 @@ export class GdeltProvider implements NewsProvider {
         sourceCountry: countryNameToCode(article.sourcecountry),
       }];
     });
-    const oldest = articles.reduce<number | null>((current, article) => {
-      const timestamp = new Date(article.publishedAt).getTime();
+    const oldest = datedArticles.reduce<number | null>((current, { publishedAt }) => {
+      const timestamp = publishedAt ? new Date(publishedAt).getTime() : Number.NaN;
+      if (!Number.isFinite(timestamp)) return current;
       return current === null || timestamp < current ? timestamp : current;
     }, null);
-    const exhausted = articles.length < maximumRecords || oldest === null || oldest <= rangeStart.getTime();
+    const pageShort = parsed.data.articles.length < maximumRecords;
+    const reachedStart = oldest === null || oldest <= rangeStart.getTime();
+    const exhausted = pageShort || reachedStart;
+    const timeRangeCovered = exhausted;
     return {
       provider: this.name,
       articles,
       receivedAt: new Date().toISOString(),
       continuation: exhausted ? null : { before: new Date(oldest - 1).toISOString() },
       exhausted,
+      coverage: {
+        archiveCapable: true,
+        windowStart: rangeStart.toISOString(),
+        windowEnd: rangeEnd.toISOString(),
+        coveredFrom: timeRangeCovered ? rangeStart.toISOString() : new Date(oldest).toISOString(),
+        coveredTo: rangeEnd.toISOString(),
+        timeRangeCovered,
+        exhaustionReason: timeRangeCovered ? "time_range_covered" : undefined,
+      },
+      diagnostics: { received: parsed.data.articles.length, outOfWindow },
     };
   }
 
   fetchLatest(request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
     return this.search(
-      request.query ?? (request.countries?.includes("JP") ? '("Japan" OR "日本" OR "日本国")' : "world"),
+      request.query ?? buildCountryDiscoveryQuery(request.countries ?? []) ?? "world",
       request,
     );
   }
@@ -163,9 +233,9 @@ export class GdeltProvider implements NewsProvider {
       existingCursors?.[discoveryQuery] !== null
     );
     logNews("info", "gdelt_discovery_planned", {
-      provider_source_targeted_query_count: request.sourceTargets?.length
-        ? activeQueries.length
-        : 0,
+      provider_source_targeted_query_count: activeQueries.filter((discoveryQuery) =>
+        /\b(?:domainis|sourcecountry):/u.test(discoveryQuery)
+      ).length,
       discoveryQueryCount: activeQueries.length,
       exhaustedDiscoveryQueryCount: discoveryQueries.length - activeQueries.length,
     });
@@ -202,6 +272,11 @@ export class GdeltProvider implements NewsProvider {
     const exhausted = discoveryQueries.every((discoveryQuery) =>
       discoveryCursors[discoveryQuery] === null
     );
+    const fulfilled = settled.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+    const cursorDates = Object.values(discoveryCursors)
+      .filter((cursor): cursor is string => Boolean(cursor))
+      .map((cursor) => new Date(cursor).getTime())
+      .filter(Number.isFinite);
     const singleCursor = discoveryQueries.length === 1
       ? discoveryCursors[discoveryQueries[0]]
       : null;
@@ -215,6 +290,27 @@ export class GdeltProvider implements NewsProvider {
           ? { before: singleCursor }
           : { discoveryCursors },
       exhausted,
+      coverage: {
+        archiveCapable: true,
+        windowStart: request.from?.toISOString(),
+        windowEnd: request.to?.toISOString(),
+        coveredFrom: exhausted
+          ? request.from?.toISOString()
+          : cursorDates.length > 0
+            ? new Date(Math.min(...cursorDates)).toISOString()
+            : undefined,
+        coveredTo: request.to?.toISOString(),
+        timeRangeCovered: exhausted && fulfilled.every(({ coverage }) => coverage?.timeRangeCovered !== false),
+        exhaustionReason: exhausted ? "time_range_covered" : undefined,
+      },
+      diagnostics: {
+        received: fulfilled.reduce((total, result) => total + (result.diagnostics?.received ?? result.articles.length), 0),
+        plansAttempted: activeQueries.length,
+        plansCompleted: discoveryQueries.filter((discoveryQuery) => discoveryCursors[discoveryQuery] === null).length,
+        languages: gdeltLanguageNames(request),
+        countryQueries: activeQueries,
+        outOfWindow: fulfilled.reduce((total, result) => total + (result.diagnostics?.outOfWindow ?? 0), 0),
+      },
     };
   }
 }
