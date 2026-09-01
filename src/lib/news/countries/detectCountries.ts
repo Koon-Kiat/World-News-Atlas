@@ -57,10 +57,11 @@ interface PreparedCountrySignal {
   isoCodes: string[];
 }
 
-const UNSAFE_ALPHA2_CODES = new Set([
-  "AD", "AM", "AS", "AT", "BE", "BY", "DO", "IN", "IS", "IT", "ME", "MY", "NO", "OR", "SO", "TO",
-]);
-const UNSAFE_ALPHA3_CODES = new Set(["ARE", "CAN"]);
+// Free-text two/three-letter ISO matching creates unavoidable collisions with
+// ordinary acronyms (for example PM = Saint Pierre and Miquelon). Structured
+// provider country codes are handled separately above. Keep only reviewed,
+// widely used country abbreviations in unstructured headlines and excerpts.
+const SAFE_TEXT_COUNTRY_CODES = new Set(["DPRK", "UAE", "UK", "U.K.", "US", "U.S.", "USA"]);
 const COMPACT_SCRIPT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 const LETTER_OR_NUMBER = /[\p{L}\p{N}]/u;
 
@@ -152,11 +153,7 @@ function safeNames(signal: CountrySignals): string[] {
 }
 
 function prepareIsoCodes(codes: string[]): string[] {
-  return [...new Set(codes)].filter((code) => {
-    if (code.length === 2 && UNSAFE_ALPHA2_CODES.has(code)) return false;
-    if (code.length === 3 && UNSAFE_ALPHA3_CODES.has(code)) return false;
-    return true;
-  });
+  return [...new Set(codes)].filter((code) => SAFE_TEXT_COUNTRY_CODES.has(code));
 }
 
 const PREPARED_COUNTRY_SIGNALS: PreparedCountrySignal[] = COUNTRY_SIGNALS.map((signal) => {
