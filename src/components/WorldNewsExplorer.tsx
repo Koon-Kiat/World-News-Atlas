@@ -253,6 +253,7 @@ export function WorldNewsExplorer({
     setIsLoadingMore(true);
     const nextUrl = new URL(requestUrl, window.location.origin);
     nextUrl.searchParams.set("page", String(nextPage));
+    if (data.meta.continuationId) nextUrl.searchParams.set("continuation", data.meta.continuationId);
     fetch(`${nextUrl.pathname}?${nextUrl.searchParams.toString()}`, {
       signal: controller.signal,
       cache: "no-store",
@@ -263,6 +264,14 @@ export function WorldNewsExplorer({
         return (await response.json()) as NewsResponse;
       })
       .then((responseData) => {
+        if (responseData.meta.continuationReset) {
+          setData(responseData);
+          setContinuationVersion((current) => current + 1);
+          setLoadedPage(responseData.meta.page);
+          setCanFetchMore(responseHasNextPage(responseData));
+          setError(null);
+          return;
+        }
         const mergedPage = mergeNextPage(data.stories, responseData, nextPage);
         setData((current) => {
           const mergedCurrentPage = mergeNextPage(current.stories, responseData, nextPage);
@@ -404,8 +413,14 @@ export function WorldNewsExplorer({
                 <span className="refreshing"><i aria-hidden="true" /> Checking live sources…</span>
               ) : (
                 <span>
-                  {data.meta.total}{data.meta.corpusComplete ? "" : "+"} {data.meta.total === 1 ? "story" : "stories"}
-                  <small>{data.meta.corpusComplete ? newsPeriodLabel(period) : `${newsPeriodLabel(period)} · live corpus expanding`}</small>
+                  {data.meta.total}{data.meta.coverageStatus === "expanding" ? "+" : ""} {data.meta.total === 1 ? "story" : "stories"}
+                  <small>
+                    {data.meta.coverageComplete
+                      ? newsPeriodLabel(period)
+                      : data.meta.coverageStatus === "expanding"
+                        ? `${newsPeriodLabel(period)} · discovering more coverage`
+                        : `${newsPeriodLabel(period)} · from currently available coverage`}
+                  </small>
                 </span>
               )}
             </div>
@@ -439,6 +454,12 @@ export function WorldNewsExplorer({
             <div className="notice-banner" role="status">
               <span>Demo feed</span>
               <p>{data.meta.notice ?? "Sample stories are being used while live ingestion is unavailable."}</p>
+            </div>
+          )}
+          {!isLoading && data.meta.dataSource !== "fixtures" && data.meta.continuationReset && (
+            <div className="notice-banner" role="status">
+              <span>Coverage refreshed</span>
+              <p>{data.meta.notice ?? "Live coverage restarted because the previous continuation expired."}</p>
             </div>
           )}
           {error && <div className="error-banner" role="alert">{error}</div>}

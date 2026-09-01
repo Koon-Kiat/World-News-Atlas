@@ -14,6 +14,7 @@ export function logNews(
   event: string,
   details: Record<string, unknown> = {},
 ): void {
+  if (process.env.NEWS_DIAGNOSTIC_QUIET === "true") return;
   const entry = JSON.stringify({
     timestamp: new Date().toISOString(),
     level,

@@ -96,7 +96,7 @@ describe("Bing News RSS provider", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(result.continuation).toEqual({ offset: 2 });
+    expect(result.continuation).toEqual(expect.objectContaining({ offset: 2 }));
     while (result.continuation) {
       result = await provider.search('"Japan"', {
         countries: ["JP"],
@@ -104,7 +104,7 @@ describe("Bing News RSS provider", () => {
         continuation: result.continuation,
       });
     }
-    expect(fetchMock).toHaveBeenCalledTimes(10);
+    expect(fetchMock).toHaveBeenCalledTimes(18);
     const requestedQueries = fetchMock.mock.calls.map(([input]) => new URL(String(input)).searchParams.get("q"));
     expect(requestedQueries).toContain('"Japan" site:reuters.com');
     expect(requestedQueries).toContain('"Japan" site:apnews.com');

@@ -1,0 +1,136 @@
+[
+  {
+    "code": "US",
+    "cities": [
+      "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia", "San Antonio",
+      "San Diego", "Dallas", "San Francisco", "Seattle", "Boston", "Miami", "Silicon Valley",
+      "California", "Texas", "Florida", "New York State", "Illinois", "Pennsylvania",
+      "Ohio", "Michigan", "Massachusetts", "New Jersey", "North Carolina", "Virginia"
+    ],
+    "institutions": [
+      "White House", "Federal Reserve", "U.S. Congress", "United States Congress",
+      "Supreme Court of the United States", "U.S. Supreme Court", "Pentagon"
+    ]
+  },
+  {
+    "code": "CA",
+    "aliases": ["Canada"],
+    "demonyms": ["Canadian"],
+    "cities": [
+      "Ottawa", "Toronto", "Vancouver", "Montreal", "Montréal", "Calgary", "Edmonton",
+      "Ontario", "Quebec", "Québec", "Alberta", "British Columbia", "Nova Scotia",
+      "New Brunswick", "Saskatchewan", "Manitoba"
+    ],
+    "institutions": ["Bank of Canada", "House of Commons of Canada", "Supreme Court of Canada"]
+  },
+  {
+    "code": "AU",
+    "aliases": ["Australia"],
+    "demonyms": ["Australian"],
+    "cities": [
+      "Canberra", "Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide", "Darwin",
+      "New South Wales", "Queensland", "Tasmania", "Western Australia", "South Australia",
+      "Australian Capital Territory", "Northern Territory"
+    ],
+    "institutions": ["Reserve Bank of Australia", "Parliament of Australia", "High Court of Australia"]
+  },
+  {
+    "code": "IN",
+    "aliases": ["India", "Republic of India", "भारत", "भारत गणराज्य"],
+    "demonyms": ["Indian", "भारतीय"],
+    "cities": [
+      "New Delhi", "Mumbai", "Bengaluru", "Bangalore", "Chennai", "Hyderabad", "Kolkata",
+      "Ahmedabad", "Pune", "Karnataka", "Tamil Nadu", "Uttar Pradesh", "Maharashtra",
+      "Kerala", "Gujarat", "Rajasthan", "Madhya Pradesh", "West Bengal", "Telangana"
+    ],
+    "institutions": ["Reserve Bank of India", "Lok Sabha", "Rajya Sabha", "Supreme Court of India"]
+  },
+  {
+    "code": "JP",
+    "cities": [
+      "Chiba", "Saitama", "Kanagawa", "Niigata", "Ishikawa", "Nagano", "Shizuoka",
+      "Aichi", "Nara", "Wakayama", "Okayama", "Yamaguchi", "Ehime", "Kochi", "Kōchi",
+      "Kumamoto", "Kagoshima", "Miyazaki", "Aomori", "Akita", "Iwate", "Yamagata",
+      "Fukushima", "Ibaraki", "Tochigi", "Gunma", "Yamanashi", "Toyama", "Fukui",
+      "Gifu", "Mie", "Shiga", "Hyogo", "Hyōgo", "Tottori", "Shimane", "Tokushima",
+      "Kagawa", "Saga", "Oita", "Ōita", "宮城", "千葉", "埼玉", "神奈川", "新潟",
+      "石川", "長野", "静岡", "愛知", "奈良", "和歌山", "岡山", "山口", "愛媛",
+      "高知", "熊本", "鹿児島", "宮崎", "青森", "秋田", "岩手", "山形", "福島",
+      "茨城", "栃木", "群馬", "山梨", "富山", "福井", "岐阜", "三重", "滋賀",
+      "兵庫", "鳥取", "島根", "徳島", "香川", "佐賀", "大分"
+    ],
+    "institutions": [
+      "Bank of Japan", "National Diet of Japan", "Japan Meteorological Agency",
+      "Supreme Court of Japan", "日本銀行", "気象庁", "最高裁判所"
+    ]
+  },
+  {
+    "code": "CN",
+    "cities": [
+      "Guangzhou", "Chongqing", "Chengdu", "Wuhan", "Hangzhou", "Nanjing", "Tianjin",
+      "Guangdong", "Sichuan", "Zhejiang", "Jiangsu", "Hubei", "Henan", "Shandong",
+      "Fujian", "Yunnan", "Xinjiang", "Tibet", "广州", "重庆", "成都", "武汉", "杭州",
+      "南京", "天津", "广东", "四川", "浙江", "江苏", "湖北", "河南", "山东", "福建",
+      "云南", "新疆", "西藏"
+    ],
+    "institutions": [
+      "People's Bank of China", "National People's Congress", "State Council of China",
+      "中国人民银行", "全国人民代表大会", "国务院"
+    ]
+  },
+  {
+    "code": "GB",
+    "cities": [
+      "England", "Scotland", "Wales", "Northern Ireland", "Manchester", "Birmingham",
+      "Liverpool", "Glasgow", "Cardiff", "Belfast", "Leeds", "Bristol"
+    ],
+    "institutions": [
+      "Bank of England", "House of Commons", "Downing Street", "UK Supreme Court",
+      "Supreme Court of the United Kingdom", "Whitehall"
+    ]
+  },
+  {
+    "code": "DE",
+    "cities": [
+      "Cologne", "Köln", "Düsseldorf", "Stuttgart", "Leipzig", "Dresden", "Bavaria",
+      "Bayern", "North Rhine-Westphalia", "Nordrhein-Westfalen", "Hesse", "Hessen",
+      "Saxony", "Sachsen", "Baden-Württemberg", "Lower Saxony", "Niedersachsen"
+    ],
+    "institutions": ["Bundestag", "Bundesrat", "Bundesbank", "Federal Constitutional Court", "Bundesverfassungsgericht"]
+  },
+  {
+    "code": "FR",
+    "cities": [
+      "Toulouse", "Nice", "Nantes", "Montpellier", "Bordeaux", "Lille", "Île-de-France",
+      "Auvergne-Rhône-Alpes", "Nouvelle-Aquitaine", "Occitanie"
+    ],
+    "institutions": ["Élysée Palace", "Elysée Palace", "National Assembly of France", "Banque de France", "Conseil constitutionnel"]
+  },
+  {
+    "code": "SG",
+    "institutions": [
+      "Monetary Authority of Singapore", "Parliament of Singapore", "Housing and Development Board",
+      "Singapore Exchange", "Supreme Court of Singapore"
+    ]
+  },
+  {
+    "code": "KR",
+    "cities": ["Incheon", "Daegu", "Daejeon", "Gwangju", "Jeju", "인천", "대구", "대전", "광주", "제주"],
+    "institutions": ["Bank of Korea", "National Assembly of South Korea", "한국은행", "대한민국 국회"]
+  },
+  {
+    "code": "BR",
+    "cities": ["Belo Horizonte", "Salvador", "Recife", "Curitiba", "Porto Alegre", "Amazonas", "Minas Gerais"],
+    "institutions": ["Banco Central do Brasil", "National Congress of Brazil", "Supreme Federal Court of Brazil"]
+  },
+  {
+    "code": "ES",
+    "cities": ["Seville", "Sevilla", "Bilbao", "Málaga", "Malaga", "Catalonia", "Cataluña", "Andalusia", "Andalucía"],
+    "institutions": ["Banco de España", "Congress of Deputies", "Congreso de los Diputados"]
+  },
+  {
+    "code": "IT",
+    "cities": ["Turin", "Torino", "Bologna", "Florence", "Firenze", "Sicily", "Sicilia", "Sardinia", "Sardegna"],
+    "institutions": ["Banca d'Italia", "Italian Parliament", "Corte costituzionale"]
+  }
+]

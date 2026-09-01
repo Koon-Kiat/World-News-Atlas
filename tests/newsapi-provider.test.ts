@@ -46,6 +46,37 @@ describe("NewsAPI provider", () => {
     expect(result.articles).toHaveLength(1);
   });
 
+  it("locally rejects out-of-window articles after the hosted date fallback", async () => {
+    let everythingCalls = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("top-headlines/sources")) {
+        return new Response(JSON.stringify({ status: "ok", sources: [] }), { status: 200 });
+      }
+      everythingCalls += 1;
+      if (everythingCalls === 1) return new Response(JSON.stringify({ status: "error" }), { status: 400 });
+      return new Response(JSON.stringify({
+        status: "ok",
+        totalResults: 1,
+        articles: [{
+          source: { id: null, name: "Old News" },
+          title: "An old report outside the requested window",
+          description: null,
+          url: "https://example.com/old-report",
+          urlToImage: null,
+          publishedAt: "2026-07-01T00:00:00Z",
+        }],
+      }), { status: 200 });
+    }));
+
+    const result = await new NewsApiProvider("test-key").search("Japan", {
+      from: new Date("2026-08-01T00:00:00Z"),
+      to: new Date("2026-08-31T00:00:00Z"),
+    });
+    expect(result.articles).toHaveLength(0);
+    expect(result.diagnostics?.outOfWindow).toBe(1);
+  });
+
   it("targets selected source IDs and domains without forcing Japanese requests to English", async () => {
     const requestedUrls: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (input: string | URL) => {
@@ -71,6 +102,45 @@ describe("NewsAPI provider", () => {
     expect(request.searchParams.get("sources")).toBe("bbc-news");
     expect(request.searchParams.get("domains")).toBe("bbc.com,bbc.co.uk");
     expect(request.searchParams.has("language")).toBe(false);
+  });
+
+  it("caches source metadata and pushes a local publisher country upstream", async () => {
+    const requestedUrls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      requestedUrls.push(url);
+      if (url.includes("top-headlines/sources")) {
+        return new Response(JSON.stringify({
+          status: "ok",
+          sources: [
+            { id: "bbc-news", country: "gb" },
+            { id: "channel-news-asia", country: "sg" },
+            { id: "straits-times", country: "sg" },
+          ],
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ status: "ok", totalResults: 200, articles: [] }), { status: 200 });
+    }));
+
+    const provider = new NewsApiProvider("test-key");
+    await provider.search("Singapore", {
+      countries: ["SG"],
+      sourcePerspective: "local",
+    });
+    await provider.search("Singapore", {
+      countries: ["SG"],
+      sourcePerspective: "local",
+      continuation: { page: 2 },
+    });
+
+    expect(requestedUrls.filter((url) => url.includes("top-headlines/sources"))).toHaveLength(1);
+    const everything = requestedUrls
+      .filter((url) => url.includes("/everything"))
+      .map((url) => new URL(url));
+    expect(everything).toHaveLength(2);
+    expect(everything.every((url) =>
+      url.searchParams.get("sources") === "channel-news-asia,straits-times"
+    )).toBe(true);
   });
 
   it("advances supported result pages without requesting page 1 again", async () => {
@@ -105,5 +175,17 @@ describe("NewsAPI provider", () => {
     expect(first.continuation).toEqual({ page: 2 });
     expect(second.continuation).toEqual({ page: 3 });
     expect(third).toMatchObject({ continuation: null, exhausted: true });
+  });
+
+  it("reports the subscription result ceiling separately from normal time-range exhaustion", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL) =>
+      String(input).includes("top-headlines/sources")
+        ? new Response(JSON.stringify({ status: "ok", sources: [] }), { status: 200 })
+        : new Response(JSON.stringify({ status: "error" }), { status: 426 })
+    ));
+
+    await expect(new NewsApiProvider("test-key").search("Singapore", {
+      continuation: { page: 4 },
+    })).rejects.toMatchObject({ code: "PROVIDER_LIMIT" });
   });
 });

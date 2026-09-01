@@ -195,6 +195,15 @@ describe("incremental live corpus", () => {
     expect(liveCorpusLimit()).toBe(220);
   });
 
+  it("uses larger accumulated relevant-corpus limits for longer periods", () => {
+    vi.stubEnv("NEWS_LIVE_CORPUS_LIMIT", "2000");
+    expect(liveCorpusLimit("24h")).toBe(360);
+    expect(liveCorpusLimit("latest")).toBe(500);
+    expect(liveCorpusLimit("7d")).toBe(750);
+    expect(liveCorpusLimit("30d")).toBe(1000);
+    expect(liveBatchSize()).toBe(96);
+  });
+
   it("separates cached corpora when a material query parameter changes", async () => {
     const provider = new PagedProvider("OTHER", 300);
     setLiveProviderFactoryForTesting(() => [provider]);
@@ -334,7 +343,8 @@ describe("incremental live corpus", () => {
     const first = await loadNewsDataset(query(1));
     expect(first.stories).toHaveLength(48);
     const second = await loadNewsDataset(query(2));
-    expect(second.stories).toHaveLength(96);
+    expect(second.stories).toHaveLength(140);
+    expect(second.stories.length - first.stories.length).toBeLessThanOrEqual(liveBatchSize());
     expect(healthy.offsets).toEqual([0, 48]);
     expect(failing.calls).toBe(1);
     expect(second.corpusComplete).toBe(false);
@@ -350,5 +360,23 @@ describe("incremental live corpus", () => {
     expect(result.stories).toHaveLength(10);
     expect(result.corpusComplete).toBe(true);
     expect(failing.calls).toBe(1);
+  });
+
+  it("marks an expired process-local continuation as reset instead of silently reusing it", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-31T00:00:00Z"));
+    const provider = new PagedProvider("OTHER", 40, "Reset");
+    setLiveProviderFactoryForTesting(() => [provider]);
+    const first = await loadNewsDataset(query(1));
+
+    resetLiveCorpusForTesting();
+    vi.setSystemTime(new Date("2026-08-31T00:00:01Z"));
+    const restarted = await loadNewsDataset({
+      ...query(2),
+      continuationId: first.continuationId,
+    });
+
+    expect(restarted.continuationReset).toBe(true);
+    expect(restarted.continuationId).not.toBe(first.continuationId);
   });
 });

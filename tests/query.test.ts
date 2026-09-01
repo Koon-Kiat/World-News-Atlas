@@ -63,6 +63,16 @@ describe("news matching", () => {
         { code: "GB", name: "United Kingdom", relevanceScore: 0.73 },
         { code: "FR", name: "France", relevanceScore: 0.73 },
       ],
+      articles: direct.articles.map((article) => ({
+        ...article,
+        countries: [
+          { code: "JP", name: "Japan", relevanceScore: 0.73 },
+          { code: "SG", name: "Singapore", relevanceScore: 0.73 },
+          { code: "US", name: "United States", relevanceScore: 0.73 },
+          { code: "GB", name: "United Kingdom", relevanceScore: 0.73 },
+          { code: "FR", name: "France", relevanceScore: 0.73 },
+        ],
+      })),
     };
     const result = queryStories([incidental], {
       ...baseQuery,
@@ -252,7 +262,7 @@ describe("news matching", () => {
       id: "newest-story",
       lastUpdatedAt: "2026-08-27T11:00:00Z",
       importanceScore: 0.2,
-      articles: [template.articles[0]],
+      articles: [{ ...template.articles[0], publishedAt: "2026-08-27T11:00:00Z" }],
     };
     const popular = {
       ...template,
@@ -260,15 +270,28 @@ describe("news matching", () => {
       lastUpdatedAt: "2026-08-27T01:00:00Z",
       importanceScore: 1,
       articles: [
-        template.articles[0],
-        { ...template.articles[1], id: "popular-second", source: { ...template.articles[1].source, domain: "second.example", countryCode: "SG" } },
-        { ...template.articles[2], id: "popular-third", source: { ...template.articles[2].source, domain: "third.example", countryCode: "GB" } },
+        { ...template.articles[0], publishedAt: "2026-08-27T01:00:00Z" },
+        { ...template.articles[1], id: "popular-second", publishedAt: "2026-08-27T01:05:00Z", source: { ...template.articles[1].source, domain: "second.example", countryCode: "SG" } },
+        { ...template.articles[2], id: "popular-third", publishedAt: "2026-08-27T01:10:00Z", source: { ...template.articles[2].source, domain: "third.example", countryCode: "GB" } },
       ],
     };
     const now = new Date("2026-08-27T12:00:00Z");
 
     expect(queryStories([popular, newest], { ...baseQuery, sort: "newest", period: "30d" }, now).stories[0].id).toBe("newest-story");
     expect(queryStories([popular, newest], { ...baseQuery, sort: "popular", period: "30d" }, now).stories[0].id).toBe("popular-story");
+  });
+
+  it("projects coverage sources to articles inside the requested publication window", () => {
+    const template = getFixtureStories()[0];
+    const recent = { ...template.articles[0], id: "recent", publishedAt: "2026-08-30T00:00:00Z" };
+    const old = { ...template.articles[1], id: "old", publishedAt: "2026-06-01T00:00:00Z" };
+    const result = queryStories([{ ...template, articles: [recent, old] }], {
+      ...baseQuery,
+      period: "7d",
+    }, new Date("2026-08-31T00:00:00Z"));
+    expect(result.stories).toHaveLength(1);
+    expect(result.stories[0].articles.map(({ id }) => id)).toEqual(["recent"]);
+    expect(result.stories[0].firstPublishedAt).toBe("2026-08-30T00:00:00.000Z");
   });
 });
 

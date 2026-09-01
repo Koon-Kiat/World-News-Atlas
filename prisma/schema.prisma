@@ -193,17 +193,66 @@ model StoryTopic {
 }
 
 model ProviderIngestionRun {
-  id              String          @id @default(cuid())
-  provider        ProviderName
-  status          IngestionStatus @default(RUNNING)
-  startedAt       DateTime        @default(now())
-  completedAt     DateTime?
-  receivedCount   Int             @default(0)
-  normalizedCount Int             @default(0)
-  duplicateCount  Int             @default(0)
-  storedCount     Int             @default(0)
-  storiesUpdated  Int             @default(0)
-  errorCode       String?
+  id               String          @id @default(cuid())
+  provider         ProviderName
+  discoveryKey     String          @default("global")
+  countryCode      String?         @db.Char(2)
+  language         String?         @db.VarChar(12)
+  mode             String          @default("incremental") @db.VarChar(24)
+  status           IngestionStatus @default(RUNNING)
+  startedAt        DateTime        @default(now())
+  completedAt      DateTime?
+  windowStart      DateTime?
+  windowEnd        DateTime?
+  cursor           Json?
+  exhausted        Boolean         @default(false)
+  coverageComplete Boolean         @default(false)
+  lastSuccessfulAt DateTime?
+  receivedCount    Int             @default(0)
+  normalizedCount  Int             @default(0)
+  acceptedCount    Int             @default(0)
+  outOfWindowCount Int             @default(0)
+  irrelevantCount  Int             @default(0)
+  duplicateCount   Int             @default(0)
+  storedCount      Int             @default(0)
+  storiesUpdated   Int             @default(0)
+  errorCode        String?
 
   @@index([provider, startedAt(sort: Desc)])
+  @@index([provider, discoveryKey, startedAt(sort: Desc)])
+  @@index([countryCode, windowStart, windowEnd])
+}
+
+model ProviderIngestionCheckpoint {
+  id               String          @id @default(cuid())
+  provider         ProviderName
+  discoveryKey     String
+  countryCode      String?         @db.Char(2)
+  language         String?         @db.VarChar(12)
+  mode             String          @default("incremental") @db.VarChar(24)
+  status           IngestionStatus @default(RUNNING)
+  windowStart      DateTime
+  windowEnd        DateTime
+  coveredFrom      DateTime?
+  coveredTo        DateTime?
+  cursor           Json?
+  exhausted        Boolean         @default(false)
+  coverageComplete Boolean         @default(false)
+  receivedCount    Int             @default(0)
+  acceptedCount    Int             @default(0)
+  duplicateCount   Int             @default(0)
+  lastSuccessfulAt DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@unique([provider, discoveryKey])
+  @@index([countryCode, windowStart, windowEnd])
+  @@index([status, updatedAt])
+}
+
+model IngestionSchedulerState {
+  id                String    @id
+  nextCountryOffset Int       @default(0)
+  lastRunAt         DateTime?
+  updatedAt         DateTime  @updatedAt
 }

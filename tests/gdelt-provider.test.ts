@@ -29,6 +29,24 @@ describe("GDELT discovery planning", () => {
     expect(queries.every((query) => query.includes("domainis:news.web.nhk"))).toBe(true);
   });
 
+  it("adds one bounded domestic-publisher branch for all-perspective discovery", () => {
+    const queries = buildGdeltDiscoveryQueries("Japan", {
+      countries: ["JP"],
+      sourcePerspective: "all",
+    });
+    expect(queries).toHaveLength(3);
+    expect(queries).toContainEqual(expect.stringMatching(/domainis:(?:nhk\.or\.jp|japantimes\.co\.jp)/));
+  });
+
+  it("can discover local-perspective headlines through publisher origin without assigning article subject", () => {
+    const queries = buildGdeltDiscoveryQueries("Japan", {
+      countries: ["JP"],
+      sourcePerspective: "local",
+    });
+    expect(queries).toHaveLength(3);
+    expect(queries).toContainEqual(expect.stringMatching(/^sourcecountry:japan sourcelang:japanese$/));
+  });
+
   it("continues through supported bounded date windows instead of repeating the first window", async () => {
     const requestedUrls: URL[] = [];
     vi.stubGlobal("fetch", vi.fn(async (input: string | URL) => {

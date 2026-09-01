@@ -36,9 +36,10 @@ describe("database candidate window", () => {
   });
 
   it("builds Japanese and English country discovery aliases without losing Unicode", () => {
-    expect(providerSearchQuery({ ...query, countries: ["JP"] })).toBe(
-      '("Japan" OR "日本" OR "日本国")',
-    );
+    const discovery = providerSearchQuery({ ...query, countries: ["JP"] });
+    expect(discovery).toContain('"Japan"');
+    expect(discovery).toContain('"日本"');
+    expect(discovery).toContain('"日本国"');
   });
 
   it("matches a stable domainless source name exactly in Prisma", async () => {

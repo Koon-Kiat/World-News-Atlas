@@ -38,6 +38,34 @@ describe("story clustering", () => {
     expect(clusters.map((cluster) => cluster.articles.length).sort()).toEqual([1, 2]);
   });
 
+  it("does not collapse a single-link A~B~C chain when A and C describe different events", () => {
+    const first = normalized("chain-a", "Alpha beta gamma delta");
+    const bridge = normalized("chain-b", "Alpha beta gamma epsilon");
+    const different = normalized("chain-c", "Alpha beta epsilon zeta");
+    const clusters = clusterArticles([first, bridge, different]);
+    expect(clusters).toHaveLength(2);
+    expect(clusters.map(({ articles }) => articles.map(({ providerArticleId }) => providerArticleId))).toEqual(
+      expect.arrayContaining([
+        expect.arrayContaining(["chain-a", "chain-b"]),
+        ["chain-c"],
+      ]),
+    );
+  });
+
+  it("keeps generic government headlines from different countries separate", () => {
+    const japan = normalized("generic-jp", "Government announces new measures");
+    const france = normalizeProviderArticle({
+      provider: "RSS",
+      providerArticleId: "generic-fr",
+      title: "Government announces new measures",
+      description: "France approved a separate labour programme in Paris.",
+      url: "https://france.example/measures",
+      publishedAt: new Date().toISOString(),
+      sourceName: "France Desk",
+    });
+    expect(clusterArticles([japan, france])).toHaveLength(2);
+  });
+
   it("clusters semantic headline variants without merging a different event", async () => {
     const articles = [
       normalized("lunar", "Japan launches new lunar spacecraft"),
@@ -60,6 +88,42 @@ describe("story clustering", () => {
     );
     expect(embed).toHaveBeenCalledTimes(1);
     expect(embed.mock.calls[0][0]).toHaveLength(3);
+  });
+
+  it("preserves Japanese and English coverage of the same event as one semantic cluster", async () => {
+    const japanese = normalizeProviderArticle({
+      provider: "RSS",
+      providerArticleId: "nhk-quake",
+      title: "福井県で記録的な大雨 土砂災害に厳重警戒",
+      description: "日本の気象庁が福井県に大雨と土砂災害への警戒を呼びかけた。",
+      url: "https://news.web.nhk/newsweb/na/example-quake",
+      publishedAt: "2026-08-30T12:00:00Z",
+      language: "ja",
+      sourceName: "NHK",
+      sourceCountry: "JP",
+    });
+    const english = normalizeProviderArticle({
+      provider: "OTHER",
+      providerArticleId: "reuters-quake",
+      title: "Record rain raises landslide alert in Japan's Fukui prefecture",
+      description: "Japan's weather agency warned residents in Fukui of landslides after record rainfall.",
+      url: "https://reuters.example/japan-fukui-rain",
+      publishedAt: "2026-08-30T12:20:00Z",
+      language: "en",
+      sourceName: "Reuters",
+      sourceCountry: "GB",
+    });
+    const embed = vi.fn(async (texts: string[]) => texts.map(() => [1, 0, 0]));
+
+    const clusters = await clusterArticlesHybrid([japanese, english], {
+      embeddingProvider: { id: "test:cross-language", embed },
+    });
+
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].articles.map(({ providerArticleId }) => providerArticleId)).toEqual([
+      "nhk-quake",
+      "reuters-quake",
+    ]);
   });
 
   it("reuses cached embeddings by stable semantic content hash", async () => {

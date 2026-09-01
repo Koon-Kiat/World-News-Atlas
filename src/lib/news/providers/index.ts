@@ -4,8 +4,10 @@ import { MemoryTtlCache } from "../bounded-cache";
 import { logNews } from "../logger";
 import { canonicalSourceId, domainFromUrl } from "../sources/registry";
 import type {
+  NewsPeriod,
   ProviderArticle,
   ProviderContinuationState,
+  ProviderCoverageProgress,
   ProviderFetchRequest,
   ProviderFetchResult,
   ProviderName,
@@ -55,7 +57,25 @@ export function rssFeedsFromEnvironment(): RssFeedConfig[] {
   }
 }
 
-export function createConfiguredProviders(): NewsProvider[] {
+export type GdeltMode = "auto" | "on" | "off";
+
+export function gdeltModeFromEnvironment(): GdeltMode {
+  const configured = process.env.GDELT_MODE?.trim().toLowerCase();
+  if (configured === "auto" || configured === "on" || configured === "off") return configured;
+  const legacy = process.env.GDELT_ENABLED?.trim().toLowerCase();
+  if (legacy === "true") return "on";
+  if (legacy === "false") return "off";
+  return "auto";
+}
+
+export function shouldEnableGdelt(options: { period?: NewsPeriod; countries?: string[] } = {}): boolean {
+  const mode = gdeltModeFromEnvironment();
+  if (mode === "on") return true;
+  if (mode === "off") return false;
+  return (options.countries?.length ?? 0) > 0 && ["7d", "30d"].includes(options.period ?? "latest");
+}
+
+export function createConfiguredProviders(options: { period?: NewsPeriod; countries?: string[] } = {}): NewsProvider[] {
   const providers: NewsProvider[] = [];
   const timeout = providerTimeoutFromEnvironment();
   providers.push(new BingNewsProvider(timeout));
@@ -63,10 +83,13 @@ export function createConfiguredProviders(): NewsProvider[] {
   if (newsApiKey) providers.push(new NewsApiProvider(newsApiKey, timeout));
   else logNews("info", "provider_disabled", { provider: "NEWSAPI", reason: "missing_credential" });
 
-  if (process.env.GDELT_ENABLED?.toLowerCase() === "true") {
+  if (shouldEnableGdelt(options)) {
     providers.push(new GdeltProvider(timeout));
   } else {
-    logNews("info", "provider_disabled", { provider: "GDELT", reason: "configuration" });
+    logNews("info", "provider_disabled", {
+      provider: "GDELT",
+      reason: gdeltModeFromEnvironment() === "auto" ? "auto_not_required" : "configuration",
+    });
   }
 
   const feeds = rssFeedsFromEnvironment();
@@ -81,6 +104,8 @@ export interface ProviderBatchResult {
   providerCounts: Partial<Record<ProviderName, number>>;
   continuations: Partial<Record<ProviderName, ProviderContinuationState | null>>;
   exhaustedProviders: ProviderName[];
+  providerCoverage: Partial<Record<ProviderName, ProviderCoverageProgress>>;
+  providerDiagnostics: Partial<Record<ProviderName, ProviderFetchResult["diagnostics"]>>;
 }
 
 interface ProviderOutcome {
@@ -107,6 +132,8 @@ function providerRequestKey(provider: NewsProvider, request: ProviderFetchReques
     to: requestTimestamp(request.to),
     countries: [...(request.countries ?? [])].sort(),
     language: request.language ?? null,
+    period: request.period ?? null,
+    sourcePerspective: request.sourcePerspective ?? null,
     sourceTargets: (request.sourceTargets ?? []).map(({ id }) => id).sort(),
     limit: request.limit ?? null,
     continuation: request.continuation ?? null,
@@ -184,6 +211,8 @@ export async function fetchProviderArticlesGracefully(
   const providerCounts: ProviderBatchResult["providerCounts"] = {};
   const continuations: ProviderBatchResult["continuations"] = {};
   const exhaustedProviders: ProviderName[] = [];
+  const providerCoverage: ProviderBatchResult["providerCoverage"] = {};
+  const providerDiagnostics: ProviderBatchResult["providerDiagnostics"] = {};
 
   outcomes.forEach((outcome, index) => {
     const provider = providers[index];
@@ -191,6 +220,8 @@ export async function fetchProviderArticlesGracefully(
       articles.push(...outcome.result.articles);
       providerCounts[provider.name] = outcome.result.articles.length;
       continuations[provider.name] = outcome.result.continuation ?? null;
+      if (outcome.result.coverage) providerCoverage[provider.name] = outcome.result.coverage;
+      if (outcome.result.diagnostics) providerDiagnostics[provider.name] = outcome.result.diagnostics;
       if (outcome.result.exhausted ?? (outcome.result.continuation === null)) {
         exhaustedProviders.push(provider.name);
       }
@@ -198,5 +229,13 @@ export async function fetchProviderArticlesGracefully(
       failures.push(outcome.failure);
     }
   });
-  return { articles, failures, providerCounts, continuations, exhaustedProviders };
+  return {
+    articles,
+    failures,
+    providerCounts,
+    continuations,
+    exhaustedProviders,
+    providerCoverage,
+    providerDiagnostics,
+  };
 }
