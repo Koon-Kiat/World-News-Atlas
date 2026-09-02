@@ -9,6 +9,7 @@ import { logNews } from "../logger";
 import { publicationDateInRange, trustedPublicationDate } from "../publication-date";
 import type { ProviderArticle, ProviderFetchRequest, ProviderFetchResult } from "../types";
 import { fetchWithTimeout, type NewsProvider, ProviderError } from "./provider";
+import { historicalDiscoveryWindows } from "./historical-windows";
 
 const gdeltResponseSchema = z.object({
   articles: z
@@ -45,6 +46,7 @@ const LANGUAGE_CODES: Record<string, string> = {
 const GDELT_LANGUAGE_NAMES_BY_CODE: Record<string, string> = Object.fromEntries(
   Object.entries(LANGUAGE_CODES).map(([name, code]) => [code, name]),
 );
+const GDELT_BRANCHES_PER_STAGE = 3;
 
 const GDELT_SOURCE_COUNTRY_NAMES: Readonly<Record<string, string>> = {
   US: "unitedstates",
@@ -123,6 +125,26 @@ export function buildGdeltDiscoveryQueries(
     ? [localFilter, localLanguage ? `sourcelang:${localLanguage}` : ""].filter(Boolean).join(" ")
     : "";
   return [...new Set([...primaryBranches, localBranch].filter(Boolean))].slice(0, 3);
+}
+
+interface GdeltDiscoveryBranch {
+  id: string;
+  query: string;
+  from?: Date;
+  to?: Date;
+}
+
+function gdeltDiscoveryBranches(
+  queries: string[],
+  request: ProviderFetchRequest,
+): GdeltDiscoveryBranch[] {
+  const windows = historicalDiscoveryWindows(request);
+  return queries.flatMap((query, queryIndex) => windows.map((window) => ({
+    id: `gdelt:${queryIndex}:${window.index}:${query}`,
+    query,
+    from: window.from,
+    to: window.to,
+  })));
 }
 
 export class GdeltProvider implements NewsProvider {
@@ -228,18 +250,19 @@ export class GdeltProvider implements NewsProvider {
 
   async search(query: string, request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
     const discoveryQueries = buildGdeltDiscoveryQueries(query, request);
+    const discoveryBranches = gdeltDiscoveryBranches(discoveryQueries, request);
     const existingCursors = request.continuation?.discoveryCursors;
-    const activeQueries = discoveryQueries.filter((discoveryQuery) =>
-      existingCursors?.[discoveryQuery] !== null
-    );
+    const activeBranches = discoveryBranches
+      .filter(({ id }) => existingCursors?.[id] !== null)
+      .slice(0, GDELT_BRANCHES_PER_STAGE);
     logNews("info", "gdelt_discovery_planned", {
-      provider_source_targeted_query_count: activeQueries.filter((discoveryQuery) =>
-        /\b(?:domainis|sourcecountry):/u.test(discoveryQuery)
+      provider_source_targeted_query_count: activeBranches.filter(({ query: branchQuery }) =>
+        /\b(?:domainis|sourcecountry):/u.test(branchQuery)
       ).length,
-      discoveryQueryCount: activeQueries.length,
-      exhaustedDiscoveryQueryCount: discoveryQueries.length - activeQueries.length,
+      discoveryQueryCount: activeBranches.length,
+      exhaustedDiscoveryQueryCount: discoveryBranches.filter(({ id }) => existingCursors?.[id] === null).length,
     });
-    if (activeQueries.length === 0) {
+    if (activeBranches.length === 0) {
       return {
         provider: this.name,
         articles: [],
@@ -248,11 +271,15 @@ export class GdeltProvider implements NewsProvider {
         exhausted: true,
       };
     }
+    const perBranchLimit = Math.max(1, Math.ceil((request.limit ?? 250) / activeBranches.length));
     const settled = await Promise.allSettled(
-      activeQueries.map((discoveryQuery) => {
-        const branchBefore = existingCursors?.[discoveryQuery] ?? request.continuation?.before;
-        return this.request(discoveryQuery, {
+      activeBranches.map((branch) => {
+        const branchBefore = existingCursors?.[branch.id] ?? request.continuation?.before;
+        return this.request(branch.query, {
           ...request,
+          from: branch.from,
+          to: branch.to,
+          limit: perBranchLimit,
           continuation: branchBefore ? { before: branchBefore } : undefined,
         });
       }),
@@ -263,22 +290,22 @@ export class GdeltProvider implements NewsProvider {
     }
     const unique = new Map(successful.map((article) => [article.url, article]));
     const discoveryCursors: Record<string, string | null> = { ...existingCursors };
-    activeQueries.forEach((discoveryQuery, index) => {
+    activeBranches.forEach((branch, index) => {
       const result = settled[index];
       if (result.status === "fulfilled") {
-        discoveryCursors[discoveryQuery] = result.value.continuation?.before ?? null;
+        discoveryCursors[branch.id] = result.value.continuation?.before ?? null;
       }
     });
-    const exhausted = discoveryQueries.every((discoveryQuery) =>
-      discoveryCursors[discoveryQuery] === null
+    const exhausted = discoveryBranches.every(({ id }) =>
+      discoveryCursors[id] === null
     );
     const fulfilled = settled.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
     const cursorDates = Object.values(discoveryCursors)
       .filter((cursor): cursor is string => Boolean(cursor))
       .map((cursor) => new Date(cursor).getTime())
       .filter(Number.isFinite);
-    const singleCursor = discoveryQueries.length === 1
-      ? discoveryCursors[discoveryQueries[0]]
+    const singleCursor = discoveryBranches.length === 1
+      ? discoveryCursors[discoveryBranches[0].id]
       : null;
     return {
       provider: this.name,
@@ -286,7 +313,7 @@ export class GdeltProvider implements NewsProvider {
       receivedAt: new Date().toISOString(),
       continuation: exhausted
         ? null
-        : discoveryQueries.length === 1 && singleCursor
+        : discoveryBranches.length === 1 && singleCursor
           ? { before: singleCursor }
           : { discoveryCursors },
       exhausted,
@@ -300,15 +327,15 @@ export class GdeltProvider implements NewsProvider {
             ? new Date(Math.min(...cursorDates)).toISOString()
             : undefined,
         coveredTo: request.to?.toISOString(),
-        timeRangeCovered: exhausted && fulfilled.every(({ coverage }) => coverage?.timeRangeCovered !== false),
+        timeRangeCovered: exhausted,
         exhaustionReason: exhausted ? "time_range_covered" : undefined,
       },
       diagnostics: {
         received: fulfilled.reduce((total, result) => total + (result.diagnostics?.received ?? result.articles.length), 0),
-        plansAttempted: activeQueries.length,
-        plansCompleted: discoveryQueries.filter((discoveryQuery) => discoveryCursors[discoveryQuery] === null).length,
+        plansAttempted: activeBranches.length,
+        plansCompleted: discoveryBranches.filter(({ id }) => discoveryCursors[id] === null).length,
         languages: gdeltLanguageNames(request),
-        countryQueries: activeQueries,
+        countryQueries: activeBranches.map(({ query: branchQuery }) => branchQuery),
         outOfWindow: fulfilled.reduce((total, result) => total + (result.diagnostics?.outOfWindow ?? 0), 0),
       },
     };

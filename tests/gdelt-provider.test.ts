@@ -83,6 +83,42 @@ describe("GDELT discovery planning", () => {
     expect(requestedUrls[1].searchParams.get("enddatetime")).toBe("20260830115959");
   });
 
+  it("samples recent, middle, and oldest portions of a 30-day window in the first stage", async () => {
+    const requestedUrls: URL[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL) => {
+      const url = new URL(String(input));
+      requestedUrls.push(url);
+      const start = url.searchParams.get("startdatetime") ?? "";
+      const year = start.slice(0, 4);
+      const month = start.slice(4, 6);
+      const day = String(Number(start.slice(6, 8)) + 1).padStart(2, "0");
+      return new Response(JSON.stringify({ articles: [{
+        url: `https://example.com/window-${requestedUrls.length}`,
+        title: `World report ${requestedUrls.length}`,
+        seendate: `${year}${month}${day}T000000Z`,
+        domain: "example.com",
+        language: "English",
+      }] }), { status: 200 });
+    }));
+
+    const provider = new GdeltProvider();
+    const result = await provider.search("world", {
+      language: "en",
+      period: "30d",
+      from: new Date("2026-08-02T00:00:00Z"),
+      to: new Date("2026-09-01T00:00:00Z"),
+      limit: 9,
+    });
+
+    expect(result.articles).toHaveLength(3);
+    expect(requestedUrls.map((url) => url.searchParams.get("startdatetime"))).toEqual([
+      "20260827000000",
+      "20260812000000",
+      "20260802000000",
+    ]);
+    expect(result.continuation?.discoveryCursors).toBeDefined();
+  });
+
   it("tracks and exhausts each language discovery cursor independently", async () => {
     const requestedUrls: URL[] = [];
     vi.stubGlobal("fetch", vi.fn(async (input: string | URL) => {

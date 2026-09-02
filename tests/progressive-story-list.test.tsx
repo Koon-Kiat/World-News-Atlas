@@ -32,6 +32,7 @@ function stories(count: number): StoryView[] {
 afterEach(() => {
   cleanup();
   observerCallback = null;
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -136,7 +137,8 @@ describe("progressive story list", () => {
     expect(onRequestMore).toHaveBeenCalledTimes(2);
   });
 
-  it("continues prefetching after a duplicate-only stage leaves the story count unchanged", async () => {
+  it("backs off before prefetching after a duplicate-only stage", async () => {
+    vi.useFakeTimers();
     vi.stubGlobal("IntersectionObserver", TestIntersectionObserver);
     const onRequestMore = vi.fn();
     const view = render(
@@ -164,7 +166,46 @@ describe("progressive story list", () => {
         continuationVersion={1}
       />,
     ));
+    expect(onRequestMore).toHaveBeenCalledTimes(1);
+
+    await act(async () => vi.advanceTimersByTimeAsync(1_499));
+    expect(onRequestMore).toHaveBeenCalledTimes(1);
+
+    await act(async () => vi.advanceTimersByTimeAsync(1));
     expect(onRequestMore).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops automatic retries after four duplicate-only stages", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("IntersectionObserver", TestIntersectionObserver);
+    const onRequestMore = vi.fn();
+    const view = render(
+      <ProgressiveStoryList
+        stories={stories(12)}
+        canFetchMore
+        isFetchingMore={false}
+        onRequestMore={onRequestMore}
+        continuationVersion={0}
+      />,
+    );
+
+    await act(async () => vi.runOnlyPendingTimersAsync());
+    expect(onRequestMore).toHaveBeenCalledTimes(1);
+
+    for (let version = 1; version <= 5; version += 1) {
+      await act(async () => view.rerender(
+        <ProgressiveStoryList
+          stories={stories(12)}
+          canFetchMore
+          isFetchingMore={false}
+          onRequestMore={onRequestMore}
+          continuationVersion={version}
+        />,
+      ));
+      await act(async () => vi.advanceTimersByTimeAsync(12_000));
+    }
+
+    expect(onRequestMore).toHaveBeenCalledTimes(5);
   });
 
   it("stops requesting when the server reports no further usable page", async () => {
