@@ -7,6 +7,10 @@ function story(id: string): StoryView {
   return { ...getFixtureStories()[0], id };
 }
 
+function datedStory(id: string, lastUpdatedAt: string): StoryView {
+  return { ...story(id), lastUpdatedAt };
+}
+
 function response(page: number, total: number, stories: StoryView[]): NewsResponse {
   const hasMore = page < 100 && page * 12 < total;
   return {
@@ -69,5 +73,13 @@ describe("news pagination", () => {
     const merged = mergeNextPage([story("one")], response(3, 60, [story("two")]), 2);
     expect(merged.stories).toHaveLength(2);
     expect(merged.canFetchMore).toBe(false);
+  });
+
+  it("inserts later-discovered stories into strict newest-first order", () => {
+    const current = [datedStory("older", "2026-08-20T00:00:00Z")];
+    const next = response(2, 60, [datedStory("newer", "2026-08-30T00:00:00Z")]);
+    const merged = mergeNextPage(current, next, 2, "newest");
+
+    expect(merged.stories.map(({ id }) => id)).toEqual(["newer", "older"]);
   });
 });

@@ -6,7 +6,11 @@ import { queryRelevantArticles, type QueryRejectionReason } from "./acceptance";
 import { deduplicateArticles } from "./deduplicate";
 import { logNews } from "./logger";
 import { normalizeProviderArticles } from "./normalize";
-import { createConfiguredProviders, fetchProviderArticlesGracefully } from "./providers";
+import {
+  createConfiguredProviders,
+  fetchProviderArticlesGracefully,
+  liveProviderBatchTimeoutFromEnvironment,
+} from "./providers";
 import type { NewsProvider } from "./providers/provider";
 import { newsPeriodHours } from "./periods";
 import { queryStories } from "./query";
@@ -498,6 +502,26 @@ async function appendLiveClusters(
     return incremental.comparedPairCount;
   }
 
+  if (query.sort === "newest") {
+    const candidatesByArticleKey = new Map(incremental.clusters.map((candidate) => [
+      clusterArticleKey(candidate.articles),
+      candidate,
+    ]));
+    const rankedStories = rankStories(incremental.clusters.map((candidate, index) => ({
+      ...toStoryView(candidate),
+      id: index < previousClusterCount
+        ? previousStoryIds[index] ?? candidate.fingerprint
+        : candidate.fingerprint,
+    })), query);
+    state.clusters = rankedStories.map((story) => {
+      const candidate = candidatesByArticleKey.get(clusterArticleKey(story.articles as NormalizedArticle[]));
+      if (!candidate) throw new Error("Ranked story did not resolve to its cluster");
+      return candidate;
+    });
+    state.stories = rankedStories;
+    return incremental.comparedPairCount;
+  }
+
   const retainedClusters = incremental.clusters.slice(0, previousClusterCount);
   const retainedStories = retainedClusters.map((candidate, index) => ({
     ...toStoryView(candidate),
@@ -633,7 +657,10 @@ async function discoverLiveStage(
     if (activeProviders.length === 0) return;
     const stageLimit = Math.min(liveBatchSize(), state.corpusLimit - state.articles.length);
     if (stageLimit <= 0) return;
-    const perProviderLimit = Math.max(1, Math.ceil(stageLimit / activeProviders.length));
+    // Relevance, country and duplicate filtering happen after provider fetches.
+    // Give every provider enough candidates to fill the bounded shared stage;
+    // dividing this budget before filtering severely underfilled country views.
+    const perProviderLimit = stageLimit;
     const requestBase = {
       from: state.snapshotFrom,
       to: state.snapshotTo,
@@ -651,6 +678,7 @@ async function discoverLiveStage(
         searchQuery && provider.name !== "RSS"
           ? { ...requestBase, query: searchQuery, continuation: state.providerStates.get(provider.name) }
           : { ...requestBase, continuation: state.providerStates.get(provider.name) },
+        { deadlineMs: liveProviderBatchTimeoutFromEnvironment() },
       ),
     })));
 
@@ -663,7 +691,7 @@ async function discoverLiveStage(
             ? "missing_credential"
             : terminalProviderFailure(failure.code)
               ? "terminal_error"
-              : failure.code === "REQUEST_FAILED"
+              : failure.code === "REQUEST_FAILED" || failure.code === "STAGE_TIMEOUT"
                 ? "timeout"
                 : "partial";
         state.providerHealth.set(provider.name, health);
@@ -715,11 +743,11 @@ async function discoverLiveStage(
       }
     }
 
-    const sampled = takeDiverseArticles(results.map(({ result }) => result.articles), stageLimit);
+    const candidates = results.flatMap(({ result }) => result.articles);
     state.rawArticleCount += results.reduce((total, { provider, result }) =>
       total + (result.providerDiagnostics[provider.name]?.received ?? result.providerCounts[provider.name] ?? 0),
     0);
-    const unseen = sampled.filter((article) => {
+    const unseen = candidates.filter((article) => {
       try {
         return !state.seenCanonicalUrls.has(canonicalizeArticleUrl(article.url));
       } catch {
@@ -745,16 +773,19 @@ async function discoverLiveStage(
       }
     }
     const deduplicatedBatch = deduplicateArticles(relevance.accepted);
-    const newArticles = deduplicatedBatch.articles
-      .filter(({ canonicalUrl }) => !state.seenCanonicalUrls.has(canonicalUrl))
+    const unseenDeduplicated = deduplicatedBatch.articles
+      .filter(({ canonicalUrl }) => !state.seenCanonicalUrls.has(canonicalUrl));
+    const newArticles = takeDiverseArticles(
+      activeProviders.map((provider) => unseenDeduplicated.filter((article) => article.provider === provider.name)),
+      stageLimit,
+    )
       .slice(0, state.corpusLimit - state.articles.length);
-    const duplicateCount = deduplicatedBatch.duplicateCount +
-      deduplicatedBatch.articles.length - newArticles.length;
+    const duplicateCount = deduplicatedBatch.duplicateCount;
     state.duplicateArticleCount += duplicateCount;
+    const acceptedUrls = new Set(newArticles.map(({ canonicalUrl }) => canonicalUrl));
     for (const article of relevance.accepted) {
       const metric = providerDiagnostics(state, article.provider);
-      if (newArticles.some(({ canonicalUrl }) => canonicalUrl === article.canonicalUrl)) metric.accepted += 1;
-      else metric.duplicates += 1;
+      if (acceptedUrls.has(article.canonicalUrl)) metric.accepted += 1;
     }
     let comparedPairCount = 0;
     if (newArticles.length > 0) {
@@ -776,7 +807,8 @@ async function discoverLiveStage(
     ]));
     const coverage = coverageAssessment(state, query);
     logNews("info", "live_discovery_stage", {
-      live_batch_size: sampled.length,
+      live_candidate_count: candidates.length,
+      live_batch_size: newArticles.length,
       live_corpus_article_count: state.articles.length,
       live_corpus_story_count: state.stories.length,
       live_corpus_complete: corpusComplete(state),

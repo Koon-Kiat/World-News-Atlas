@@ -143,6 +143,42 @@ class SameStoryProvider implements NewsProvider {
   }
 }
 
+class OutOfOrderProvider implements NewsProvider {
+  readonly name = "OTHER" as const;
+  readonly capabilities = {
+    latest: true,
+    search: true,
+    languages: true,
+    sourceMetadata: true,
+    requiresCredentials: false,
+  } as const;
+
+  fetchLatest(request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
+    const laterStage = Boolean(request.continuation?.offset);
+    const publishedAt = laterStage ? "2026-08-30T18:00:00Z" : "2026-08-30T12:00:00Z";
+    return Promise.resolve({
+      provider: this.name,
+      articles: [{
+        provider: this.name,
+        providerArticleId: laterStage ? "newer" : "older",
+        title: laterStage ? "Newer independent update" : "Older independent report",
+        description: "A separately reported development.",
+        url: `https://ordering.example/${laterStage ? "newer" : "older"}`,
+        publishedAt,
+        language: "en",
+        sourceName: "Ordering Wire",
+      }],
+      receivedAt: new Date().toISOString(),
+      continuation: laterStage ? null : { offset: 1 },
+      exhausted: laterStage,
+    });
+  }
+
+  search(_query: string, request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
+    return this.fetchLatest(request);
+  }
+}
+
 class FailingProvider implements NewsProvider {
   readonly name = "NEWSAPI" as const;
   readonly capabilities = {
@@ -319,6 +355,19 @@ describe("incremental live corpus", () => {
     });
   });
 
+  it("reorders a newer story discovered in a later stage ahead of older coverage", async () => {
+    setLiveProviderFactoryForTesting(() => [new OutOfOrderProvider()]);
+
+    const first = await loadNewsDataset(query(1));
+    const second = await loadNewsDataset(query(1));
+
+    expect(first.stories.map(({ title }) => title)).toEqual(["Older independent report"]);
+    expect(second.stories.map(({ title }) => title)).toEqual([
+      "Newer independent update",
+      "Older independent report",
+    ]);
+  });
+
   it("preserves provider diversity and never requests an exhausted provider again", async () => {
     const rss = new PagedProvider("RSS", 10, "RSS");
     const bing = new PagedProvider("OTHER", 160, "Bing");
@@ -329,10 +378,10 @@ describe("incremental live corpus", () => {
     expect(first.stories.some((story) => story.articles[0].provider === "RSS")).toBe(true);
     expect(first.stories.some((story) => story.articles[0].provider === "OTHER")).toBe(true);
 
-    const expanded = await loadNewsDataset(query(4, "popular"));
+    const expanded = await loadNewsDataset(query(7, "popular"));
     expect(expanded.stories.slice(0, originalOrder.length).map(({ id }) => id)).toEqual(originalOrder);
     expect(rss.offsets).toEqual([0]);
-    expect(bing.offsets).toEqual([0, 48]);
+    expect(bing.offsets).toEqual([0, 96]);
   });
 
   it("isolates a failing provider while healthy continuation keeps expanding", async () => {
@@ -341,11 +390,11 @@ describe("incremental live corpus", () => {
     setLiveProviderFactoryForTesting(() => [failing, healthy]);
 
     const first = await loadNewsDataset(query(1));
-    expect(first.stories).toHaveLength(48);
-    const second = await loadNewsDataset(query(2));
+    expect(first.stories).toHaveLength(96);
+    const second = await loadNewsDataset(query(7));
     expect(second.stories).toHaveLength(140);
     expect(second.stories.length - first.stories.length).toBeLessThanOrEqual(liveBatchSize());
-    expect(healthy.offsets).toEqual([0, 48]);
+    expect(healthy.offsets).toEqual([0, 96]);
     expect(failing.calls).toBe(1);
     expect(second.corpusComplete).toBe(false);
   });

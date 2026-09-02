@@ -177,6 +177,46 @@ describe("NewsAPI provider", () => {
     expect(third).toMatchObject({ continuation: null, exhausted: true });
   });
 
+  it("samples recent, middle, and oldest portions of a 30-day window in the first stage", async () => {
+    const everythingUrls: URL[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/sources")) {
+        return new Response(JSON.stringify({ status: "ok", sources: [] }), { status: 200 });
+      }
+      everythingUrls.push(url);
+      const from = new Date(url.searchParams.get("from")!);
+      const publishedAt = new Date(from.getTime() + 24 * 3_600_000).toISOString();
+      return new Response(JSON.stringify({
+        status: "ok",
+        totalResults: 1,
+        articles: [{
+          source: { id: null, name: "Example News" },
+          title: `World report ${everythingUrls.length}`,
+          description: null,
+          url: `https://example.com/window-${everythingUrls.length}`,
+          urlToImage: null,
+          publishedAt,
+        }],
+      }), { status: 200 });
+    }));
+
+    const result = await new NewsApiProvider("test-key").search("world", {
+      period: "30d",
+      from: new Date("2026-08-02T00:00:00Z"),
+      to: new Date("2026-09-01T00:00:00Z"),
+      limit: 9,
+    });
+
+    expect(result.articles).toHaveLength(3);
+    expect(everythingUrls.map((url) => url.searchParams.get("from"))).toEqual([
+      "2026-08-27T00:00:00.000Z",
+      "2026-08-12T00:00:00.000Z",
+      "2026-08-02T00:00:00.000Z",
+    ]);
+    expect(result.continuation?.discoveryPages).toBeDefined();
+  });
+
   it("reports the subscription result ceiling separately from normal time-range exhaustion", async () => {
     vi.stubGlobal("fetch", vi.fn(async (input: string | URL) =>
       String(input).includes("top-headlines/sources")

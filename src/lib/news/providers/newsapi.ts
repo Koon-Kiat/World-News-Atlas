@@ -2,6 +2,7 @@ import { z } from "zod";
 import { logNews } from "../logger";
 import { publicationDateInRange, trustedPublicationDate } from "../publication-date";
 import type { ProviderArticle, ProviderFetchRequest, ProviderFetchResult } from "../types";
+import { historicalDiscoveryWindows } from "./historical-windows";
 import { fetchWithTimeout, type NewsProvider, ProviderError } from "./provider";
 
 const newsApiResponseSchema = z.object({
@@ -35,6 +36,8 @@ const newsApiSourcesSchema = z.object({
 });
 
 const NEWSAPI_LANGUAGES = new Set(["ar", "de", "en", "es", "fr", "he", "it", "nl", "no", "pt", "ru", "sv", "ud", "zh"]);
+const NEWSAPI_RESULT_LIMIT = 100;
+const NEWSAPI_BRANCHES_PER_STAGE = 3;
 
 export class NewsApiProvider implements NewsProvider {
   readonly name = "NEWSAPI" as const;
@@ -89,7 +92,7 @@ export class NewsApiProvider implements NewsProvider {
     }
   }
 
-  private async request(
+  private async requestOnce(
     query: string,
     request: ProviderFetchRequest = {},
   ): Promise<ProviderFetchResult> {
@@ -194,8 +197,14 @@ export class NewsApiProvider implements NewsProvider {
       return current === null || timestamp < current ? timestamp : current;
     }, null);
     const reachedWindowStart = Boolean(request.from && oldestRaw !== null && oldestRaw <= request.from.getTime());
-    const exhausted = rawArticles.length < pageSize || reachedWindowStart || (
-      parsed.data.totalResults !== undefined && page * pageSize >= parsed.data.totalResults
+    const totalResults = parsed.data.totalResults;
+    const providerLimitReached = Boolean(
+      totalResults !== undefined &&
+      totalResults > NEWSAPI_RESULT_LIMIT &&
+      (page + 1) * pageSize > NEWSAPI_RESULT_LIMIT
+    );
+    const exhausted = rawArticles.length < pageSize || reachedWindowStart || providerLimitReached || (
+      totalResults !== undefined && page * pageSize >= totalResults
     );
     return {
       provider: this.name,
@@ -213,8 +222,12 @@ export class NewsApiProvider implements NewsProvider {
             ? undefined
             : new Date(oldestRaw).toISOString(),
         coveredTo: request.to?.toISOString(),
-        timeRangeCovered: exhausted,
-        exhaustionReason: exhausted ? "time_range_covered" : undefined,
+        timeRangeCovered: exhausted && !providerLimitReached,
+        exhaustionReason: providerLimitReached
+          ? "provider_limit"
+          : exhausted
+            ? "time_range_covered"
+            : undefined,
       },
       diagnostics: {
         received: rawArticles.length,
@@ -223,6 +236,104 @@ export class NewsApiProvider implements NewsProvider {
         languages: language ? [language] : [],
         countryQueries: [query],
         outOfWindow,
+      },
+    };
+  }
+
+  private async request(
+    query: string,
+    request: ProviderFetchRequest = {},
+  ): Promise<ProviderFetchResult> {
+    const windows = historicalDiscoveryWindows(request);
+    if (windows.length === 1) return this.requestOnce(query, request);
+
+    const branches = windows.map((window) => ({ id: `newsapi:${window.index}`, ...window }));
+    const existingPages = request.continuation?.discoveryPages;
+    const activeBranches = branches
+      .filter(({ id }) => existingPages?.[id] !== null)
+      .slice(0, NEWSAPI_BRANCHES_PER_STAGE);
+    if (activeBranches.length === 0) {
+      const providerLimited = request.continuation?.exhaustionReason === "provider_limit";
+      return {
+        provider: this.name,
+        articles: [],
+        receivedAt: new Date().toISOString(),
+        continuation: null,
+        exhausted: true,
+        coverage: {
+          archiveCapable: true,
+          windowStart: request.from?.toISOString(),
+          windowEnd: request.to?.toISOString(),
+          coveredFrom: request.from?.toISOString(),
+          coveredTo: request.to?.toISOString(),
+          timeRangeCovered: !providerLimited,
+          exhaustionReason: providerLimited ? "provider_limit" : "time_range_covered",
+        },
+      };
+    }
+
+    const perBranchLimit = Math.max(1, Math.ceil((request.limit ?? 100) / activeBranches.length));
+    const settled = await Promise.allSettled(activeBranches.map((branch) => this.requestOnce(query, {
+      ...request,
+      from: branch.from,
+      to: branch.to,
+      limit: perBranchLimit,
+      continuation: existingPages?.[branch.id]
+        ? { page: existingPages[branch.id] ?? undefined }
+        : undefined,
+    })));
+    const successful = settled.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+    if (successful.length === 0) {
+      const rejected = settled.find((result) => result.status === "rejected");
+      if (rejected?.status === "rejected") throw rejected.reason;
+      throw new ProviderError(this.name, "REQUEST_FAILED", "NewsAPI historical discovery failed");
+    }
+
+    const discoveryPages: Record<string, number | null> = { ...existingPages };
+    activeBranches.forEach((branch, index) => {
+      const result = settled[index];
+      if (result.status === "fulfilled") discoveryPages[branch.id] = result.value.continuation?.page ?? null;
+    });
+    const providerLimited = request.continuation?.exhaustionReason === "provider_limit" ||
+      successful.some(({ coverage }) => coverage?.exhaustionReason === "provider_limit");
+    const exhausted = branches.every(({ id }) => discoveryPages[id] === null);
+    const unique = new Map(successful.flatMap(({ articles }) => articles).map((article) => [article.url, article]));
+    const dated = [...unique.values()];
+    const oldest = dated.reduce<number | null>((current, article) => {
+      const timestamp = new Date(article.publishedAt).getTime();
+      return !Number.isFinite(timestamp) ? current : current === null || timestamp < current ? timestamp : current;
+    }, null);
+    return {
+      provider: this.name,
+      articles: dated.slice(0, request.limit ?? 100),
+      receivedAt: new Date().toISOString(),
+      continuation: exhausted ? null : {
+        discoveryPages,
+        exhaustionReason: providerLimited ? "provider_limit" : undefined,
+      },
+      exhausted,
+      coverage: {
+        archiveCapable: true,
+        windowStart: request.from?.toISOString(),
+        windowEnd: request.to?.toISOString(),
+        coveredFrom: exhausted
+          ? request.from?.toISOString()
+          : oldest === null
+            ? undefined
+            : new Date(oldest).toISOString(),
+        coveredTo: request.to?.toISOString(),
+        timeRangeCovered: exhausted && !providerLimited,
+        exhaustionReason: exhausted
+          ? providerLimited ? "provider_limit" : "time_range_covered"
+          : undefined,
+      },
+      diagnostics: {
+        received: successful.reduce((total, result) => total + (result.diagnostics?.received ?? result.articles.length), 0),
+        plansAttempted: activeBranches.length,
+        plansCompleted: branches.filter(({ id }) => discoveryPages[id] === null).length,
+        languages: [...new Set(successful.flatMap(({ diagnostics }) => diagnostics?.languages ?? []))],
+        countryQueries: [query],
+        outOfWindow: successful.reduce((total, result) => total + (result.diagnostics?.outOfWindow ?? 0), 0),
       },
     };
   }

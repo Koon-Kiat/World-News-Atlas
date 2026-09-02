@@ -43,8 +43,10 @@ export function articleRejectionReason(
 
   if (
     query.countries.length > 0 &&
-    !article.countries.some(({ code, relevanceScore }) =>
-      query.countries.includes(code) && relevanceScore >= 0.6
+    !query.countries.every((selectedCode) =>
+      article.countries.some(({ code, relevanceScore }) =>
+        code === selectedCode && relevanceScore >= 0.6
+      )
     )
   ) return "country_irrelevant";
 

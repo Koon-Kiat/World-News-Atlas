@@ -43,6 +43,7 @@ function fakeProvider(name: "NEWSAPI" | "GDELT", fails: boolean): NewsProvider {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   resetProviderRequestCacheForTesting();
 });
 
@@ -108,5 +109,26 @@ describe("provider failure handling", () => {
     expect(fetchLatest).toHaveBeenCalledTimes(1);
     expect(first.articles).toEqual([]);
     expect(second.articles).toEqual([]);
+  });
+
+  it("returns partial results when a provider exceeds the live-stage deadline", async () => {
+    vi.useFakeTimers();
+    const provider: NewsProvider = {
+      ...fakeProvider("GDELT", false),
+      fetchLatest: () => new Promise<ProviderFetchResult>(() => {}),
+      search: () => new Promise<ProviderFetchResult>(() => {}),
+    };
+
+    const pending = fetchProviderArticlesGracefully(
+      [provider],
+      {},
+      { deadlineMs: 2_500 },
+    );
+    await vi.advanceTimersByTimeAsync(2_500);
+
+    await expect(pending).resolves.toMatchObject({
+      articles: [],
+      failures: [{ provider: "GDELT", code: "STAGE_TIMEOUT" }],
+    });
   });
 });

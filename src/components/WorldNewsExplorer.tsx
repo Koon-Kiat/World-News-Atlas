@@ -21,6 +21,8 @@ const QUICK_COUNTRIES = ["US", "CN", "JP", "GB", "FR", "DE", "SG"];
 const INITIAL_STORY_COUNT = 12;
 const STORY_BATCH_SIZE = 12;
 const STORY_PREFETCH_LOW_WATER = 24;
+const NO_GROWTH_RETRY_BASE_MS = 1_500;
+const MAX_AUTOMATIC_NO_GROWTH_RETRIES = 4;
 
 export type ExplorerMode = "country" | "compare";
 
@@ -40,17 +42,43 @@ export function ProgressiveStoryList({
   const [visibleStoryCount, setVisibleStoryCount] = useState(INITIAL_STORY_COUNT);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const prefetchedRequestRef = useRef<string | null>(null);
+  const observedContinuationRef = useRef({
+    version: continuationVersion,
+    storyCount: stories.length,
+  });
+  const noGrowthRetryCountRef = useRef(0);
+  const nextAutomaticRequestAtRef = useRef(0);
   const visibleStories = stories.slice(0, visibleStoryCount);
   const hasMoreRenderedStories = visibleStoryCount < stories.length;
   const hasMoreServerStories = canFetchMore;
   const hasMoreStories = hasMoreRenderedStories || hasMoreServerStories;
   const automaticRequestKey = `${continuationVersion}:${stories.length}`;
 
+  useEffect(() => {
+    const previous = observedContinuationRef.current;
+    if (previous.version === continuationVersion) return;
+    const storyCountGrew = stories.length > previous.storyCount;
+    noGrowthRetryCountRef.current = storyCountGrew
+      ? 0
+      : noGrowthRetryCountRef.current + 1;
+    const retryCount = noGrowthRetryCountRef.current;
+    nextAutomaticRequestAtRef.current = retryCount === 0
+      ? 0
+      : retryCount <= MAX_AUTOMATIC_NO_GROWTH_RETRIES
+        ? Date.now() + NO_GROWTH_RETRY_BASE_MS * 2 ** (retryCount - 1)
+        : Number.POSITIVE_INFINITY;
+    observedContinuationRef.current = {
+      version: continuationVersion,
+      storyCount: stories.length,
+    };
+  }, [continuationVersion, stories.length]);
+
   const requestMoreOnce = useCallback(() => {
     if (
       !hasMoreServerStories ||
       isFetchingMore ||
-      prefetchedRequestRef.current === automaticRequestKey
+      prefetchedRequestRef.current === automaticRequestKey ||
+      Date.now() < nextAutomaticRequestAtRef.current
     ) return;
     prefetchedRequestRef.current = automaticRequestKey;
     onRequestMore();
@@ -94,7 +122,14 @@ export function ProgressiveStoryList({
       bufferedStories > STORY_PREFETCH_LOW_WATER ||
       prefetchedRequestRef.current === automaticRequestKey
     ) return;
-    requestMoreOnce();
+    const delayMs = nextAutomaticRequestAtRef.current - Date.now();
+    if (!Number.isFinite(delayMs)) return;
+    if (delayMs <= 0) {
+      requestMoreOnce();
+      return;
+    }
+    const timer = window.setTimeout(requestMoreOnce, delayMs);
+    return () => window.clearTimeout(timer);
   }, [automaticRequestKey, hasMoreServerStories, isFetchingMore, requestMoreOnce, stories.length, visibleStoryCount]);
 
   return (
@@ -272,9 +307,9 @@ export function WorldNewsExplorer({
           setError(null);
           return;
         }
-        const mergedPage = mergeNextPage(data.stories, responseData, nextPage);
+        const mergedPage = mergeNextPage(data.stories, responseData, nextPage, sort);
         setData((current) => {
-          const mergedCurrentPage = mergeNextPage(current.stories, responseData, nextPage);
+          const mergedCurrentPage = mergeNextPage(current.stories, responseData, nextPage, sort);
           return {
             stories: mergedCurrentPage.stories,
             meta: responseData.meta,
@@ -287,7 +322,6 @@ export function WorldNewsExplorer({
       })
       .catch((requestError: unknown) => {
         if (requestError instanceof DOMException && requestError.name === "AbortError") return;
-        setCanFetchMore(false);
         setError("Could not load the next page of coverage. Refresh the page to try again.");
       })
       .finally(() => {

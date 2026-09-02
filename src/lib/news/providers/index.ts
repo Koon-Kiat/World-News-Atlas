@@ -36,6 +36,12 @@ export function providerTimeoutFromEnvironment(): number {
   return Number.isFinite(raw) ? Math.max(2_000, Math.min(30_000, raw)) : 8_000;
 }
 
+export function liveProviderBatchTimeoutFromEnvironment(): number {
+  const fallback = Math.min(6_500, providerTimeoutFromEnvironment() + 500);
+  const raw = Number(process.env.NEWS_LIVE_STAGE_TIMEOUT_MS ?? fallback);
+  return Number.isFinite(raw) ? Math.max(2_500, Math.min(12_000, raw)) : fallback;
+}
+
 export function rssFeedsFromEnvironment(): RssFeedConfig[] {
   const raw = process.env.RSS_FEEDS_JSON;
   if (!raw) return DEFAULT_RSS_FEEDS;
@@ -194,6 +200,31 @@ async function fetchProviderCached(
   }
 }
 
+async function fetchProviderWithinDeadline(
+  provider: NewsProvider,
+  request: ProviderFetchRequest,
+  deadlineMs: number | undefined,
+): Promise<ProviderOutcome> {
+  const pending = fetchProviderCached(provider, request);
+  if (deadlineMs === undefined) return pending;
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<ProviderOutcome>((resolve) => {
+    timer = setTimeout(() => {
+      logNews("warn", "provider_batch_deadline_exceeded", {
+        provider: provider.name,
+        deadlineMs,
+      });
+      resolve({ failure: { provider: provider.name, code: "STAGE_TIMEOUT" } });
+    }, deadlineMs);
+  });
+  try {
+    return await Promise.race([pending, deadline]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 export function resetProviderRequestCacheForTesting(): void {
   providerResultCache.clear();
   providerRequestsInFlight.clear();
@@ -202,9 +233,10 @@ export function resetProviderRequestCacheForTesting(): void {
 export async function fetchProviderArticlesGracefully(
   providers: NewsProvider[],
   request: ProviderFetchRequest = {},
+  options: { deadlineMs?: number } = {},
 ): Promise<ProviderBatchResult> {
   const outcomes = await Promise.all(
-    providers.map((provider) => fetchProviderCached(provider, request)),
+    providers.map((provider) => fetchProviderWithinDeadline(provider, request, options.deadlineMs)),
   );
   const articles: ProviderArticle[] = [];
   const failures: ProviderBatchResult["failures"] = [];

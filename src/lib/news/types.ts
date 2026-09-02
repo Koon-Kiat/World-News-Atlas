@@ -210,6 +210,8 @@ export interface ProviderContinuationState {
    * branch as exhausted; a missing branch remains retryable.
    */
   discoveryCursors?: Record<string, string | null>;
+  /** Independent page positions for providers that fan out across time windows. */
+  discoveryPages?: Record<string, number | null>;
   /** Deterministic Bing/RSS plan identifiers already attempted. */
   completedPlanIds?: string[];
   /** Provider-specific reason continuation ended before historical coverage completed. */
