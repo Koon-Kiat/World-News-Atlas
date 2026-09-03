@@ -205,9 +205,10 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
         ? new Date(Math.max(new Date(prior.windowEnd).getTime(), providerWindowEnd.getTime()))
         : providerWindowEnd;
       let providerStages = 0;
-      const providerStageBudget = shards.length > 1
-        ? Math.max(1, Math.floor(stageLimit / Math.max(1, shards.length * providers.length)))
-        : stageLimit;
+      const providerStageBudget = Math.max(
+        1,
+        Math.floor(stageLimit / Math.max(1, shards.length * providers.length)),
+      );
 
       while (!exhausted && !coverageComplete) {
         if (summary.stagesProcessed >= stageLimit || providerStages >= providerStageBudget) {

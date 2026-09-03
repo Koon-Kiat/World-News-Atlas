@@ -48,6 +48,8 @@ const DEFAULT_LIVE_CORPUS_LIMITS: Record<NewsQuery["period"], number> = {
 const DEFAULT_LIVE_CORPUS_ABSOLUTE_MAX = 1_000;
 const DEFAULT_LIVE_LOW_WATER = 24;
 const DEFAULT_DATABASE_CANDIDATE_LIMIT = 1_000;
+const MAX_CONSECUTIVE_PROVIDER_FAILURES = 2;
+const LIVE_PROVIDER_RETRY_DELAY_MS = 1_500;
 interface LiveCorpusState {
   id: string;
   articles: NormalizedArticle[];
@@ -58,6 +60,7 @@ interface LiveCorpusState {
   exhaustedProviders: Set<ProviderName>;
   providerCoverage: Map<ProviderName, ProviderCoverageProgress>;
   providerHealth: Map<ProviderName, ProviderHealthStatus>;
+  providerFailureCounts: Map<ProviderName, number>;
   providerRetryAfter: Map<ProviderName, number>;
   diagnostics: Map<ProviderName, ProviderDiscoveryDiagnostics>;
   rawArticleCount: number;
@@ -468,6 +471,8 @@ async function discoverLiveStage(
     for (const { provider, result } of results) {
       const failure = result.failures.find(({ provider: failedProvider }) => failedProvider === provider.name);
       if (failure) {
+        const failureCount = (state.providerFailureCounts.get(provider.name) ?? 0) + 1;
+        state.providerFailureCounts.set(provider.name, failureCount);
         const health: ProviderHealthStatus = failure.code === "HTTP_429"
           ? "rate_limited"
           : failure.code === "MISSING_CREDENTIAL"
@@ -478,20 +483,26 @@ async function discoverLiveStage(
                 ? "timeout"
                 : "partial";
         state.providerHealth.set(provider.name, health);
-        state.providerRetryAfter.set(provider.name, Date.now() + 20_000);
         const metric = providerDiagnostics(state, provider.name);
         metric.health = health;
         if (failure.code === "PROVIDER_LIMIT") metric.exhaustionReason = "provider_limit";
-        if (terminalProviderFailure(failure.code)) {
+        const retryBudgetExhausted = failureCount >= MAX_CONSECUTIVE_PROVIDER_FAILURES;
+        if (terminalProviderFailure(failure.code) || retryBudgetExhausted) {
           state.exhaustedProviders.add(provider.name);
+          state.providerRetryAfter.delete(provider.name);
           logNews("warn", "live_provider_unavailable", {
             provider: provider.name,
             code: failure.code,
+            failure_count: failureCount,
+            retry_budget_exhausted: retryBudgetExhausted,
           });
+        } else {
+          state.providerRetryAfter.set(provider.name, Date.now() + LIVE_PROVIDER_RETRY_DELAY_MS);
         }
         continue;
       }
       const continuation = result.continuations[provider.name];
+      state.providerFailureCounts.delete(provider.name);
       state.providerRetryAfter.delete(provider.name);
       if (continuation) state.providerStates.set(provider.name, continuation);
       else state.providerStates.delete(provider.name);
@@ -663,6 +674,7 @@ async function loadLiveStories(query: NewsQuery): Promise<{
         exhaustedProviders: new Set(),
         providerCoverage: new Map(),
         providerHealth: new Map(providers.map(({ name }) => [name, "active" as const])),
+        providerFailureCounts: new Map(),
         providerRetryAfter: new Map(),
         diagnostics: new Map(),
         rawArticleCount: 0,

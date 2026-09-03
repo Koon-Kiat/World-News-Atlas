@@ -412,6 +412,31 @@ describe("incremental live corpus", () => {
     expect(failing.calls).toBe(1);
   });
 
+  it("stops pagination after repeated transient provider failures", async () => {
+    const failing = new FailingProvider();
+    setLiveProviderFactoryForTesting(() => [failing]);
+
+    const first = await loadNewsDataset(query(1));
+    expect(first.corpusComplete).toBe(false);
+    expect(first.discoveryExhausted).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(1_501);
+    const final = await loadNewsDataset(query(1));
+    const response = buildNewsResponse(
+      final.stories,
+      query(1),
+      final.dataSource,
+      final.notice,
+      final,
+    );
+
+    expect(failing.calls).toBe(1);
+    expect(final.corpusComplete).toBe(true);
+    expect(final.discoveryExhausted).toBe(true);
+    expect(final.coverageStatus).toBe("degraded");
+    expect(response.meta).toMatchObject({ hasMore: false, nextPage: null });
+  });
+
   it("marks an expired process-local continuation as reset instead of silently reusing it", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-31T00:00:00Z"));

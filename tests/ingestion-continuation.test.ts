@@ -176,7 +176,15 @@ describe("bounded resumable ingestion", () => {
       stageLimit: 4,
       snapshotTo: new Date("2026-08-31T00:00:00Z"),
     };
-    for (let run = 0; run < 4; run += 1) await runNewsIngestion(options);
+    await runNewsIngestion(options);
+    expect(providers.map(({ steps }) => steps)).toEqual([
+      [0],
+      [0],
+      [0],
+      [0],
+    ]);
+
+    for (let run = 1; run < 4; run += 1) await runNewsIngestion(options);
 
     expect(providers.map(({ steps }) => steps)).toEqual([
       [0, 1, 2],
