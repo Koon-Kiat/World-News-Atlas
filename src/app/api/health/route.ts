@@ -1,12 +1,15 @@
 import { DEFAULT_RSS_FEEDS } from "@/config/news-sources";
+import { getSitesD1Binding } from "@/lib/db/d1";
 
 export const runtime = "nodejs";
 
-export function GET(): Response {
+export async function GET(): Promise<Response> {
+  const database = await getSitesD1Binding();
   return Response.json(
     {
       status: "ok",
-      databaseConfigured: Boolean(process.env.DATABASE_URL),
+      databaseConfigured: Boolean(database),
+      storage: database ? "d1" : "live-fallback",
       providers: {
         bingNews: true,
         newsApi: Boolean(process.env.NEWSAPI_KEY),

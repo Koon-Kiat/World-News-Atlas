@@ -12,7 +12,7 @@ runNewsIngestion(parseNewsCliOptions("latest"))
     console.error(
       JSON.stringify({
         event: "ingestion_failed",
-        message: "News ingestion did not complete. Check server logs and database configuration.",
+        message: "News ingestion did not complete. Check server logs and the Sites D1 binding.",
       }),
     );
     process.exitCode = 1;

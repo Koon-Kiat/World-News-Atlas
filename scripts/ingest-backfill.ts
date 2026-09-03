@@ -10,7 +10,7 @@ runNewsIngestion({ ...parseNewsCliOptions("30d"), mode: "backfill" })
     console.error(JSON.stringify({
       event: "backfill_failed",
       code: error instanceof Error ? error.name : "UNEXPECTED_FAILURE",
-      message: "Historical ingestion did not complete; its saved checkpoint can be resumed safely.",
+      message: "Historical ingestion did not complete; a D1-backed request can resume its saved checkpoint safely.",
     }));
     process.exitCode = 1;
   });
