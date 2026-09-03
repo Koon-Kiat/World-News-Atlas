@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import type { Prisma, PrismaClient, ProviderName as DatabaseProviderName, SourceScope } from "@prisma/client";
 import { getFixtureStories } from "@/data/fixture-news";
+import { getConfiguredNewsStore } from "./configured-store";
 import { clusterArticlesHybridIncremental } from "./cluster";
 import { queryRelevantArticles, type QueryRejectionReason } from "./acceptance";
 import { deduplicateArticles } from "./deduplicate";
@@ -17,13 +17,10 @@ import { queryStories } from "./query";
 import { rankStories } from "./ranking";
 import { buildCountryDiscoveryQuery } from "./countries/discovery";
 import { MemoryLiveStateStore, type LiveStateStore } from "./live-state-store";
-import { registrableDomain } from "./sources/domain";
 import {
-  canonicalSourceId,
-  parseDomainlessSourceId,
-  sourceSeedForSelection,
   sourceTargetsFromSelections,
 } from "./sources/registry";
+import type { DatabaseCoverageState, NewsStore } from "./store";
 import type {
   NewsQuery,
   NormalizedArticle,
@@ -94,240 +91,26 @@ export interface LoadedNewsDataset {
   notice?: string;
 }
 
-export interface DatabaseCoverageState {
-  complete: boolean;
-  archiveComplete: boolean;
-  reasons: string[];
-  checkpointCount: number;
-}
-
 let liveStateStore: LiveStateStore<LiveCorpusState> = new MemoryLiveStateStore<LiveCorpusState>();
 let liveProviderFactory: (query: NewsQuery) => NewsProvider[] = (query) => createConfiguredProviders({
   period: query.period,
   countries: query.countries,
 });
-
-function enumValue<T extends string>(value: T): T {
-  return value;
-}
-
-function databaseArticleAccessWhere(query: NewsQuery): Prisma.ArticleWhereInput | undefined {
-  const filters: Prisma.ArticleWhereInput[] = [];
-
-  if (query.sources.length > 0) {
-    const sourcePredicates: Prisma.SourceWhereInput[] = query.sources.flatMap((selection): Prisma.SourceWhereInput[] => {
-      const seed = sourceSeedForSelection(selection);
-      if (seed) {
-        return [
-          { name: seed.name },
-          { domain: { in: [...new Set([seed.domain, ...seed.alternateDomains].map(registrableDomain))] } },
-        ];
-      }
-      if (selection.startsWith("domain:")) {
-        return [{ domain: registrableDomain(selection.slice("domain:".length)) }];
-      }
-      const domainless = parseDomainlessSourceId(selection);
-      if (domainless) {
-        return [{
-          domain: null,
-          name: { equals: domainless.name, mode: "insensitive" },
-          ...(domainless.countryCode ? { countryCode: domainless.countryCode } : {}),
-        }];
-      }
-      return [{ name: selection }];
-    });
-    filters.push({ source: { is: { OR: sourcePredicates } } });
-  }
-
-  const perspectiveCountry = query.sourcePerspective === "local" || query.sourcePerspective === "first-country"
-    ? query.countries[0]
-    : query.sourcePerspective === "second-country"
-      ? query.countries[1]
-      : undefined;
-  if (perspectiveCountry) {
-    filters.push({ source: { countryCode: perspectiveCountry } });
-  } else if (query.sourcePerspective === "international") {
-    filters.push({
-      source: {
-        is: {
-          OR: [
-            { countryCode: null },
-            { countryCode: { notIn: query.countries } },
-          ],
-        },
-      },
-    });
-  }
-
-  return filters.length > 0 ? { AND: filters } : undefined;
-}
-
-function databaseStoryWhere(query: NewsQuery, now = new Date()): Prisma.StoryWhereInput {
-  const publicationWindow = {
-    gte: new Date(now.getTime() - newsPeriodHours(query.period) * 3_600_000),
-    lte: now,
-  };
-  const filters: Prisma.StoryWhereInput[] = [{
-    articles: { some: { article: { publishedAt: publicationWindow } } },
-  }, ...query.countries.map((countryCode) => ({
-    countries: { some: { countryCode } },
-  }))];
-  const articleAccessWhere = databaseArticleAccessWhere(query);
-
-  if (query.topic) {
-    filters.push({ topics: { some: { topic: { slug: query.topic } } } });
-  }
-  if (query.language) {
-    filters.push({ articles: { some: { article: { language: query.language } } } });
-  }
-  if (articleAccessWhere) {
-    filters.push({ articles: { some: { article: articleAccessWhere } } });
-  }
-  if (query.search) {
-    const contains = { contains: query.search, mode: "insensitive" as const };
-    filters.push({
-      OR: [
-        { title: contains },
-        { summary: contains },
-        { countries: { some: { country: { name: contains } } } },
-        { topics: { some: { topic: { slug: contains } } } },
-        { articles: { some: { article: { title: contains } } } },
-        { articles: { some: { article: { description: contains } } } },
-        { articles: { some: { article: { source: { name: contains } } } } },
-      ],
-    });
-  }
-
-  return { AND: filters };
-}
-
+let newsStoreFactory: () => Promise<NewsStore | null> = getConfiguredNewsStore;
 export async function loadDatabaseStories(
   query: NewsQuery,
-  client?: PrismaClient,
+  store: NewsStore,
+  now = new Date(),
 ): Promise<StoryView[]> {
-  const database = client ?? (await import("@/lib/db/prisma")).prisma;
-  const records = await database.story.findMany({
-    where: databaseStoryWhere(query),
-    orderBy: query.sort === "newest"
-      ? [{ lastUpdatedAt: "desc" }, { importanceScore: "desc" }]
-      : [{ importanceScore: "desc" }, { lastUpdatedAt: "desc" }],
-    take: databaseCandidateLimit(),
-    include: {
-      countries: { include: { country: true } },
-      topics: { include: { topic: true } },
-      articles: {
-        include: {
-          article: {
-            include: {
-              source: true,
-              countries: { include: { country: true } },
-              topics: { include: { topic: true } },
-            },
-          },
-        },
-      },
-    },
-  });
-
-  return records.map((story) => ({
-    id: story.id,
-    title: story.title,
-    summary: story.summary,
-    firstPublishedAt: story.firstPublishedAt.toISOString(),
-    lastUpdatedAt: story.lastUpdatedAt.toISOString(),
-    importanceScore: story.importanceScore,
-    countries: story.countries.map((entry) => ({
-      code: entry.countryCode,
-      name: entry.country.name,
-      relevanceScore: entry.relevanceScore,
-    })),
-    topics: story.topics.map((entry) => entry.topic.slug),
-    articles: story.articles.map(({ article }) => ({
-      id: article.id,
-      provider: enumValue<DatabaseProviderName>(article.provider),
-      providerArticleId: article.providerArticleId,
-      title: article.title,
-      description: article.description,
-      url: article.url,
-      canonicalUrl: article.canonicalUrl,
-      imageUrl: article.imageUrl,
-      publishedAt: article.publishedAt.toISOString(),
-      language: article.language,
-      source: {
-        id: canonicalSourceId({
-          name: article.source.name,
-          domain: article.source.domain,
-          countryCode: article.source.countryCode,
-        }),
-        name: article.source.name,
-        domain: article.source.domain,
-        countryCode: article.source.countryCode,
-        region: article.source.region,
-        language: article.source.language,
-        scope: enumValue<SourceScope>(article.source.scope),
-        qualityScore: article.source.qualityScore,
-      },
-      countries: article.countries.map((entry) => ({
-        code: entry.countryCode,
-        name: entry.country.name,
-        relevanceScore: entry.relevanceScore,
-      })),
-      topics: article.topics.map((entry) => entry.topic.slug),
-      importanceScore: article.importanceScore,
-      relevanceScore: article.relevanceScore,
-      isFixture: article.provider === "FIXTURE",
-    })),
-  })) as StoryView[];
+  return store.loadStories(query, now);
 }
 
 export async function loadDatabaseCoverage(
   query: NewsQuery,
-  client?: PrismaClient,
+  store: NewsStore,
   now = new Date(),
 ): Promise<DatabaseCoverageState> {
-  const database = client ?? (await import("@/lib/db/prisma")).prisma;
-  const windowStart = new Date(now.getTime() - newsPeriodHours(query.period) * 3_600_000);
-  const freshnessMs = Math.max(15, Math.min(360, Number(process.env.NEWS_DATABASE_FRESHNESS_MINUTES ?? 120))) * 60_000;
-  const countryCodes = query.countries.length > 0 ? query.countries : [null];
-  const checkpoints = await database.providerIngestionCheckpoint.findMany({
-    where: {
-      countryCode: query.countries.length > 0 ? { in: query.countries } : null,
-      status: "SUCCEEDED",
-      lastSuccessfulAt: { gte: new Date(now.getTime() - freshnessMs) },
-      windowStart: { lte: windowStart },
-      windowEnd: { gte: new Date(now.getTime() - freshnessMs) },
-    },
-  });
-  const historical = query.period === "7d" || query.period === "30d";
-  const enabledProviders = [...new Set(createConfiguredProviders({
-    period: query.period,
-    countries: query.countries,
-  }).map(({ name }) => name))];
-  const providerComplete = (countryCode: string | null, provider: ProviderName): boolean =>
-    checkpoints.some((checkpoint) =>
-      checkpoint.countryCode === countryCode &&
-      checkpoint.provider === provider &&
-      (["GDELT", "NEWSAPI"].includes(provider)
-        ? checkpoint.coverageComplete &&
-          checkpoint.coveredFrom !== null && checkpoint.coveredFrom <= windowStart &&
-          checkpoint.coveredTo !== null && checkpoint.coveredTo >= new Date(now.getTime() - freshnessMs)
-        : checkpoint.exhausted)
-    );
-  const complete = checkpoints.length > 0 && countryCodes.every((code) =>
-    enabledProviders.every((provider) => providerComplete(code, provider))
-  );
-  const archiveComplete = complete && (!historical || countryCodes.every((code) =>
-    checkpoints.some((checkpoint) =>
-      checkpoint.countryCode === code &&
-      ["GDELT", "NEWSAPI"].includes(checkpoint.provider) &&
-      checkpoint.coveredFrom !== null && checkpoint.coveredFrom <= windowStart &&
-      checkpoint.coveredTo !== null && checkpoint.coveredTo >= new Date(now.getTime() - freshnessMs)
-    )
-  ));
-  const reasons: string[] = [];
-  if (!complete) reasons.push(checkpoints.length === 0 ? "DATABASE_COVERAGE_UNKNOWN" : "DATABASE_WINDOW_PARTIAL");
-  if (historical && !archiveComplete) reasons.push("DATABASE_ARCHIVE_PARTIAL");
-  return { complete: complete && (!historical || archiveComplete), archiveComplete, reasons, checkpointCount: checkpoints.length };
+  return store.loadCoverage(query, now);
 }
 
 export function providerSearchQuery(query: NewsQuery): string | undefined {
@@ -1072,14 +855,14 @@ export async function buildCoverageAwareDataset(
 }
 
 export async function loadNewsDataset(query: NewsQuery): Promise<LoadedNewsDataset> {
-  if (!process.env.DATABASE_URL) {
+  const database = await newsStoreFactory();
+  if (!database) {
     return liveDatasetOrFixtures(
       query,
       "No live provider returned usable coverage.",
     );
   }
   try {
-    const database = (await import("@/lib/db/prisma")).prisma;
     const [stories, databaseCoverage] = await Promise.all([
       loadDatabaseStories(query, database),
       loadDatabaseCoverage(query, database),
@@ -1113,4 +896,8 @@ export function setLiveProviderFactoryForTesting(factory?: (query: NewsQuery) =>
 export function setLiveStateStoreForTesting(store?: LiveStateStore<LiveCorpusState>): void {
   liveStateStore = store ?? new MemoryLiveStateStore<LiveCorpusState>();
   resetLiveCorpusForTesting();
+}
+
+export function setNewsStoreFactoryForTesting(factory?: () => Promise<NewsStore | null>): void {
+  newsStoreFactory = factory ?? getConfiguredNewsStore;
 }

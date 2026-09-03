@@ -6,16 +6,17 @@ import {
   discoveryKeyFor,
   MemoryIngestionStateStore,
   mergeCoverage,
-  PrismaIngestionStateStore,
   type IngestionMode,
   type IngestionStateStore,
 } from "./ingestion-state";
+import { getConfiguredNewsStore } from "./configured-store";
 import { logNews } from "./logger";
 import { normalizeProviderArticles } from "./normalize";
 import { newsPeriodHours } from "./periods";
 import { persistStoryCandidates } from "./persistence";
 import { createConfiguredProviders, fetchProviderArticlesGracefully } from "./providers";
 import type { NewsProvider } from "./providers/provider";
+import type { NewsStore } from "./store";
 import type { NewsPeriod, NewsQuery, ProviderContinuationState } from "./types";
 
 const DEFAULT_STAGE_LIMIT = 24;
@@ -23,6 +24,7 @@ const DEFAULT_COUNTRY_BATCH_SIZE = 8;
 const STAGE_ARTICLE_LIMIT = 96;
 
 export interface IngestionSummary {
+  runId: string;
   mode: IngestionMode;
   period: NewsPeriod;
   countries: string[];
@@ -43,12 +45,14 @@ export interface IngestionSummary {
   persisted: boolean;
   budgetExhausted: boolean;
   checkpointsCompleted: number;
+  durationMs: number;
 }
 
 export interface NewsIngestionOptions {
   providers?: NewsProvider[];
   persist?: boolean;
   stateStore?: IngestionStateStore;
+  store?: NewsStore;
   mode?: IngestionMode;
   period?: NewsPeriod;
   countries?: string[];
@@ -123,8 +127,10 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
   const period = options.period ?? (mode === "backfill" ? "30d" : "latest");
   const snapshotTo = options.snapshotTo ?? new Date();
   const snapshotFrom = new Date(snapshotTo.getTime() - newsPeriodHours(period) * 3_600_000);
-  const shouldPersist = options.persist ?? Boolean(process.env.DATABASE_URL);
-  const stateStore = options.stateStore ?? (shouldPersist ? new PrismaIngestionStateStore() : new MemoryIngestionStateStore());
+  const store = options.store ?? (options.persist === false ? null : await getConfiguredNewsStore());
+  const shouldPersist = options.persist ?? Boolean(store);
+  if (shouldPersist && !store) throw new Error("D1 persistence was requested but the Sites DB binding is unavailable");
+  const stateStore = options.stateStore ?? store ?? new MemoryIngestionStateStore();
   const stageLimit = boundedNumber(options.stageLimit ?? Number(process.env.NEWS_INGESTION_STAGE_LIMIT), DEFAULT_STAGE_LIMIT, 1, 200);
   const countryBatchSize = boundedNumber(options.countryBatchSize ?? Number(process.env.NEWS_INGESTION_COUNTRY_BATCH_SIZE), DEFAULT_COUNTRY_BATCH_SIZE, 1, 40);
   const providersForAllShards = options.providers ?? createConfiguredProviders({ period, countries: ["US"] });
@@ -133,11 +139,12 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
     stageLimit,
     providersForAllShards.length,
   );
-  const countries = options.countries?.length
+  const countries = options.countries !== undefined
     ? [...new Set(options.countries.map((code) => code.toUpperCase()))]
     : options.providers ? [] : await stateStore.nextCountryBatch(effectiveCountryBatchSize);
   const shards: Array<string | null> = countries.length > 0 ? countries : [null];
   const summary: IngestionSummary = {
+    runId: crypto.randomUUID(),
     mode,
     period,
     countries,
@@ -158,6 +165,7 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
     persisted: shouldPersist,
     budgetExhausted: false,
     checkpointsCompleted: 0,
+    durationMs: 0,
   };
   const seenCanonicalUrls = new Set<string>();
   logNews("info", "ingestion_started", { mode, period, countries, stageLimit });
@@ -249,7 +257,7 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
         let stored = 0;
         let storiesUpdated = 0;
         if (shouldPersist && deduplicated.articles.length > 0) {
-          const result = await persistStoryCandidates(await clusterArticlesHybrid(deduplicated.articles));
+          const result = await persistStoryCandidates(await clusterArticlesHybrid(deduplicated.articles), store!);
           stored = result.storedArticles;
           storiesUpdated = result.storiesUpdated;
           summary.stored += stored;
@@ -306,6 +314,7 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
   }
 
   summary.countryDetectionRate = summary.normalized === 0 ? 0 : Number((summary.articlesWithCountries / summary.normalized).toFixed(3));
-  logNews("info", "ingestion_completed", { ...summary, durationMs: Date.now() - startedAt });
+  summary.durationMs = Date.now() - startedAt;
+  logNews("info", "ingestion_completed", { ...summary });
   return summary;
 }

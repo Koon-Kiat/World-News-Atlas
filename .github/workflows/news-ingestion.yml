@@ -8,7 +8,7 @@ on:
       period:
         description: Discovery period
         required: false
-        default: latest
+        default: 30d
         type: choice
         options: [latest, 24h, 7d, 30d]
 
@@ -22,45 +22,63 @@ concurrency:
 jobs:
   ingest:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
-      GDELT_MODE: auto
-      NEWS_FIXTURES_ENABLED: "false"
-      NEWS_INGESTION_STAGE_LIMIT: "24"
-      NEWS_INGESTION_COUNTRY_BATCH_SIZE: "8"
+      NEWS_INGEST_URL: ${{ secrets.NEWS_INGEST_URL }}
+      NEWS_INGEST_HMAC_SECRET: ${{ secrets.NEWS_INGEST_HMAC_SECRET }}
+      OAI_SITES_BYPASS_TOKEN: ${{ secrets.OAI_SITES_BYPASS_TOKEN }}
+      PERIOD: ${{ github.event_name == 'schedule' && '30d' || inputs.period || '30d' }}
     steps:
-      - name: Check database configuration
-        id: database
+      - name: Trigger bounded Sites ingestion
         shell: bash
         run: |
-          if [[ -z "$DATABASE_URL" ]]; then
-            {
-              echo "### News ingestion is not configured"
-              echo
-              echo "The optional DATABASE_URL repository secret is not set, so this scheduled persistence pass was skipped."
-              echo "Add a PostgreSQL connection string that is reachable from GitHub-hosted runners to enable migrations and ingestion."
-            } >> "$GITHUB_STEP_SUMMARY"
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            exit 0
+          set -euo pipefail
+          if [[ -z "$NEWS_INGEST_URL" || -z "$NEWS_INGEST_HMAC_SECRET" ]]; then
+            echo "NEWS_INGEST_URL and NEWS_INGEST_HMAC_SECRET must be configured as repository secrets." >&2
+            exit 1
           fi
-          echo "configured=true" >> "$GITHUB_OUTPUT"
-      - name: Check out repository
-        if: steps.database.outputs.configured == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Set up Node.js
-        if: steps.database.outputs.configured == 'true'
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with:
-          node-version: 24.15.0
-          cache: npm
-      - name: Install dependencies
-        if: steps.database.outputs.configured == 'true'
-        run: npm ci
-      - name: Apply database migrations
-        if: steps.database.outputs.configured == 'true'
-        run: npx prisma migrate deploy
-      - name: Run bounded resumable ingestion
-        if: steps.database.outputs.configured == 'true'
-        run: npm run ingest:news -- --period=${{ github.event_name == 'schedule' && '30d' || inputs.period || 'latest' }}
+
+          for SCOPE in global countries countries; do
+            TIMESTAMP="$(date +%s)"
+            NONCE="$(openssl rand -hex 24)"
+            BODY="$(printf '{\"period\":\"%s\",\"mode\":\"incremental\",\"scope\":\"%s\",\"stageLimit\":4}' "$PERIOD" "$SCOPE")"
+            export TIMESTAMP NONCE BODY
+            SIGNATURE="$(python3 - <<'PY'
+          import hashlib
+          import hmac
+          import os
+
+          canonical = f"{os.environ['TIMESTAMP']}.{os.environ['NONCE']}.{os.environ['BODY']}"
+          print(hmac.new(
+              os.environ["NEWS_INGEST_HMAC_SECRET"].encode(),
+              canonical.encode(),
+              hashlib.sha256,
+          ).hexdigest())
+          PY
+            )"
+
+            CURL_HEADERS=(
+              --header 'Content-Type: application/json'
+              --header "X-Ingest-Timestamp: $TIMESTAMP"
+              --header "X-Ingest-Nonce: $NONCE"
+              --header "X-Ingest-Signature: $SIGNATURE"
+            )
+            if [[ -n "$OAI_SITES_BYPASS_TOKEN" ]]; then
+              CURL_HEADERS+=(--header "OAI-Sites-Authorization: Bearer $OAI_SITES_BYPASS_TOKEN")
+            fi
+            STATUS="$(curl --silent --show-error --output ingestion-response.json --write-out '%{http_code}' \
+              --request POST "$NEWS_INGEST_URL" "${CURL_HEADERS[@]}" --data-binary "$BODY")"
+            if [[ "$STATUS" -lt 200 || "$STATUS" -ge 300 ]]; then
+              echo "Sites ingestion failed with HTTP $STATUS." >&2
+              exit 1
+            fi
+            python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+
+          with open("ingestion-response.json", encoding="utf-8") as response_file:
+              response = json.load(response_file)
+          summary = response["summary"]
+          print(f"- `{summary['runId']}`: {summary['stagesProcessed']} stages, "
+                f"{summary['stored']} articles stored, {summary['storiesUpdated']} stories updated")
+          PY
+          done

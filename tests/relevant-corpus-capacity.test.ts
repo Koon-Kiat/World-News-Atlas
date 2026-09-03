@@ -7,12 +7,7 @@ import {
 import { resetProviderRequestCacheForTesting } from "@/lib/news/providers";
 import type { NewsProvider } from "@/lib/news/providers/provider";
 import { DEFAULT_NEWS_QUERY } from "@/lib/news/query";
-import type {
-  ProviderArticle,
-  ProviderFetchRequest,
-  ProviderFetchResult,
-  ProviderName,
-} from "@/lib/news/types";
+import type { ProviderArticle, ProviderFetchRequest, ProviderFetchResult, ProviderName } from "@/lib/news/types";
 
 class IrrelevantFirstProvider implements NewsProvider {
   readonly name = "OTHER" as const;
@@ -55,48 +50,31 @@ class IrrelevantFirstProvider implements NewsProvider {
 
 class SingleBatchProvider implements NewsProvider {
   readonly capabilities = { latest: true, search: true, languages: true, sourceMetadata: true, requiresCredentials: false } as const;
-
-  constructor(
-    readonly name: ProviderName,
-    private readonly countryName: string | null,
-  ) {}
-
+  constructor(readonly name: ProviderName, private readonly countryName: string | null) {}
   private result(request: ProviderFetchRequest): ProviderFetchResult {
     const count = request.limit ?? 96;
-    const articles: ProviderArticle[] = Array.from({ length: count }, (_, index) => ({
-      provider: this.name,
-      providerArticleId: `${this.name}-${index}`,
-      title: `${this.name} eventword${index.toString(36)} development${(index * 19).toString(36)}`,
-      description: this.countryName
-        ? `${this.countryName} authorities released details.`
-        : "A remote ocean observatory released details.",
-      url: `https://${this.name.toLowerCase()}-capacity.example/item-${index}`,
-      publishedAt: new Date(Date.UTC(2026, 7, 30, 20, 0) - index * 1_000).toISOString(),
-      language: "en",
-      sourceName: `${this.name} Capacity Wire`,
-    }));
     return {
       provider: this.name,
-      articles,
-      receivedAt: new Date().toISOString(),
-      continuation: null,
-      exhausted: true,
+      articles: Array.from({ length: count }, (_, index) => ({
+        provider: this.name,
+        providerArticleId: `${this.name}-${index}`,
+        title: `${this.name} eventword${index.toString(36)} development${(index * 19).toString(36)}`,
+        description: this.countryName ? `${this.countryName} authorities released details.` : "A remote ocean observatory released details.",
+        url: `https://${this.name.toLowerCase()}-capacity.example/item-${index}`,
+        publishedAt: new Date(Date.UTC(2026, 7, 30, 20, 0) - index * 1_000).toISOString(),
+        language: "en",
+        sourceName: `${this.name} Capacity Wire`,
+      })),
+      receivedAt: new Date().toISOString(), continuation: null, exhausted: true,
     };
   }
-
-  fetchLatest(request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
-    return Promise.resolve(this.result(request));
-  }
-
-  search(_query: string, request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
-    return Promise.resolve(this.result(request));
-  }
+  fetchLatest(request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> { return Promise.resolve(this.result(request)); }
+  search(_query: string, request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> { return Promise.resolve(this.result(request)); }
 }
 
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-08-31T00:00:00Z"));
-  vi.stubEnv("DATABASE_URL", "");
   vi.stubEnv("NEWS_FIXTURES_ENABLED", "false");
   vi.stubEnv("NEWS_LIVE_BATCH_SIZE", "96");
   vi.stubEnv("NEWS_LIVE_CORPUS_LIMIT", "1000");
@@ -118,13 +96,7 @@ describe("query-relevant corpus capacity", () => {
       new SingleBatchProvider("RSS", null),
       new SingleBatchProvider("NEWSAPI", "United States"),
     ]);
-
-    const result = await loadNewsDataset({
-      ...DEFAULT_NEWS_QUERY,
-      countries: ["US"],
-      period: "30d",
-    });
-
+    const result = await loadNewsDataset({ ...DEFAULT_NEWS_QUERY, countries: ["US"], period: "30d" });
     expect(result.articleCount).toBe(96);
     expect(result.stories).toHaveLength(96);
     expect(result.stories.every(({ articles }) => articles[0].provider === "NEWSAPI")).toBe(true);

@@ -208,7 +208,8 @@ class TerminalFailureProvider extends FailingProvider {
 }
 
 beforeEach(() => {
-  vi.stubEnv("DATABASE_URL", "");
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-08-31T00:00:00Z"));
   vi.stubEnv("NEWS_FIXTURES_ENABLED", "false");
   vi.stubEnv("NEWS_LIVE_BATCH_SIZE", "96");
   vi.stubEnv("NEWS_LIVE_CORPUS_LIMIT", "220");

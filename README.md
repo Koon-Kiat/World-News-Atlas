@@ -18,35 +18,27 @@ Fixture mode is an explicit development option only. Production returns live sto
 - Provider-independent source registry and many-to-one provider identifier mapping, including provider-aware domain/source pushdown before the final server filter.
 - Data-driven multilingual discovery for every ISO country, using bounded canonical, local-name, demonym, institution, location, topic, local-publisher, and wire-service lanes. Bing uses reviewed documented markets such as `en-US`, `de-DE`, `fr-FR`, and `ja-JP`, with `en-US` as the safe fallback.
 - Layered server-side country detection using official/native names, demonyms and safe capitals for all ISO countries plus reviewed major locations, subdivisions, and country-specific institutions. Publisher country remains separate from article subject country.
-- PostgreSQL schema, migrations, database seed, bounded resumable ingestion/backfill, coverage watermarks, structured diagnostics, caching, rate limiting, response validation, provider timeouts, and RSS SSRF controls.
+- Sites D1 schema and Drizzle migrations, bounded resumable ingestion/backfill, coverage watermarks, structured diagnostics, caching, rate limiting, response validation, provider timeouts, and RSS SSRF controls.
 - Device-local Light, Dark, and System themes with a pre-hydration theme bootstrap to prevent a wrong-theme flash.
 - Opt-in fixtures for local development and tests; disabled by default and never required by the production UI.
 
 ## Architecture
 
 ```text
-NewsAPI       GDELT       Bing News RSS       trusted publisher feeds
-   \            |              |                       /
-        provider adapters
+GitHub Actions (every 30 minutes)
                 |
- bounded discovery stage (up to 96 provider candidates)
+ HMAC-signed POST /api/internal/ingest/run
                 |
-          normalization
+ bounded provider discovery -> normalize -> deduplicate -> cluster
                 |
-  multilingual country/entity signals + layered source resolution
+ Sites D1 (articles, stories, relations, checkpoints, replay nonces)
                 |
- query-aware acceptance before relevant corpus capacity
+ GET /api/news reads D1 first and supplements incomplete coverage live
                 |
- cross-stage deduplication + representative-consistent clustering
-                |
- stable snapshot ordering + period-aware relevant corpus
-                |
-   GET /api/news internal continuation
-                |
- IntersectionObserver infinite-scroll UI (12-story reveals)
+ country / comparison / search / filter UI
 ```
 
-Database-backed reads use a bounded Prisma candidate path and provider/country/window checkpoints. A fresh complete window can satisfy a request without live calls; partial, stale, or unknown stored coverage is supplemented by live discovery and deduplicated into a hybrid result. Live HTTP discovery keeps a process-local query corpus for 60 minutes, caps it at 40 query entries, and performs at most one bounded stage per continuation request.
+D1-backed reads use a bounded indexed candidate path and provider/country/window checkpoints. A fresh complete window can satisfy a request without live calls; partial, stale, or unknown stored coverage is supplemented by live discovery and deduplicated into a hybrid result. Live HTTP discovery keeps a process-local query corpus for 60 minutes, caps it at 40 query entries, and performs at most one bounded stage per continuation request.
 
 The browser calls only this application's `/api/news` route. Provider credentials and RSS configuration are never exposed through public environment variables or client components.
 
@@ -59,43 +51,37 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. Reviewed RSS feeds and Bing News RSS discovery require no API key. PostgreSQL and paid provider credentials are optional. Fixtures appear only when `NEWS_FIXTURES_ENABLED=true`; they are never silently substituted in production.
+Open `http://localhost:3000`. Reviewed RSS feeds and Bing News RSS discovery require no API key. The local UI falls back to live discovery when a D1 binding is unavailable. Fixtures appear only when `NEWS_FIXTURES_ENABLED=true`; they are never silently substituted in production.
 
-## PostgreSQL setup
+## Sites D1 persistence
 
-Copy the environment template and set a real PostgreSQL connection string:
+The hosted app declares the logical `DB` binding in `.openai/hosting.json`. Sites owns the physical D1 database, applies the generated Drizzle migrations during publication, and exposes the binding only to server code. For local D1 development:
 
 ```powershell
 Copy-Item .env.example .env.local
+npm run db:migrate:local
 ```
 
-Then initialize and seed the database:
+The normalized schema includes the news entities plus provider runs, checkpoints, scheduler state, and one-time request nonces. Checkpoints record the discovery key, country/language shard, fixed window, cursor, covered boundaries, completion state, counts, and last successful update. Story count alone is never treated as proof of coverage.
 
-```powershell
-npx prisma migrate deploy
-npm run db:seed
-```
-
-The normalized schema includes the news entities plus `ProviderIngestionRun`, `ProviderIngestionCheckpoint`, and `IngestionSchedulerState`. Checkpoints record the discovery key, country/language shard, fixed window, cursor, covered boundaries, completion state, counts, and last successful update. Story count alone is never treated as proof of coverage.
-
-Database reads apply the time range, selected countries, topic, language, source, and text search in PostgreSQL before mapping records. The final deterministic bilateral relevance and popularity ranking stays in application code. Candidate loading is bounded to 1,000 matching stories by default (operator-configurable from 300 to 5,000) after the database sort, preventing unbounded nested-relation reads while preserving the ranking window used by the UI.
+D1 reads apply the time range, selected countries, topic, language, source, and text search before mapping records. The final deterministic bilateral relevance and popularity ranking stays in application code. Candidate loading is bounded to 1,000 matching stories by default (operator-configurable from 300 to 5,000) after the database sort.
 
 Article/story persistence is transactional and idempotent. Ingestion persists after every bounded provider stage, so a stopped worker resumes its cursor instead of restarting page 1 or the newest date window. A repeated fixed backfill snapshot skips checkpoints that already cover it; a later snapshot requests only the uncovered time edge and merges that coverage into the existing watermark.
 
-The current ChatGPT Sites project has no D1/R2 binding configured and uses live HTTP providers; its worker does not use the repository's raw PostgreSQL connection. The scheduled GitHub workflow is database-backed only when the repository `DATABASE_URL` secret points to a database reachable from GitHub Actions. It does not make Sites database-backed. A shared Sites corpus requires an actually configured supported binding or HTTP-accessible state service.
+The scheduled GitHub workflow never receives database credentials. It makes several small sequential requests to the Sites ingestion endpoint, which performs provider work and writes through the server-only D1 binding. Requests use HMAC-SHA256 over the exact timestamp, nonce, and body; D1 records each nonce atomically to reject replay.
 
 ## Environment variables
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `DATABASE_URL` | For persistence | PostgreSQL connection string used only on the server. |
+| `NEWS_INGEST_HMAC_SECRET` | Hosted ingestion | Server-only random secret shared with the GitHub workflow; use at least 32 characters. |
 | `NEWSAPI_KEY` | No | Enables NewsAPI ingestion. Missing credentials disable only this adapter. |
 | `GDELT_MODE` | No | `auto` (default) enables credential-free GDELT for 7d/30d country requests; `on` enables it wherever appropriate; `off` disables it. |
 | `GDELT_ENABLED` | No | Legacy compatibility switch used only when `GDELT_MODE` is unset. |
 | `NEWS_FIXTURES_ENABLED` | No | Opts into fixture fallback for local development or ingestion tests; defaults to `false`. |
 | `NEWS_PROVIDER_TIMEOUT_MS` | No | External request timeout, clamped to 2–30 seconds; defaults to 8 seconds. |
 | `NEWS_LIVE_STAGE_TIMEOUT_MS` | No | Whole live-discovery stage deadline, clamped to 2.5–12 seconds; defaults to at most 6.5 seconds so a stalled provider cannot hold the response open. |
-| `NEWS_LIVE_BATCH_SIZE` | No | Maximum **new relevant** provider articles stored and clustered in one bounded discovery stage; defaults to 96 and is clamped to 24–150. Providers may return a larger bounded candidate pool before relevance filtering. |
+| `NEWS_LIVE_BATCH_SIZE` | No | Maximum **new** provider articles normalized in one bounded discovery stage; defaults to 96 and is clamped to 24–150. |
 | `NEWS_LIVE_CORPUS_LIMIT` | No | Absolute accumulated **relevant** corpus safety cap; defaults to 1,000 and is clamped to 200–2,000. |
 | `NEWS_LIVE_CORPUS_LIMIT_24H`, `_3D`, `_7D`, `_30D` | No | Period-aware relevant corpus defaults: 360, 500, 750, and 1,000, each bounded by the absolute cap. |
 | `NEWS_LIVE_LOW_WATER` | No | Matching-story buffer threshold that can trigger another bounded stage; defaults to 24 and is clamped to 12–60. |
@@ -114,7 +100,7 @@ There are intentionally no `NEXT_PUBLIC_` provider variables.
 
 ## News ingestion
 
-Run continuous recent ingestion or a resumable historical backfill with:
+Run a local provider dry run with:
 
 ```powershell
 npm run ingest:news
@@ -122,7 +108,7 @@ npm run ingest:backfill -- --period=30d
 npm run ingest:backfill -- --country=US --period=30d --stages=48
 ```
 
-The commands use fixed snapshots, provider continuation, bounded stages, per-country rotation, canonical deduplication, per-stage persistence, and checkpointed resume. `ingest:news` defaults to a recent incremental window; `ingest:backfill` defaults to 30 days. Every country in the structured high-volume list rotates through the priority slots while the remaining ISO countries rotate through separate capacity. The selected shard count is capped by the stage/provider budget so the scheduler never advances past countries the current worker could not touch.
+The production path is `.github/workflows/news-ingestion.yml`. Every 30 minutes it sends three sequential, independently signed requests (one global and two rotating country passes) to `/api/internal/ingest/run`. Each request is capped at four provider stages so it stays within Sites request limits. D1 preserves checkpoints and country rotation between requests.
 
 The ingestion pipeline:
 
@@ -132,12 +118,12 @@ The ingestion pipeline:
 4. separates publisher country from mentioned countries.
 5. Removes canonical URL and strong headline duplicates.
 6. Builds hybrid semantic/lexical story clusters when configured, or deterministic lexical clusters otherwise.
-7. Persists articles, provider references, country/topic relations, and stories when `DATABASE_URL` is set.
+7. Persists articles, provider references, country/topic relations, stories, and checkpoints through the Sites D1 binding.
 8. Saves a coverage watermark and run record after every stage, including raw, accepted, out-of-window, irrelevant, duplicate, stored, and story counts without article bodies or secrets.
 
-Without `DATABASE_URL`, the command still fetches, normalizes, deduplicates, clusters, and prints a dry-run summary. Fixtures are used only when `NEWS_FIXTURES_ENABLED=true` is set explicitly.
+Without a D1 runtime binding, the local commands fetch, normalize, deduplicate, cluster, and print a dry-run summary. Fixtures are used only when `NEWS_FIXTURES_ENABLED=true` is set explicitly.
 
-`.github/workflows/news-ingestion.yml` runs a bounded 30-day continuation pass every 30 minutes and supports manual dispatch with another period. It uses repository secrets, applies migrations, and prevents concurrent ingestion runs with workflow concurrency. Database reachability from GitHub-hosted runners is a deployment prerequisite. When the optional `DATABASE_URL` secret is absent, the workflow records a successful not-configured summary and skips the persistence steps instead of reporting a broken ingestion run.
+Configure repository secrets `NEWS_INGEST_URL` and `NEWS_INGEST_HMAC_SECRET`; configure the same HMAC value in Sites. An owner-only Site also needs `OAI_SITES_BYPASS_TOKEN` so GitHub can pass the Sites access gate before the application verifies the HMAC. The workflow has no database or provider credentials: `NEWSAPI_KEY` remains only in Sites.
 
 Coverage can be inspected without printing article content:
 
@@ -155,7 +141,7 @@ The smoke command is optional and intentionally excluded from CI because real-pr
 | GDELT | None | `auto` for 7d/30d country views. Principal local languages get independent `sourcelang:` branches and cursors. Historical requests sample bounded recent, middle, and oldest time windows first, then continue each branch until the requested range is covered. Selected publishers use documented `domainis:`/`sourcecountry:` filters where appropriate. |
 | RSS/Atom | None | Reviewed feeds from BBC News, The Guardian, Al Jazeera, CNA, The Straits Times, The Japan Times, NHK, DW, Euronews, France 24, Sky News, and NPR are enabled by default. RSS is a finite snapshot: up to four relevant feeds are fetched per stage, each feed snapshot is visited once per fresh corpus, and articles remain publisher-round-robin. |
 | Bing News RSS | None | Bing is a finite discovery snapshot, not an archive. At most two of 18 staged plans run per worker stage; completed plan IDs are retained. Markets/local languages are data-driven, local publisher domains are prioritized, and Reuters/AP remain supplementary lanes. |
-| NewsAPI | `NEWSAPI_KEY` | Optional archive-capable provider. Seven- and 30-day requests sample bounded recent, middle, and oldest windows before continuing each window independently with `page`/`totalResults`; hosted date-filter incompatibility retries still enforce the publication window locally. Source-country metadata is cached and local-perspective source IDs are pushed upstream where NewsAPI exposes them. Provider-plan/result-limit exhaustion remains distinct from coverage completeness. |
+| NewsAPI | `NEWSAPI_KEY` | Optional archive-capable provider. Continuation uses `page`/`totalResults`; hosted date-filter incompatibility retries still enforce the publication window locally. Source-country metadata is cached and local-perspective source IDs are pushed upstream where NewsAPI exposes them. Provider-plan/result-limit exhaustion remains distinct from coverage completeness. |
 | Fixtures | None | Disabled by default. Available only as an explicit local development/testing fallback. |
 
 Publisher availability is never assumed. A source-registry entry is an identity mapping, not an availability claim. The UI lists only publishers present in the current candidate set plus any publisher the visitor already selected. NHK is additionally enabled through its reviewed default RSS feed; Reuters and AP remain discovery targets rather than bundled feeds.
@@ -288,7 +274,7 @@ Review the current official terms for every selected provider and publisher befo
 - Coverage remains limited by configured provider availability, provider/API result limits, publisher metadata quality, and licensing. RSS/Bing snapshots cannot prove a complete historical archive; GDELT/NewsAPI can broaden discovery but still do not guarantee every publisher or event.
 - Story clustering uses hybrid semantic and lexical similarity when semantic embeddings are explicitly configured and gracefully falls back to deterministic lexical clustering otherwise. The embedding cache is process-local rather than shared or database-backed.
 - Publisher-country resolution uses a structured registry, provider identifiers, RSS metadata, registrable domains, and reliable ccTLD signals; truly unknown, globally hosted, or internationally repurposed country-code domains may remain unclassified.
-- Live corpus and rate-limit state use explicit store boundaries but remain process-local because this Sites project has no shared binding configured. Continuation IDs detect a missing/restarted corpus and recover honestly; true multi-instance deep-scroll continuity still requires a configured shared store.
+- The durable article corpus, ingestion checkpoints, scheduler state, and replay nonces are shared in D1. Short-lived request continuation and rate-limit state remain process-local and recover honestly after an isolate restart.
 - Live-provider browsing is finite for the chosen time range and provider result windows. Infinite scroll can progressively accumulate 200+ stories where providers supply enough unique coverage, but it stops at the configured corpus maximum and never crawls publisher sites or bypasses provider/API limits.
 - No automatic translation, user accounts, admin UI, or full-content storage is implemented. Saved articles use browser-local storage and do not sync across devices.
 - Fixture URLs are intentionally non-live and shown as “Sample article” rather than pretending to be publisher links.
@@ -300,8 +286,8 @@ npm run lint
 npm run typecheck
 npm test
 npm run build
-npx prisma validate
+npm run db:check
 npm audit
 ```
 
-The test suite additionally covers multilingual discovery/markets, 400 irrelevant articles ahead of country results, 500-story US/JP/SG corpora through bounded continuation, archive windows, ingestion checkpoint resume, partial-database supplementation, complete-database live-call avoidance, article-based periods, NewsAPI fallback filtering, representative-consistent clustering, and honest completion semantics. GitHub Actions starts PostgreSQL 17 and applies the real migrations.
+The test suite additionally covers D1 migrations and relational persistence, signed ingestion and replay rejection, multilingual discovery/markets, large country corpora through bounded continuation, archive windows, checkpoint resume, partial-database supplementation, complete-database live-call avoidance, article-based periods, provider filtering, representative-consistent clustering, and honest completion semantics.
