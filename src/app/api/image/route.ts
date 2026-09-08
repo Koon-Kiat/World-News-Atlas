@@ -1,4 +1,5 @@
 import { approvedArticleUrl, approvedImageUrl } from "@/lib/news/image-policy";
+import { boundedStream, boundedText } from "@/lib/bounded-stream";
 
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 const MAX_ARTICLE_BYTES = 2 * 1024 * 1024;
@@ -8,14 +9,14 @@ async function fetchWithReviewedRedirects(
   approveRedirect: (value: string | null) => URL | null,
   accept: string,
   referer?: string,
-): Promise<Response> {
+): Promise<{ response: Response; signal: AbortSignal; finish: () => void }> {
   let current = initialUrl;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 7_000);
+  const finish = () => { clearTimeout(timer); controller.abort(); };
+  try {
   for (let redirect = 0; redirect <= 2; redirect += 1) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 7_000);
-    let response: Response;
-    try {
-      response = await fetch(current, {
+      const response = await fetch(current, {
         redirect: "manual",
         signal: controller.signal,
         headers: {
@@ -24,19 +25,18 @@ async function fetchWithReviewedRedirects(
           "User-Agent": "WorldNewsAtlas/1.0",
         },
       });
-    } finally {
-      clearTimeout(timer);
-    }
     if (response.status >= 300 && response.status < 400) {
+      void response.body?.cancel().catch(() => undefined);
       const location = response.headers.get("location");
       const next = location ? approveRedirect(new URL(location, current).toString()) : null;
       if (!next || redirect === 2) throw new Error("Unapproved redirect");
       current = next;
       continue;
     }
-    return response;
+    return { response, signal: controller.signal, finish };
   }
   throw new Error("Redirect limit exceeded");
+  } catch (error) { finish(); throw error; }
 }
 
 function imageReferer(url: URL): string {
@@ -72,43 +72,46 @@ function articleImageUrl(html: string, articleUrl: URL): URL | null {
 }
 
 async function resolveArticleImage(articleUrl: URL): Promise<URL | null> {
-  const response = await fetchWithReviewedRedirects(
+  const upstream = await fetchWithReviewedRedirects(
     articleUrl,
     approvedArticleUrl,
     "text/html,application/xhtml+xml",
   );
+  const { response, signal, finish } = upstream;
+  try {
   const contentType = response.headers.get("content-type")?.split(";")[0].toLowerCase();
   const declaredLength = Number(response.headers.get("content-length") ?? 0);
   if (!response.ok || !["text/html", "application/xhtml+xml"].includes(contentType ?? "") || declaredLength > MAX_ARTICLE_BYTES) {
+    void response.body?.cancel().catch(() => undefined);
     return null;
   }
-  const bytes = await response.arrayBuffer();
-  if (bytes.byteLength > MAX_ARTICLE_BYTES) return null;
-  return articleImageUrl(new TextDecoder().decode(bytes), articleUrl);
+  const html = await boundedText(response.body, MAX_ARTICLE_BYTES, signal);
+  return articleImageUrl(html, articleUrl);
+  } finally { finish(); }
 }
 
 async function imageResponse(imageUrl: URL): Promise<Response | null> {
-  const upstream = await fetchWithReviewedRedirects(
+  const reviewed = await fetchWithReviewedRedirects(
     imageUrl,
     approvedImageUrl,
     "image/avif,image/webp,image/png,image/jpeg,image/*;q=0.8",
     imageReferer(imageUrl),
   );
+  const { response: upstream, signal, finish } = reviewed;
   const contentType = upstream.headers.get("content-type")?.split(";")[0].toLowerCase();
   const declaredLength = Number(upstream.headers.get("content-length") ?? 0);
   if (
     !upstream.ok ||
     !contentType?.match(/^image\/(?:avif|gif|jpeg|png|webp)$/) ||
-    declaredLength > MAX_IMAGE_BYTES
+    declaredLength > MAX_IMAGE_BYTES || !upstream.body
   ) {
+    void upstream.body?.cancel().catch(() => undefined);
+    finish();
     return null;
   }
-  const bytes = await upstream.arrayBuffer();
-  if (bytes.byteLength > MAX_IMAGE_BYTES) return null;
-  return new Response(bytes, {
+  return new Response(boundedStream(upstream.body!, MAX_IMAGE_BYTES, signal, finish), {
     headers: {
       "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000",
-      "Content-Length": String(bytes.byteLength),
       "Content-Type": contentType,
       "Content-Security-Policy": "default-src 'none'",
       "X-Content-Type-Options": "nosniff",

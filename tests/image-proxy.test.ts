@@ -3,9 +3,40 @@ import { GET } from "@/app/api/image/route";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe("publisher image relay", () => {
+  it("cancels oversized streams even when Content-Length understates the body", async () => {
+    const cancel = vi.fn();
+    let chunks = 0;
+    const body = new ReadableStream<Uint8Array>({ pull(controller) {
+      controller.enqueue(new Uint8Array(chunks++ === 0 ? 6 * 1024 * 1024 : 1));
+    }, cancel });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(body, { headers: { "Content-Type": "image/jpeg", "Content-Length": "1" } })));
+    const response = await GET(new Request("https://example.test/api/image?url=https://ichef.bbci.co.uk/photo.jpg"));
+    await expect(response.arrayBuffer()).rejects.toThrow("byte limit");
+    expect(cancel).toHaveBeenCalled();
+  });
+  it("applies the timeout to a stalled body, not only the response headers", async () => {
+    vi.useFakeTimers();
+    const cancel = vi.fn();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new ReadableStream({ pull() {}, cancel }), { headers: { "Content-Type": "image/jpeg" } })));
+    const response = await GET(new Request("https://example.test/api/image?url=https://ichef.bbci.co.uk/photo.jpg"));
+    const result = expect(response.arrayBuffer()).rejects.toThrow("deadline");
+    await vi.advanceTimersByTimeAsync(7000); await result; expect(cancel).toHaveBeenCalled();
+  });
+  it("revalidates redirects, rejects nonstandard ports and bad MIME, and retains safe fallbacks", async () => {
+    const fetcher = vi.fn(async () => new Response(null, { status: 302, headers: { Location: "https://127.0.0.1/private" } }));
+    vi.stubGlobal("fetch", fetcher);
+    const response = await GET(new Request("https://example.test/api/image?url=https://ichef.bbci.co.uk/photo.jpg"));
+    expect(response.headers.get("content-type")).toContain("image/svg+xml"); expect(fetcher).toHaveBeenCalledOnce();
+    expect((await GET(new Request("https://example.test/api/image?url=https://ichef.bbci.co.uk:8443/photo.jpg"))).status).toBe(404);
+    fetcher.mockResolvedValueOnce(new Response("<script>bad</script>", { headers: { "Content-Type": "image/svg+xml" } }));
+    const badMime = await GET(new Request("https://example.test/api/image?url=https://ichef.bbci.co.uk/photo.jpg"));
+    expect(await badMime.text()).not.toContain("<script>");
+    expect(badMime.headers.get("x-content-type-options")).toBe("nosniff");
+  });
   it("rejects URLs outside the reviewed publisher image path", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);

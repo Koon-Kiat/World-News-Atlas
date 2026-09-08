@@ -37,7 +37,7 @@ export function parsedHttpsUrl(value: string | null | undefined): URL | null {
   if (!value || value.length > 2_000) return null;
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:" || url.username || url.password) return null;
+    if (url.protocol !== "https:" || url.username || url.password || url.port) return null;
     return url;
   } catch {
     return null;

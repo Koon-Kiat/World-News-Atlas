@@ -6,7 +6,9 @@ import { canonicalSourceId, parseDomainlessSourceId, sourceSeedForSelection } fr
 import { registrableDomain } from "./sources/domain";
 import type { DatabaseCoverageState, NewsStore } from "./store";
 import { topicLabel } from "./topics";
-import type { NewsQuery, NormalizedArticle, ProviderContinuationState, ProviderName, SourceScope, StoryCandidate, StoryView } from "./types";
+import { buildNewsResponse } from "./query";
+import { D1IngestionRequestStore } from "./ingestion-requests";
+import type { NewsQuery, NewsResponse, NormalizedArticle, ProviderContinuationState, ProviderName, SourceScope, StoryCandidate, StoryView } from "./types";
 
 type D1Value = string | number | null;
 interface StoryRow { id: string; title: string; summary: string | null; first_published_at: string; last_updated_at: string; importance_score: number }
@@ -145,6 +147,17 @@ function chunks<T>(values: T[], size = 80): T[][] {
   return result;
 }
 
+function groupRows<T>(rows: T[], key: (row: T) => string): Map<string, T[]> {
+  const grouped = new Map<string, T[]>();
+  for (const row of rows) {
+    const id = key(row);
+    const group = grouped.get(id);
+    if (group) group.push(row);
+    else grouped.set(id, [row]);
+  }
+  return grouped;
+}
+
 function sourceAccessClause(query: NewsQuery, values: D1Value[]): string | null {
   const selections: string[] = [];
   for (const selection of query.sources) {
@@ -187,12 +200,16 @@ export function databaseCandidateLimit(): number {
 }
 
 export class D1NewsStore implements NewsStore {
-  constructor(readonly database: D1Database) {}
+  readonly ingestionRequests: D1IngestionRequestStore;
+  constructor(readonly database: D1Database) { this.ingestionRequests = new D1IngestionRequestStore(database); }
 
-  async persistStoryCandidates(candidates: StoryCandidate[]): Promise<{ storedArticles: number; storiesUpdated: number }> {
+  async persistStoryCandidates(candidates: StoryCandidate[], beforeWrite?: () => Promise<void>): Promise<{ storedArticles: number; storiesUpdated: number }> {
     const uniqueArticles = new Map(candidates.flatMap(({ articles }) => articles).map((article) => [article.canonicalUrl, article]));
     const articleIds = new Map<string, string>();
-    for (const article of uniqueArticles.values()) articleIds.set(article.canonicalUrl, await upsertArticle(this.database, article));
+    for (const article of uniqueArticles.values()) {
+      await beforeWrite?.();
+      articleIds.set(article.canonicalUrl, await upsertArticle(this.database, article));
+    }
     const previousStoryIds = new Set<string>();
     for (const idChunk of chunks([...articleIds.values()])) {
       for (const row of await allRows<{ story_id: string }>(this.database,
@@ -200,6 +217,7 @@ export class D1NewsStore implements NewsStore {
     }
     const desiredStoryIds = new Set<string>();
     for (const candidate of candidates) {
+      await beforeWrite?.();
       for (const country of candidate.countries) await ensureCountry(this.database, country.code, country.name);
       const existingId = await firstId(this.database, "SELECT id FROM story WHERE fingerprint = ? LIMIT 1", [candidate.fingerprint]);
       const storyId = existingId ?? crypto.randomUUID();
@@ -235,13 +253,15 @@ export class D1NewsStore implements NewsStore {
       await this.database.batch(statements);
     }
     for (const idChunk of chunks([...previousStoryIds].filter((id) => !desiredStoryIds.has(id)))) {
+      await beforeWrite?.();
       await this.database.prepare(`DELETE FROM story WHERE id IN (${placeholders(idChunk.length)})`).bind(...idChunk).run();
     }
+    await beforeWrite?.();
     await this.database.prepare("DELETE FROM story WHERE NOT EXISTS (SELECT 1 FROM story_article WHERE story_article.story_id = story.id)").run();
     return { storedArticles: articleIds.size, storiesUpdated: candidates.length };
   }
 
-  async loadStories(query: NewsQuery, now = new Date()): Promise<StoryView[]> {
+  async loadStories(query: NewsQuery, now = new Date(), options: { compact?: boolean; ids?: string[] } = {}): Promise<StoryView[]> {
     const values: D1Value[] = [new Date(now.getTime() - newsPeriodHours(query.period) * 3_600_000).toISOString(), now.toISOString()];
     const where = [`EXISTS (SELECT 1 FROM story_article p JOIN article a ON a.id = p.article_id WHERE p.story_id = s.id AND a.published_at >= ? AND a.published_at <= ?)`];
     for (const countryCode of query.countries) {
@@ -268,41 +288,46 @@ export class D1NewsStore implements NewsStore {
           WHERE x.story_id = s.id AND (LOWER(a.title) LIKE ? OR LOWER(COALESCE(a.description, '')) LIKE ? OR LOWER(src.name) LIKE ?)))`);
       values.push(needle, needle, needle, needle, needle, needle, needle);
     }
+    if (options.ids) {
+      where.push("s.id IN (SELECT value FROM json_each(?))");
+      values.push(JSON.stringify(options.ids));
+    }
     values.push(databaseCandidateLimit());
     const order = query.sort === "newest" ? "s.last_updated_at DESC, s.importance_score DESC, s.id ASC" : "s.importance_score DESC, s.last_updated_at DESC, s.id ASC";
     const storyRows = await allRows<StoryRow>(this.database, `SELECT s.id, s.title, s.summary, s.first_published_at, s.last_updated_at, s.importance_score FROM story s WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT ?`, values);
     if (!storyRows.length) return [];
-    const storyIds = storyRows.map(({ id }) => id);
-    const storyCountries: StoryCountryRow[] = [];
-    const storyTopics: StoryTopicRow[] = [];
-    const articleRows: ArticleRow[] = [];
-    for (const idChunk of chunks(storyIds)) {
-      const marks = placeholders(idChunk.length);
-      storyCountries.push(...await allRows<StoryCountryRow>(this.database, `SELECT sc.story_id, c.code, c.name, sc.relevance_score FROM story_country sc JOIN country c ON c.code = sc.country_code WHERE sc.story_id IN (${marks})`, idChunk));
-      storyTopics.push(...await allRows<StoryTopicRow>(this.database, `SELECT st.story_id, t.slug FROM story_topic st JOIN topic t ON t.id = st.topic_id WHERE st.story_id IN (${marks})`, idChunk));
-      articleRows.push(...await allRows<ArticleRow>(this.database, `
-        SELECT sa.story_id, a.id, a.provider, a.provider_article_id, a.title, a.description, a.url, a.canonical_url,
-          a.image_url, a.published_at, a.language, a.importance_score, a.relevance_score,
+    const ids = JSON.stringify(storyRows.map(({ id }) => id));
+    // JSON table-valued parameters avoid D1's variable limit. One batch keeps
+    // relation reads consistent and replaces dozens of serial round trips.
+    const marks = "SELECT value FROM json_each(?)";
+    const compact = options.compact && !query.search;
+    const results = await this.database.batch([
+      this.database.prepare(`SELECT sc.story_id, c.code, c.name, sc.relevance_score FROM story_country sc JOIN country c ON c.code = sc.country_code WHERE sc.story_id IN (${marks})`).bind(ids),
+      this.database.prepare(`SELECT st.story_id, t.slug FROM story_topic st JOIN topic t ON t.id = st.topic_id WHERE st.story_id IN (${marks})`).bind(ids),
+      this.database.prepare(`
+        SELECT sa.story_id, a.id, a.provider, a.provider_article_id,
+          ${compact ? "'' AS title, NULL AS description, '' AS url, '' AS canonical_url, NULL AS image_url" : "a.title, a.description, a.url, a.canonical_url, a.image_url"},
+          a.published_at, a.language, a.importance_score, a.relevance_score,
           src.name AS source_name, src.domain AS source_domain, src.country_code AS source_country_code,
           src.region AS source_region, src.language AS source_language, src.scope AS source_scope,
           src.quality_score AS source_quality_score
         FROM story_article sa JOIN article a ON a.id = sa.article_id JOIN source src ON src.id = a.source_id
         WHERE sa.story_id IN (${marks}) ORDER BY a.published_at ASC, a.id ASC
-      `, idChunk));
-    }
-    const articleCountries: ArticleCountryRow[] = [];
-    const articleTopics: ArticleTopicRow[] = [];
-    for (const idChunk of chunks(articleRows.map(({ id }) => id))) {
-      const marks = placeholders(idChunk.length);
-      articleCountries.push(...await allRows<ArticleCountryRow>(this.database, `SELECT ac.article_id, c.code, c.name, ac.relevance_score FROM article_country ac JOIN country c ON c.code = ac.country_code WHERE ac.article_id IN (${marks})`, idChunk));
-      articleTopics.push(...await allRows<ArticleTopicRow>(this.database, `SELECT at.article_id, t.slug FROM article_topic at JOIN topic t ON t.id = at.topic_id WHERE at.article_id IN (${marks})`, idChunk));
-    }
+      `).bind(ids),
+      this.database.prepare(`SELECT ac.article_id, c.code, c.name, ac.relevance_score FROM article_country ac JOIN country c ON c.code = ac.country_code WHERE ac.article_id IN (SELECT article_id FROM story_article WHERE story_id IN (${marks}))`).bind(ids),
+      this.database.prepare(`SELECT at.article_id, t.slug FROM article_topic at JOIN topic t ON t.id = at.topic_id WHERE at.article_id IN (SELECT article_id FROM story_article WHERE story_id IN (${marks}))`).bind(ids),
+    ]);
+    const storyCountries = groupRows(results[0].results as unknown as StoryCountryRow[], (row) => row.story_id);
+    const storyTopics = groupRows(results[1].results as unknown as StoryTopicRow[], (row) => row.story_id);
+    const articleRows = groupRows(results[2].results as unknown as ArticleRow[], (row) => row.story_id);
+    const articleCountries = groupRows(results[3].results as unknown as ArticleCountryRow[], (row) => row.article_id);
+    const articleTopics = groupRows(results[4].results as unknown as ArticleTopicRow[], (row) => row.article_id);
     return storyRows.map((story) => ({
       id: story.id, title: story.title, summary: story.summary, firstPublishedAt: story.first_published_at,
       lastUpdatedAt: story.last_updated_at, importanceScore: story.importance_score,
-      countries: storyCountries.filter((row) => row.story_id === story.id).map((row) => ({ code: row.code, name: row.name, relevanceScore: row.relevance_score })),
-      topics: storyTopics.filter((row) => row.story_id === story.id).map(({ slug }) => slug),
-      articles: articleRows.filter((row) => row.story_id === story.id).map((article) => ({
+      countries: (storyCountries.get(story.id) ?? []).map((row) => ({ code: row.code, name: row.name, relevanceScore: row.relevance_score })),
+      topics: (storyTopics.get(story.id) ?? []).map(({ slug }) => slug),
+      articles: (articleRows.get(story.id) ?? []).map((article) => ({
         id: article.id, provider: article.provider, providerArticleId: article.provider_article_id,
         title: article.title, description: article.description, url: article.url, canonicalUrl: article.canonical_url,
         imageUrl: article.image_url, publishedAt: article.published_at, language: article.language,
@@ -312,12 +337,33 @@ export class D1NewsStore implements NewsStore {
           region: article.source_region, language: article.source_language, scope: article.source_scope,
           qualityScore: article.source_quality_score,
         },
-        countries: articleCountries.filter((row) => row.article_id === article.id).map((row) => ({ code: row.code, name: row.name, relevanceScore: row.relevance_score })),
-        topics: articleTopics.filter((row) => row.article_id === article.id).map(({ slug }) => slug),
+        countries: (articleCountries.get(article.id) ?? []).map((row) => ({ code: row.code, name: row.name, relevanceScore: row.relevance_score })),
+        topics: (articleTopics.get(article.id) ?? []).map(({ slug }) => slug),
         importanceScore: article.importance_score, relevanceScore: article.relevance_score,
         isFixture: article.provider === "FIXTURE",
       })),
     }));
+  }
+
+  async loadStoryPage(query: NewsQuery, now = new Date()): Promise<NewsResponse> {
+    const candidates = await this.loadStories(query, now, { compact: true });
+    const response = buildNewsResponse(candidates, query, "database", undefined, {}, now);
+    if (!response.stories.length) return response;
+    const ids = JSON.stringify(response.stories.flatMap((story) => story.articles.map(({ id }) => id)));
+    const displayRows = await allRows<Pick<ArticleRow, "id" | "title" | "description" | "url" | "canonical_url" | "image_url">>(
+      this.database, `SELECT id, title, description, url, canonical_url, image_url
+        FROM article WHERE id IN (SELECT value FROM json_each(?))`, [ids]);
+    const articles = new Map(displayRows.map((article) => [article.id, article]));
+    // Retain the exact projected window, filtering and ranking from the broad
+    // pool. Only restore large display fields for this page's articles.
+    response.stories = response.stories.map((story) => ({ ...story,
+      articles: story.articles.flatMap((article) => {
+        const display = articles.get(article.id);
+        return display ? [{ ...article, title: display.title, description: display.description,
+          url: display.url, canonicalUrl: display.canonical_url, imageUrl: display.image_url }] : [];
+      }),
+    })).filter((story) => story.articles.length > 0);
+    return response;
   }
 
   async loadCoverage(query: NewsQuery, now = new Date()): Promise<DatabaseCoverageState> {

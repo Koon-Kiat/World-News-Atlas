@@ -127,3 +127,19 @@ export const ingestionSchedulerState = sqliteTable("ingestion_scheduler_state", 
 export const ingestionRequestNonces = sqliteTable("ingestion_request_nonce", {
   nonce: text("nonce").primaryKey(), receivedAt: text("received_at").notNull(), expiresAt: text("expires_at").notNull(),
 }, (table) => [index("ingestion_request_nonce_expiry_idx").on(table.expiresAt)]);
+
+export const apiRateLimits = sqliteTable("api_rate_limit", {
+  clientKey: text("client_key").primaryKey(), count: integer("count").notNull(), resetAt: integer("reset_at").notNull(),
+}, (table) => [index("api_rate_limit_expiry_idx").on(table.resetAt)]);
+
+export const ingestionLogicalRequests = sqliteTable("ingestion_logical_request", {
+  requestId: text("request_id").primaryKey(), bodyDigest: text("body_digest").notNull(), state: text("state").notNull(),
+  summaryJson: text("summary_json"), leaseUntil: integer("lease_until").notNull(), expiresAt: integer("expires_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+  attempts: integer("attempts").notNull().default(0), attemptToken: text("attempt_token").notNull().default(""),
+  planJson: text("plan_json"), terminalFailure: integer("terminal_failure", { mode: "boolean" }).notNull().default(false),
+}, (table) => [index("ingestion_logical_expiry_idx").on(table.expiresAt), index("ingestion_logical_state_lease_idx").on(table.state, table.leaseUntil)]);
+export const ingestionOperationLock = sqliteTable("ingestion_operation_lock", {
+  id: text("id").primaryKey(), requestId: text("request_id").notNull(), leaseUntil: integer("lease_until").notNull(),
+  attemptToken: text("attempt_token").notNull().default(""),
+});

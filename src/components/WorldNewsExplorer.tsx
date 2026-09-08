@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { CountryFlag } from "@/components/CountryFlag";
 import { ExploreNavigation, HeaderTools } from "@/components/ExploreNavigation";
@@ -8,7 +9,7 @@ import { HeaderSearch } from "@/components/HeaderSearch";
 import { NewsFilters } from "@/components/filters/NewsFilters";
 import { PerspectiveFilter } from "@/components/filters/PerspectiveFilter";
 import { CountryPicker } from "@/components/map/CountryPicker";
-import { WorldMap } from "@/components/map/WorldMap";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { updateCountrySelection } from "@/components/map/selection";
 import { StoryList } from "@/components/news/StoryList";
 import { getCountryName } from "@/lib/news/countries/metadata";
@@ -23,6 +24,11 @@ const STORY_BATCH_SIZE = 12;
 const STORY_PREFETCH_LOW_WATER = 24;
 const NO_GROWTH_RETRY_BASE_MS = 1_500;
 const MAX_AUTOMATIC_NO_GROWTH_RETRIES = 4;
+const INITIAL_REQUEST = "/api/news?sourcePerspective=all&period=latest&sort=newest&page=1&pageSize=12";
+const WorldMap = dynamic(() => import("@/components/map/WorldMap").then((module) => module.WorldMap), {
+  ssr: false,
+  loading: () => <div className="map-shell map-placeholder" aria-label="Loading interactive map"><p className="map-help">Loading map · Country search is ready</p></div>,
+});
 
 export type ExplorerMode = "country" | "compare";
 
@@ -32,12 +38,16 @@ export function ProgressiveStoryList({
   isFetchingMore,
   onRequestMore,
   continuationVersion = 0,
+  referenceTime,
+  waitForVisibility = false,
 }: {
   stories: StoryView[];
   canFetchMore: boolean;
   isFetchingMore: boolean;
   onRequestMore: () => void;
   continuationVersion?: number;
+  referenceTime?: string;
+  waitForVisibility?: boolean;
 }) {
   const [visibleStoryCount, setVisibleStoryCount] = useState(INITIAL_STORY_COUNT);
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -48,6 +58,7 @@ export function ProgressiveStoryList({
   });
   const noGrowthRetryCountRef = useRef(0);
   const nextAutomaticRequestAtRef = useRef(0);
+  const nearViewportRef = useRef(false);
   const visibleStories = stories.slice(0, visibleStoryCount);
   const hasMoreRenderedStories = visibleStoryCount < stories.length;
   const hasMoreServerStories = canFetchMore;
@@ -76,13 +87,14 @@ export function ProgressiveStoryList({
   const requestMoreOnce = useCallback(() => {
     if (
       !hasMoreServerStories ||
+      (waitForVisibility && !nearViewportRef.current) ||
       isFetchingMore ||
       prefetchedRequestRef.current === automaticRequestKey ||
       Date.now() < nextAutomaticRequestAtRef.current
     ) return;
     prefetchedRequestRef.current = automaticRequestKey;
     onRequestMore();
-  }, [automaticRequestKey, hasMoreServerStories, isFetchingMore, onRequestMore]);
+  }, [automaticRequestKey, hasMoreServerStories, isFetchingMore, onRequestMore, waitForVisibility]);
 
   const revealOrRequestMore = useCallback(() => {
     if (hasMoreRenderedStories) {
@@ -105,6 +117,7 @@ export function ProgressiveStoryList({
     if (!target || !hasMoreStories) return;
     const observer = new IntersectionObserver(
       (entries) => {
+        nearViewportRef.current = Boolean(entries[0]?.isIntersecting);
         if (!entries[0]?.isIntersecting) return;
         revealOrRequestMore();
       },
@@ -134,7 +147,7 @@ export function ProgressiveStoryList({
 
   return (
     <>
-      <StoryList stories={visibleStories} />
+      <StoryList stories={visibleStories} referenceTime={referenceTime} />
       {stories.length > 0 && (
         <div className={hasMoreStories ? "load-more-sentinel" : "load-more-sentinel is-complete"} ref={loadMoreRef}>
           {hasMoreStories ? (
@@ -164,9 +177,11 @@ export function ProgressiveStoryList({
 export function WorldNewsExplorer({
   initialData,
   mode,
+  initialStored = false,
 }: {
   initialData: NewsResponse;
   mode: ExplorerMode;
+  initialStored?: boolean;
 }) {
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const selectionLimit: 1 | 2 = mode === "country" ? 1 : 2;
@@ -176,9 +191,10 @@ export function WorldNewsExplorer({
   const [sources, setSources] = useState<string[]>([]);
   const [period, setPeriod] = useNewsPeriodPreference();
   const [sort, setSort] = useState<NewsSort>("newest");
-  const [search, setSearch] = useState("");
+  const { input: search, query: deferredSearch, change: setSearch, submit: submitSearch } = useDebouncedSearch();
   const [data, setData] = useState(initialData);
-  const [settledRequest, setSettledRequest] = useState<string | null>(null);
+  const [settledRequest, setSettledRequest] = useState<string | null>(initialStored ? INITIAL_REQUEST : null);
+  const initialRequestRef = useRef(initialStored ? INITIAL_REQUEST : null);
   const [loadedPage, setLoadedPage] = useState(1);
   const [canFetchMore, setCanFetchMore] = useState(responseHasNextPage(initialData));
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -187,7 +203,6 @@ export function WorldNewsExplorer({
   const storiesSectionRef = useRef<HTMLElement>(null);
   const lastScrolledSearchRef = useRef("");
   const [error, setError] = useState<string | null>(null);
-  const deferredSearch = useDeferredValue(search.trim());
 
   const heading = useMemo(() => {
     if (selectedCountries.length === 0) {
@@ -234,10 +249,14 @@ export function WorldNewsExplorer({
 
   useEffect(() => {
     loadMoreControllerRef.current?.abort();
+    loadMoreControllerRef.current = null;
+    if (initialRequestRef.current === requestUrl) {
+      return () => loadMoreControllerRef.current?.abort();
+    }
+    initialRequestRef.current = null;
     const controller = new AbortController();
     fetch(requestUrl, {
       signal: controller.signal,
-      cache: "no-store",
       headers: { Accept: "application/json" },
     })
       .then(async (response) => {
@@ -245,6 +264,7 @@ export function WorldNewsExplorer({
         return (await response.json()) as NewsResponse;
       })
       .then((responseData) => {
+        if (controller.signal.aborted) return;
         setData(responseData);
         setContinuationVersion((current) => current + 1);
         setLoadedPage(responseData.meta.page);
@@ -252,13 +272,14 @@ export function WorldNewsExplorer({
         setError(null);
       })
       .catch((requestError: unknown) => {
+        if (controller.signal.aborted) return;
         if (requestError instanceof DOMException && requestError.name === "AbortError") return;
         setError("Could not refresh coverage. Showing the most recent available results.");
       })
       .finally(() => {
-        if (!controller.signal.aborted) setSettledRequest(requestUrl);
+        if (!controller.signal.aborted) { setSettledRequest(requestUrl); setIsLoadingMore(false); }
       });
-    return () => controller.abort();
+    return () => { controller.abort(); loadMoreControllerRef.current?.abort(); };
   }, [requestUrl]);
 
   useEffect(() => {
@@ -278,7 +299,10 @@ export function WorldNewsExplorer({
       !canFetchMore ||
       loadMoreControllerRef.current
     ) return;
-    const nextPage = nextPageNumber({ ...data, meta: { ...data.meta, page: loadedPage } });
+    // A stored SSR page with incomplete coverage needs a fresh live/hybrid
+    // snapshot before appending; it is requested only when the list is near view.
+    const nextPage = data.meta.dataSource === "database" && !data.meta.coverageComplete
+      ? 1 : nextPageNumber({ ...data, meta: { ...data.meta, page: loadedPage } });
     if (nextPage === null) {
       setCanFetchMore(false);
       return;
@@ -291,7 +315,7 @@ export function WorldNewsExplorer({
     if (data.meta.continuationId) nextUrl.searchParams.set("continuation", data.meta.continuationId);
     fetch(`${nextUrl.pathname}?${nextUrl.searchParams.toString()}`, {
       signal: controller.signal,
-      cache: "no-store",
+      ...(data.meta.continuationId ? { cache: "no-store" as const } : {}),
       headers: { Accept: "application/json" },
     })
       .then(async (response) => {
@@ -299,6 +323,7 @@ export function WorldNewsExplorer({
         return (await response.json()) as NewsResponse;
       })
       .then((responseData) => {
+        if (controller.signal.aborted) return;
         if (responseData.meta.continuationReset) {
           setData(responseData);
           setContinuationVersion((current) => current + 1);
@@ -321,8 +346,9 @@ export function WorldNewsExplorer({
         setError(null);
       })
       .catch((requestError: unknown) => {
+        if (controller.signal.aborted) return;
         if (requestError instanceof DOMException && requestError.name === "AbortError") return;
-        setError("Could not load the next page of coverage. Refresh the page to try again.");
+        setError("Could not load more coverage. Use Load more to try again.");
       })
       .finally(() => {
         if (loadMoreControllerRef.current === controller) {
@@ -357,7 +383,7 @@ export function WorldNewsExplorer({
         <HeaderSearch
           value={search}
           onChange={setSearch}
-          onSearch={() => storiesSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          onSearch={(value) => { submitSearch(value); storiesSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
         />
         <HeaderTools active={mode} />
       </header>
@@ -505,10 +531,12 @@ export function WorldNewsExplorer({
             <ProgressiveStoryList
               key={requestUrl}
               stories={data.stories}
-              canFetchMore={canFetchMore}
+              canFetchMore={!isLoading && canFetchMore}
               isFetchingMore={isLoadingMore}
               onRequestMore={loadNextPage}
               continuationVersion={continuationVersion}
+              referenceTime={data.meta.generatedAt}
+              waitForVisibility={initialStored}
             />
           )}
         </section>

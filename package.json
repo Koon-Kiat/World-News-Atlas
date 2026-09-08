@@ -23,7 +23,9 @@
     "data:update-countries": "tsx scripts/update-country-geography.ts",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
-    "db:migrate:local": "wrangler d1 migrations apply world-news-atlas-d1 --local"
+    "db:migrate:local": "wrangler d1 migrations apply world-news-atlas-d1 --local",
+    "db:migrate:production": "node scripts/migrate-production.mjs",
+    "db:verify:production": "node scripts/migrate-production.mjs --verify"
   },
   "dependencies": {
     "d3-geo": "^3.1.1",
@@ -69,6 +71,11 @@
     "vite": "^8.0.13",
     "vitest": "^4.1.11",
     "wrangler": "^4.92.0"
+  },
+  "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.25.0"
+    }
   },
   "type": "module"
 }

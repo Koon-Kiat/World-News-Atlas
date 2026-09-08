@@ -4,7 +4,8 @@ import type { NewsQuery, NewsResponse } from "./types";
 import { loadNewsDataset } from "./data-store";
 
 export async function getNews(query: NewsQuery): Promise<NewsResponse> {
-  const dataset = await loadNewsDataset(query);
+  const dataset = await loadNewsDataset(query, true);
+  if (dataset.response) return dataset.response;
   const responseQuery = dataset.continuationReset ? { ...query, page: 1 } : query;
   return buildNewsResponse(
     dataset.stories,

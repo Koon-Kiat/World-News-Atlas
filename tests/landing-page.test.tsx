@@ -1,4 +1,5 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { render } from "./render-saved";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LandingPage } from "@/components/LandingPage";
 
@@ -56,10 +57,10 @@ describe("landing page", () => {
     expect(screen.getByRole("link", { name: /Build a comparison/i })).toHaveAttribute("href", "/compare#top");
   });
 
-  it("uses interactive world globes for the hero and scroll narrative", () => {
+  it("uses interactive world globes for the hero and scroll narrative", async () => {
     render(<LandingPage />);
 
-    expect(screen.getAllByLabelText(/Interactive rotating world globe/i)).toHaveLength(2);
+    expect(await screen.findAllByLabelText(/Interactive rotating world globe/i, {}, { timeout: 5_000 })).toHaveLength(2);
     expect(screen.getByText(/Drag to rotate 360°/i)).toBeInTheDocument();
     expect(screen.getByText("6 random live routes")).toBeInTheDocument();
   });

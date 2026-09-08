@@ -2,9 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { LandingGlobe } from "@/components/LandingGlobe";
+import dynamic from "next/dynamic";
 import { StoryCard } from "@/components/news/StoryCard";
 import type { ArticleView, CountryReference, StoryView } from "@/lib/news/types";
+
+const LandingGlobe = dynamic(() => import("./LandingGlobe").then((module) => module.LandingGlobe), {
+  ssr: false,
+  loading: () => <figure className="landing-globe-interactive" aria-label="Loading interactive globe" />,
+});
+const StoryGlobe = dynamic(() => import("./LandingGlobe").then((module) => module.LandingGlobe), {
+  ssr: false,
+  loading: () => <figure className="landing-globe-interactive is-story-globe" aria-label="Loading interactive globe" />,
+});
 
 function ArrowUpRightIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>;
@@ -246,7 +255,7 @@ export function LandingPage() {
             <div className={`story-visual story-visual-step-${activeStep + 1}`}>
               <div className="story-orbit story-orbit-one" aria-hidden="true" />
               <div className="story-orbit story-orbit-two" aria-hidden="true" />
-              <LandingGlobe compact activeStep={activeStep} />
+              <StoryGlobe compact activeStep={activeStep} />
               <article className="story-evidence-card" key={STORY_EVIDENCE[activeStep].label}>
                 <span>{STORY_EVIDENCE[activeStep].label}</span>
                 <strong>{STORY_EVIDENCE[activeStep].headline}</strong>

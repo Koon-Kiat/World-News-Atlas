@@ -1,14 +1,19 @@
 import { getNews } from "@/lib/news/news-service.server";
-import { clientKey } from "@/lib/news/client-key";
 import { logNews } from "@/lib/news/logger";
 import { NewsQueryValidationError, parseNewsQuery } from "@/lib/news/query";
-import { checkRateLimit } from "@/lib/news/rate-limit";
+import { limitNewsRequest } from "@/lib/news/distributed-rate-limit";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request): Promise<Response> {
   const requestId = crypto.randomUUID();
-  const limit = checkRateLimit(clientKey(request), { limit: 90, windowMs: 60_000 });
+  let limit;
+  try { limit = await limitNewsRequest(request); }
+  catch {
+    logNews("error", "news_rate_limit_unavailable", { requestId });
+    return Response.json({ error: "News is temporarily unavailable.", requestId },
+      { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "10" } });
+  }
   if (!limit.allowed) {
     return Response.json(
       { error: "Too many requests. Please try again shortly.", requestId },
@@ -27,7 +32,7 @@ export async function GET(request: Request): Promise<Response> {
         // Continuation requests can expand the server-side live corpus even
         // when the internal page number repeats, so intermediary response
         // caching must not freeze a partial discovery stage.
-        "Cache-Control": response.meta.dataSource === "database"
+        "Cache-Control": response.meta.dataSource === "database" && !query.continuationId
           ? "public, max-age=20, s-maxage=60, stale-while-revalidate=180"
           : "no-store",
         "X-RateLimit-Remaining": String(limit.remaining),

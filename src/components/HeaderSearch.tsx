@@ -10,7 +10,7 @@ export function HeaderSearch({
 }: {
   value: string;
   onChange: (value: string) => void;
-  onSearch: () => void;
+  onSearch: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const { history, add, clear } = useSearchHistory();
@@ -18,7 +18,7 @@ export function HeaderSearch({
   function submit() {
     add(value);
     setOpen(false);
-    onSearch();
+    onSearch(value);
   }
 
   return (
@@ -63,7 +63,7 @@ export function HeaderSearch({
                     onChange(query);
                     add(query);
                     setOpen(false);
-                    window.setTimeout(onSearch, 0);
+                    onSearch(query);
                   }}
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v4l3 2M4.9 4.9A10 10 0 1 1 2 12M2 5v7h7" /></svg>

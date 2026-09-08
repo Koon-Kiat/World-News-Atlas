@@ -65,6 +65,16 @@ describe("coverage-aware database supplementation", () => {
     expect(result.diagnostics?.duplicateArticleCount).toBeGreaterThan(0);
     expect(result.coverageComplete).toBe(false);
   });
+
+  it("retains an explicit live continuation when ingestion completes the stored window", async () => {
+    const loader = vi.fn(async () => ({ ...liveDataset(), continuationId: "active-snapshot" }));
+    const query = { ...DEFAULT_NEWS_QUERY, continuationId: "active-snapshot" };
+    const result = await buildCoverageAwareDataset(query, getFixtureStories().slice(0, 1),
+      { complete: true, archiveComplete: true, reasons: [], checkpointCount: 1 }, loader);
+    expect(loader).toHaveBeenCalledWith(query);
+    expect(result.continuationId).toBe("active-snapshot");
+    expect(result.dataSource).toBe("hybrid");
+  });
 });
 
 describe("completion semantics", () => {
