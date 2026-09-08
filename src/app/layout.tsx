@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import { connection } from "next/server";
 import { PwaRegistration } from "@/components/PwaRegistration";
-import { THEME_BOOTSTRAP_SCRIPT } from "@/lib/theme";
+import { SavedStoriesProvider } from "@/hooks/useSavedStories";
 import "flag-icons/css/flag-icons.min.css";
 import "./globals.css";
 
@@ -41,16 +42,18 @@ export const viewport: Viewport = {
   colorScheme: "dark light",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Vinext renders documents on request. Keep the native Next backend equally
+  // request-bound so framework inline scripts receive this response's CSP nonce.
+  await connection();
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <script
-          dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP_SCRIPT }}
-          suppressHydrationWarning
-        />
+        {/* Runs before visible content to preserve the saved theme on first paint. */}
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
+        <script src="/theme.js" />
         <PwaRegistration />
-        {children}
+        <SavedStoriesProvider>{children}</SavedStoriesProvider>
       </body>
     </html>
   );

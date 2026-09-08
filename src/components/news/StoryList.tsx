@@ -1,7 +1,7 @@
 import type { StoryView } from "@/lib/news/types";
 import { StoryCard } from "./StoryCard";
 
-export function StoryList({ stories }: { stories: StoryView[] }) {
+export function StoryList({ stories, referenceTime }: { stories: StoryView[]; referenceTime?: string }) {
   if (stories.length === 0) {
     return (
       <div className="empty-state">
@@ -14,7 +14,7 @@ export function StoryList({ stories }: { stories: StoryView[] }) {
   return (
     <div className="story-grid">
       {stories.map((story, index) => (
-        <StoryCard key={story.id} story={story} featured={index === 0} />
+        <StoryCard key={story.id} story={story} featured={index === 0} referenceTime={referenceTime} />
       ))}
     </div>
   );

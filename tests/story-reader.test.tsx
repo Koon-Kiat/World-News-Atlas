@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { render } from "./render-saved";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StoryCard } from "@/components/news/StoryCard";
 import type { StoryView } from "@/lib/news/types";
@@ -67,7 +68,7 @@ describe("Worldline Reader", () => {
     expect(screen.getByRole("link", { name: "Read at Example News" })).toHaveTextContent("Read source");
     fireEvent.click(screen.getByRole("button", { name: /Read A shared technology project.*Worldline Reader/i }));
 
-    expect(screen.getByRole("dialog", { name: story.title })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: story.title })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Back to stories" })).toHaveTextContent("");
     expect(container.querySelector(".reader-brand")).not.toBeInTheDocument();
     expect(screen.queryByText("Coverage at a glance")).not.toBeInTheDocument();
@@ -81,7 +82,7 @@ describe("Worldline Reader", () => {
     await waitFor(() => expect(window.scrollTo).toHaveBeenCalled());
   });
 
-  it("scrolls to the source comparison when more than one report is available", () => {
+  it("scrolls to the source comparison when more than one report is available", async () => {
     const comparisonStory: StoryView = {
       ...story,
       id: "comparison-story",
@@ -105,7 +106,7 @@ describe("Worldline Reader", () => {
 
     render(<StoryCard story={comparisonStory} />);
     fireEvent.click(screen.getByRole("button", { name: /Read A shared technology project.*Worldline Reader/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Compare 2 reports here" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Compare 2 reports here" }));
 
     expect(elementScrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: "smooth" }));
     expect(screen.getByRole("heading", { name: "2 reports in this story" }).closest("section")).toHaveFocus();

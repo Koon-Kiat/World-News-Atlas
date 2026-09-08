@@ -21,9 +21,19 @@ export function FilterSelect<T extends string>({
   onChange,
 }: FilterSelectProps<T>) {
   const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const listId = useId();
   const selected = options.find((option) => option.value === value) ?? options[0];
+  const selectedIndex = Math.max(0, options.findIndex((option) => option.value === value));
+
+  function choose(index: number) {
+    if (!options[index]) return;
+    onChange(options[index].value);
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
 
   useEffect(() => {
     function closeOnOutsideClick(event: PointerEvent) {
@@ -41,14 +51,38 @@ export function FilterSelect<T extends string>({
   }, []);
 
   return (
-    <div className="filter-select" ref={rootRef}>
+    <div className="filter-select" ref={rootRef} onBlur={(event) => {
+      if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+    }}>
       <button
         type="button"
         className="filter-select-trigger"
+        ref={triggerRef}
+        role="combobox"
+        aria-label={label}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-controls={listId}
-        onClick={() => setOpen((current) => !current)}
+        aria-controls={open ? listId : undefined}
+        aria-activedescendant={open ? `${listId}-${activeIndex}` : undefined}
+        onClick={() => { setActiveIndex(selectedIndex); setOpen((current) => !current); }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            setOpen(true);
+            setActiveIndex(open ? (activeIndex + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length : selectedIndex);
+          } else if (event.key === "Home" || event.key === "End") {
+            event.preventDefault(); setOpen(true); setActiveIndex(event.key === "Home" ? 0 : options.length - 1);
+          } else if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            if (open) choose(activeIndex);
+            else { setActiveIndex(selectedIndex); setOpen(true); }
+          } else if (event.key === "Escape") { event.preventDefault(); setOpen(false); }
+          else if (event.key.length === 1 && !event.ctrlKey && !event.metaKey) {
+            const index = options.findIndex((option, index) => index > activeIndex && option.label.toLowerCase().startsWith(event.key.toLowerCase()));
+            const match = index >= 0 ? index : options.findIndex((option) => option.label.toLowerCase().startsWith(event.key.toLowerCase()));
+            if (match >= 0) { event.preventDefault(); setOpen(true); setActiveIndex(match); }
+          }
+        }}
       >
         <span>
           <small>{label}</small>
@@ -60,16 +94,18 @@ export function FilterSelect<T extends string>({
       </button>
       {open && (
         <div className="filter-select-menu" role="listbox" id={listId} aria-label={label}>
-          {options.map((option) => (
+          {options.map((option, index) => (
             <button
               type="button"
               role="option"
               aria-selected={option.value === value}
               key={option.value}
-              onClick={() => {
-                onChange(option.value);
-                setOpen(false);
-              }}
+              id={`${listId}-${index}`}
+              tabIndex={-1}
+              data-active={index === activeIndex || undefined}
+              onMouseDown={(event) => event.preventDefault()}
+              onMouseEnter={() => setActiveIndex(index)}
+              onClick={() => choose(index)}
             >
               <span>{option.label}</span>
               {option.value === value && <span aria-hidden="true">✓</span>}

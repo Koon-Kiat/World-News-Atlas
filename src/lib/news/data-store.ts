@@ -23,6 +23,7 @@ import {
 import type { DatabaseCoverageState, NewsStore } from "./store";
 import type {
   NewsQuery,
+  NewsResponse,
   NormalizedArticle,
   CoverageDiagnostics,
   CoverageStatus,
@@ -77,6 +78,8 @@ interface LiveCorpusState {
 }
 
 export interface LoadedNewsDataset {
+  /** Available only to paged callers; already ranked over the full candidate pool. */
+  response?: NewsResponse;
   stories: StoryView[];
   dataSource: "database" | "live" | "hybrid" | "fixtures";
   articleCount: number;
@@ -824,7 +827,7 @@ export async function buildCoverageAwareDataset(
   liveLoader: (query: NewsQuery) => Promise<Omit<LoadedNewsDataset, "dataSource">> = loadLiveStories,
 ): Promise<LoadedNewsDataset> {
   const storedArticleCount = new Set(stories.flatMap((story) => story.articles.map(({ canonicalUrl }) => canonicalUrl))).size;
-  if (stories.length > 0 && databaseCoverage.complete) return {
+  if (stories.length > 0 && databaseCoverage.complete && !query.continuationId) return {
     stories,
     dataSource: "database",
     articleCount: storedArticleCount,
@@ -866,7 +869,7 @@ export async function buildCoverageAwareDataset(
   };
 }
 
-export async function loadNewsDataset(query: NewsQuery): Promise<LoadedNewsDataset> {
+export async function loadNewsDataset(query: NewsQuery, pageOnly = false): Promise<LoadedNewsDataset> {
   const database = await newsStoreFactory();
   if (!database) {
     return liveDatasetOrFixtures(
@@ -875,10 +878,24 @@ export async function loadNewsDataset(query: NewsQuery): Promise<LoadedNewsDatas
     );
   }
   try {
-    const [stories, databaseCoverage] = await Promise.all([
-      loadDatabaseStories(query, database),
-      loadDatabaseCoverage(query, database),
+    const now = new Date();
+    const canLoadPage = pageOnly && database.loadStoryPage && !query.continuationId;
+    const [prefetchedStories, databaseCoverage] = await Promise.all([
+      canLoadPage ? Promise.resolve(null) : loadDatabaseStories(query, database, now),
+      loadDatabaseCoverage(query, database, now),
     ]);
+    if (canLoadPage && databaseCoverage.complete) {
+      const response = await database.loadStoryPage!(query, now);
+      response.meta.archiveCoverageComplete = databaseCoverage.archiveComplete;
+      if (response.meta.total > 0) return {
+        response, stories: response.stories, dataSource: "database", articleCount: response.meta.articleCount,
+        corpusComplete: true, discoveryExhausted: true, archiveCoverageComplete: databaseCoverage.archiveComplete,
+        coverageComplete: true, coverageDegraded: false, coverageStatus: "complete", coverageReasons: [], corpusLimitReached: false,
+      };
+    }
+    // Hybrid reconciliation needs article text and URLs to cluster/deduplicate
+    // across providers. Complete stored pages fetch display fields for one page.
+    const stories = prefetchedStories ?? await loadDatabaseStories(query, database, now);
     const dataset = await buildCoverageAwareDataset(query, stories, databaseCoverage);
     if (dataset.stories.length === 0) {
       return liveDatasetOrFixtures(query, "The news database and live providers returned no usable coverage.");
