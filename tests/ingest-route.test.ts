@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { signIngestionPayload } from "@/lib/news/ingest-auth";
 import { handleIngestionRequest } from "@/lib/news/ingest-route";
-import type { IngestionSummary } from "@/lib/news/ingest";
+import type { IngestionSummary, NewsIngestionOptions } from "@/lib/news/ingest";
 import type { NewsStore } from "@/lib/news/store";
 
 const secret = "test-secret-that-is-more-than-thirty-two-characters";
@@ -22,7 +22,9 @@ function summary(): IngestionSummary {
 function replayProtectedStore(): NewsStore {
   const nonces = new Set<string>();
   return {
-    ingestionRequests: { claim: vi.fn(async () => ({ state: "ACCEPTED" })), renew: vi.fn(async () => true), finish: vi.fn(async () => {}) },
+    ingestionRequests: { claim: vi.fn(async () => ({ state: "ACCEPTED", token: "attempt-token" })), renew: vi.fn(async () => true),
+      savePlan: vi.fn(async () => {}), markTerminalFailure: vi.fn(async () => {}),
+      finish: vi.fn(async (_id, _token, state) => state) },
     persistStoryCandidates: vi.fn(), loadStories: vi.fn(), loadCoverage: vi.fn(), load: vi.fn(), save: vi.fn(),
     startStage: vi.fn(), finishStage: vi.fn(), nextCountryBatch: vi.fn(), deleteExpiredIngestionNonces: vi.fn(async () => 0),
     claimIngestionNonce: vi.fn(async (nonce: string) => {
@@ -84,14 +86,14 @@ describe("signed ingestion route", () => {
 
   it("records partial provider failure with retained counts and never reruns a failed logical key", async () => {
     const store = replayProtectedStore(); const partial = { ...summary(), providersFailed: 1 };
-    const run = vi.fn(async () => partial);
+    const run = vi.fn(async (options?: NewsIngestionOptions) => { await options?.onTerminalFailure?.(); return partial; });
     const body = JSON.stringify({ requestId: "logical-failed-request", scope: "global" });
     const dependencies = { secret, store, now: () => now, run };
     const response = await handleIngestionRequest(await signedRequest(body), dependencies);
     expect(response.status).toBe(422);
-    await expect(response.json()).resolves.toMatchObject({ state: "FAILED", summary: { stored: 3, providersFailed: 1 } });
-    expect(store.ingestionRequests.finish).toHaveBeenCalledWith("logical-failed-request", "FAILED", partial, now);
-    vi.mocked(store.ingestionRequests.claim).mockResolvedValue({ state: "FAILED", summary: partial });
+    await expect(response.json()).resolves.toMatchObject({ state: "FAILED_TERMINAL", summary: { stored: 3, providersFailed: 1 } });
+    expect(store.ingestionRequests.finish).toHaveBeenCalledWith("logical-failed-request", "attempt-token", "FAILED_TERMINAL", partial, now);
+    vi.mocked(store.ingestionRequests.claim).mockResolvedValue({ state: "FAILED_TERMINAL", summary: partial });
     const retry = await handleIngestionRequest(await signedRequest(body, { nonce: "fedcba9876543210fedcba9876543210" }), dependencies);
     expect(retry.status).toBe(422); expect(run).toHaveBeenCalledOnce();
   });

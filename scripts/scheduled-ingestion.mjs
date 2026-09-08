@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 export const SCOPES = ["global", "countries", "countries"];
 export const MAX_ATTEMPTS = 3;
 export const CONNECT_TIMEOUT_MS = 10_000;
-export const REQUEST_TIMEOUT_MS = 90_000;
+export const REQUEST_TIMEOUT_MS = 165_000;
 export const MAX_SCOPE_DURATION_MS = 300_000;
 export const MAX_STATUS_POLLS = 12;
 const TRANSIENT = new Set([408, 425, 429, 500, 502, 503, 504]);

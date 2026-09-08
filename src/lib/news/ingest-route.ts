@@ -3,7 +3,9 @@ import { createHash } from "node:crypto";
 import { boundedText } from "@/lib/bounded-stream";
 import { getConfiguredNewsStore } from "./configured-store";
 import { ingestionAuthHeaders, verifyIngestionAuth } from "./ingest-auth";
-import { runNewsIngestion } from "./ingest";
+import { runNewsIngestion, terminalIngestionFailure, type IngestionPlan } from "./ingest";
+import type { IngestionRequestState } from "./ingestion-requests";
+import { ProviderError } from "./providers/provider";
 import { logNews } from "./logger";
 import type { NewsStore } from "./store";
 
@@ -49,6 +51,8 @@ export async function handleIngestionRequest(request: Request, dependencies: Ing
   // remain accepted, but only the new protocol can safely retry with fresh nonces.
   requestId = input.requestId ?? auth.nonce;
   let store: NewsStore;
+  let token: string;
+  let plan: IngestionPlan | undefined;
   try {
     const configured = dependencies.store === undefined ? await getConfiguredNewsStore() : dependencies.store;
     if (!configured) return jsonError(503, "Ingestion storage is unavailable.", requestId);
@@ -59,10 +63,13 @@ export async function handleIngestionRequest(request: Request, dependencies: Ing
     const claim = await store.ingestionRequests.claim(requestId, digest, now);
     if (claim.state === "CONFLICT") return jsonError(409, "Logical request does not match the accepted operation.", requestId);
     if (claim.state === "SUCCEEDED") return Response.json({ requestId, state: claim.state, summary: claim.summary }, { headers: { "Cache-Control": "no-store" } });
-    if (claim.state === "FAILED") return Response.json({ requestId, state: claim.state, error: "The accepted operation failed. A later scheduled run can resume saved checkpoints.", summary: claim.summary }, { status: 422, headers: { "Cache-Control": "no-store" } });
+    if (claim.state === "FAILED_TERMINAL") return Response.json({ requestId, state: claim.state, error: "The accepted operation cannot be retried.", summary: claim.summary }, { status: 422, headers: { "Cache-Control": "no-store" } });
     if (claim.state === "RUNNING" || claim.state === "BUSY") return Response.json({ requestId, state: claim.state }, {
       status: 202, headers: { "Cache-Control": "no-store", "Retry-After": "15" },
     });
+    if (claim.state !== "ACCEPTED") throw new Error("Unexpected ingestion claim");
+    token = claim.token;
+    plan = claim.plan;
   } catch {
     logNews("error", "ingestion_request_storage_failed", { requestId });
     return jsonError(503, "Ingestion storage is temporarily unavailable.", requestId);
@@ -73,24 +80,33 @@ export async function handleIngestionRequest(request: Request, dependencies: Ing
   const beforeWork = async () => {
     if (Date.now() >= deadline) throw new Error("Ingestion deadline exceeded");
     if (Date.now() < nextRenewalAt) return;
-    if (!await store.ingestionRequests.renew(requestId, currentTime())) throw new Error("Ingestion lease expired");
+    if (!await store.ingestionRequests.renew(requestId, token, currentTime())) throw new Error("Ingestion lease expired");
     nextRenewalAt = Date.now() + 10_000;
   };
+  let terminalFailure = false;
   try {
     await beforeWork();
     const run = dependencies.run ?? runNewsIngestion;
     const summary = await run({
       period: input.period, mode: input.mode, stageLimit: input.stageLimit,
-      countries: input.scope === "global" ? [] : undefined,
+      countries: plan?.countries ?? (input.scope === "global" ? [] : undefined),
+      snapshotTo: plan ? new Date(plan.snapshotTo) : now,
+      onPlan: (resolved) => store.ingestionRequests.savePlan(requestId, token, resolved, currentTime()),
+      onTerminalFailure: async () => {
+        terminalFailure = true;
+        await store.ingestionRequests.markTerminalFailure(requestId, token, currentTime());
+      },
       store, stateStore: store, persist: true, beforeWork,
     });
     await beforeWork();
-    const state = summary.providersFailed > 0 ? "FAILED" : "SUCCEEDED";
-    await store.ingestionRequests.finish(requestId, state, summary, currentTime());
-    return Response.json({ requestId, state, summary }, { status: state === "SUCCEEDED" ? 200 : 422, headers: { "Cache-Control": "no-store" } });
-  } catch {
-    try { await store.ingestionRequests.finish(requestId, "FAILED", null, currentTime()); } catch {}
+    const state = await store.ingestionRequests.finish(requestId, token,
+      terminalFailure ? "FAILED_TERMINAL" : summary.providersFailed > 0 ? "FAILED_RETRYABLE" : "SUCCEEDED", summary, currentTime());
+    return Response.json({ requestId, state, summary }, { status: state === "SUCCEEDED" ? 200 : state === "FAILED_RETRYABLE" ? 503 : 422, headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    let state: Exclude<IngestionRequestState, "RUNNING"> = terminalFailure || (error instanceof ProviderError && terminalIngestionFailure(error.code)) ? "FAILED_TERMINAL" : "FAILED_RETRYABLE";
+    try { state = await store.ingestionRequests.finish(requestId, token, state, null, currentTime()); } catch {}
     logNews("error", "ingestion_request_failed", { requestId });
+    if (state === "FAILED_TERMINAL") return Response.json({ requestId, state, error: "The accepted operation cannot be retried." }, { status: 422, headers: { "Cache-Control": "no-store" } });
     return jsonError(500, "Ingestion did not complete.", requestId);
   }
 }

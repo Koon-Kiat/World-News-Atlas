@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { runScheduledIngestion, ingestionMarkdown, ingestionExitCode, isTransientStatus } from "../scripts/scheduled-ingestion.mjs";
+import { runScheduledIngestion, ingestionMarkdown, ingestionExitCode, isTransientStatus, REQUEST_TIMEOUT_MS, CONNECT_TIMEOUT_MS } from "../scripts/scheduled-ingestion.mjs";
 
 const secret = "test-only-secret-at-least-thirty-two-characters";
 function success(body: string) {
@@ -70,7 +70,7 @@ describe("scheduled ingestion", () => {
     expect(wait).toHaveBeenCalledTimes(3); expect(wait.mock.calls[0][0]).toBe(15_000);
     expect(result.results[2].success).toBe(true);
   });
-  it("waits for legitimate 140s work after a lost 90s response without restarting it", async () => {
+  it("keeps polling after a genuine disconnect during legitimate 140s work", async () => {
     let time = 0;
     let lost = false;
     const result = await runScheduledIngestion({ url: "https://example.test/ingest", secret, now: () => time,
@@ -85,6 +85,37 @@ describe("scheduled ingestion", () => {
     expect(result.success).toBe(true);
     expect(result.results[0].durationMs).toBeGreaterThanOrEqual(140_000);
     expect(result.results[0].durationMs).toBeLessThan(300_000);
+  });
+  it("allows a 150s response with a 165s timeout and keeps the 10s connection limit", async () => {
+    expect(REQUEST_TIMEOUT_MS).toBe(165_000);
+    expect(CONNECT_TIMEOUT_MS).toBe(10_000);
+    let time = 0;
+    const send = vi.fn(async (_url: string, _headers: Record<string, string>, body: string, timeout = REQUEST_TIMEOUT_MS) => {
+      expect(timeout).toBe(165_000);
+      time += 150_000;
+      return success(body);
+    });
+    const wait = vi.fn(async () => {});
+    const result = await runScheduledIngestion({ url: "https://example.test/ingest", secret, now: () => time, send, wait });
+    expect(result.success).toBe(true); expect(send).toHaveBeenCalledTimes(3); expect(wait).not.toHaveBeenCalled();
+  });
+  it("clamps a retry to the remaining five-minute scope budget", async () => {
+    let time = 0;
+    const timeouts: number[] = [];
+    const timestamps: string[] = [];
+    const result = await runScheduledIngestion({ url: "https://example.test/ingest", secret, now: () => time, random: () => 0,
+      wait: async (ms: number) => { time += ms; },
+      send: async (_url: string, headers: Record<string, string>, body: string, timeout = REQUEST_TIMEOUT_MS) => {
+        if (JSON.parse(body).scope !== "global") return success(body);
+        timeouts.push(timeout); timestamps.push(headers["X-Ingest-Timestamp"]);
+        time += timeout;
+        throw new Error("timeout");
+      } });
+    expect(timeouts).toHaveLength(2);
+    expect(timeouts[0]).toBe(165_000); expect(timeouts[1]).toBeLessThan(135_000);
+    expect(timestamps[0]).not.toBe(timestamps[1]);
+    expect(result.results[0].durationMs).toBe(300_000);
+    expect(result.results[0].success).toBe(false); expect(result.results[2].success).toBe(true);
   });
   it("returns a failing CLI exit code after retaining and reporting later successful scopes", async () => {
     const report = vi.fn(async () => {});

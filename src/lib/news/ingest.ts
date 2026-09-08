@@ -60,6 +60,13 @@ export interface NewsIngestionOptions {
   countryBatchSize?: number;
   snapshotTo?: Date;
   beforeWork?: () => Promise<void>;
+  onPlan?: (plan: IngestionPlan) => Promise<void>;
+  onTerminalFailure?: () => Promise<void>;
+}
+
+export interface IngestionPlan {
+  snapshotTo: string;
+  countries: string[];
 }
 
 function boundedNumber(value: number | undefined, fallback: number, minimum: number, maximum: number): number {
@@ -99,9 +106,9 @@ function checkpointCoversWindow(
     new Date(checkpoint.windowEnd).getTime() >= windowEnd.getTime();
 }
 
-function terminalIngestionFailure(code: string | undefined): boolean {
+export function terminalIngestionFailure(code: string | undefined): boolean {
   if (!code) return false;
-  if (code === "PROVIDER_LIMIT") return true;
+  if (code === "PROVIDER_LIMIT" || code === "MISSING_CREDENTIAL") return true;
   const status = Number(code.match(/^HTTP_(\d{3})$/)?.[1]);
   return Number.isInteger(status) && status >= 400 && status < 500 && ![408, 409, 425, 429].includes(status);
 }
@@ -144,6 +151,10 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
     ? [...new Set(options.countries.map((code) => code.toUpperCase()))]
     : options.providers ? [] : await stateStore.nextCountryBatch(effectiveCountryBatchSize);
   const shards: Array<string | null> = countries.length > 0 ? countries : [null];
+  // Persist the resolved scope/window before any provider or story writes.
+  // A transport retry then resumes these checkpoints, not the next rotation.
+  await options.beforeWork?.();
+  await options.onPlan?.({ snapshotTo: snapshotTo.toISOString(), countries });
   const summary: IngestionSummary = {
     runId: crypto.randomUUID(),
     mode,
@@ -239,6 +250,9 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
         const search = countryCode ? buildCountryDiscoveryQuery([countryCode]) : undefined;
         const batch = await fetchProviderArticlesGracefully([provider], search && provider.name !== "RSS" ? { ...request, query: search } : request, { deadlineMs: 32_000 });
         await options.beforeWork?.();
+        if (batch.failures.some((failure) => terminalIngestionFailure(failure.code))) {
+          await options.onTerminalFailure?.();
+        }
         summary.stagesProcessed += 1;
         providerStages += 1;
         summary.providersFailed += batch.failures.length;
