@@ -36,6 +36,11 @@ export function providerTimeoutFromEnvironment(): number {
   return Number.isFinite(raw) ? Math.max(2_000, Math.min(30_000, raw)) : 8_000;
 }
 
+export function gdeltTimeoutFromEnvironment(): number {
+  const raw = Number(process.env.NEWS_GDELT_TIMEOUT_MS ?? 30_000);
+  return Number.isFinite(raw) ? Math.max(8_000, Math.min(30_000, raw)) : 30_000;
+}
+
 export function liveProviderBatchTimeoutFromEnvironment(): number {
   const fallback = Math.min(6_500, providerTimeoutFromEnvironment() + 500);
   const raw = Number(process.env.NEWS_LIVE_STAGE_TIMEOUT_MS ?? fallback);
@@ -90,7 +95,7 @@ export function createConfiguredProviders(options: { period?: NewsPeriod; countr
   else logNews("info", "provider_disabled", { provider: "NEWSAPI", reason: "missing_credential" });
 
   if (shouldEnableGdelt(options)) {
-    providers.push(new GdeltProvider(timeout));
+    providers.push(new GdeltProvider(gdeltTimeoutFromEnvironment()));
   } else {
     logNews("info", "provider_disabled", {
       provider: "GDELT",
@@ -169,10 +174,11 @@ async function fetchProviderOnce(
 async function fetchProviderCached(
   provider: NewsProvider,
   request: ProviderFetchRequest,
+  ignoreCachedFailures = false,
 ): Promise<ProviderOutcome> {
   const key = providerRequestKey(provider, request);
   const cached = providerResultCache.get(key);
-  if (cached) return cached;
+  if (cached && !(cached.failure && ignoreCachedFailures)) return cached;
 
   const existing = providerRequestsInFlight.get(key);
   if (existing) return existing;
@@ -204,8 +210,9 @@ async function fetchProviderWithinDeadline(
   provider: NewsProvider,
   request: ProviderFetchRequest,
   deadlineMs: number | undefined,
+  ignoreCachedFailures: boolean | undefined,
 ): Promise<ProviderOutcome> {
-  const pending = fetchProviderCached(provider, request);
+  const pending = fetchProviderCached(provider, request, ignoreCachedFailures);
   if (deadlineMs === undefined) return pending;
 
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -233,10 +240,10 @@ export function resetProviderRequestCacheForTesting(): void {
 export async function fetchProviderArticlesGracefully(
   providers: NewsProvider[],
   request: ProviderFetchRequest = {},
-  options: { deadlineMs?: number } = {},
+  options: { deadlineMs?: number; ignoreCachedFailures?: boolean } = {},
 ): Promise<ProviderBatchResult> {
   const outcomes = await Promise.all(
-    providers.map((provider) => fetchProviderWithinDeadline(provider, request, options.deadlineMs)),
+    providers.map((provider) => fetchProviderWithinDeadline(provider, request, options.deadlineMs, options.ignoreCachedFailures)),
   );
   const articles: ProviderArticle[] = [];
   const failures: ProviderBatchResult["failures"] = [];

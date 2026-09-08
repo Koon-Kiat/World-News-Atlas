@@ -17,7 +17,7 @@ import { persistStoryCandidates } from "./persistence";
 import { createConfiguredProviders, fetchProviderArticlesGracefully } from "./providers";
 import type { NewsProvider } from "./providers/provider";
 import type { NewsStore } from "./store";
-import type { NewsPeriod, NewsQuery, ProviderContinuationState } from "./types";
+import type { NewsPeriod, NewsQuery, ProviderContinuationState, ProviderName } from "./types";
 
 const DEFAULT_STAGE_LIMIT = 24;
 const DEFAULT_COUNTRY_BATCH_SIZE = 8;
@@ -31,6 +31,7 @@ export interface IngestionSummary {
   stagesProcessed: number;
   providersAttempted: number;
   providersFailed: number;
+  providerFailures?: Array<{ provider: ProviderName; code: string }>;
   received: number;
   normalized: number;
   articlesWithCountries: number;
@@ -163,6 +164,7 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
     stagesProcessed: 0,
     providersAttempted: 0,
     providersFailed: 0,
+    providerFailures: [],
     received: 0,
     normalized: 0,
     articlesWithCountries: 0,
@@ -248,7 +250,9 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
           continuation: continuation ?? undefined,
         };
         const search = countryCode ? buildCountryDiscoveryQuery([countryCode]) : undefined;
-        const batch = await fetchProviderArticlesGracefully([provider], search && provider.name !== "RSS" ? { ...request, query: search } : request, { deadlineMs: 32_000 });
+        const batch = await fetchProviderArticlesGracefully([provider], search && provider.name !== "RSS" ? { ...request, query: search } : request, {
+          deadlineMs: 32_000, ignoreCachedFailures: true,
+        });
         await options.beforeWork?.();
         if (batch.failures.some((failure) => terminalIngestionFailure(failure.code))) {
           await options.onTerminalFailure?.();
@@ -256,6 +260,7 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
         summary.stagesProcessed += 1;
         providerStages += 1;
         summary.providersFailed += batch.failures.length;
+        summary.providerFailures?.push(...batch.failures);
         const rawReceived = batch.providerDiagnostics[provider.name]?.received ?? batch.articles.length;
         summary.received += rawReceived;
         let rejected = 0;

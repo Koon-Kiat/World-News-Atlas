@@ -1,9 +1,29 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { gdeltModeFromEnvironment, shouldEnableGdelt } from "@/lib/news/providers";
+import { createConfiguredProviders, gdeltModeFromEnvironment, gdeltTimeoutFromEnvironment, shouldEnableGdelt } from "@/lib/news/providers";
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe("archive provider configuration", () => {
+  it("allows a legitimate 21-second GDELT response independently of the eight-second general timeout", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("GDELT_MODE", "on"); vi.stubEnv("NEWS_PROVIDER_TIMEOUT_MS", "8000");
+    vi.stubGlobal("fetch", vi.fn((_url: unknown, init?: RequestInit) => new Promise<Response>((resolve, reject) => {
+      const timer = setTimeout(() => resolve(Response.json({ articles: [] })), 21_000);
+      init?.signal?.addEventListener("abort", () => { clearTimeout(timer); reject(new Error("aborted")); }, { once: true });
+    })));
+    const provider = createConfiguredProviders({ period: "30d", countries: ["US"] }).find(({ name }) => name === "GDELT")!;
+    const checked = expect(provider.fetchLatest({ countries: [], from: new Date("2026-09-07"), to: new Date("2026-09-08") }))
+      .resolves.toMatchObject({ provider: "GDELT", articles: [], exhausted: true });
+    await vi.advanceTimersByTimeAsync(21_000);
+    await checked;
+  });
+
+  it("bounds the separate GDELT timeout beneath the 32-second ingestion stage deadline", () => {
+    vi.stubEnv("NEWS_GDELT_TIMEOUT_MS", "30000"); expect(gdeltTimeoutFromEnvironment()).toBe(30_000);
+    vi.stubEnv("NEWS_GDELT_TIMEOUT_MS", "Infinity"); expect(gdeltTimeoutFromEnvironment()).toBe(30_000);
+    vi.stubEnv("NEWS_GDELT_TIMEOUT_MS", "999999"); expect(gdeltTimeoutFromEnvironment()).toBe(30_000);
+    vi.stubEnv("NEWS_GDELT_TIMEOUT_MS", "0"); expect(gdeltTimeoutFromEnvironment()).toBe(8_000);
+  });
   it("enables GDELT automatically only for historical country discovery", () => {
     vi.stubEnv("GDELT_MODE", "auto");
     expect(shouldEnableGdelt({ period: "30d", countries: ["US"] })).toBe(true);

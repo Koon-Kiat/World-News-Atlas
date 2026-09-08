@@ -91,6 +91,18 @@ describe("provider failure handling", () => {
     expect(first.failures).toEqual(second.failures);
   });
 
+  it("lets ingestion bypass a cached failure while retaining successful-result caching", async () => {
+    const fetchLatest = vi.fn().mockRejectedValueOnce(new ProviderError("GDELT", "HTTP_503", "transient"))
+      .mockResolvedValue(successResult);
+    const provider: NewsProvider = { ...fakeProvider("GDELT", false), fetchLatest, search: fetchLatest };
+    expect((await fetchProviderArticlesGracefully([provider])).failures).toHaveLength(1);
+    expect((await fetchProviderArticlesGracefully([provider])).failures).toHaveLength(1);
+    expect(fetchLatest).toHaveBeenCalledOnce();
+    expect((await fetchProviderArticlesGracefully([provider], {}, { ignoreCachedFailures: true })).failures).toHaveLength(0);
+    await fetchProviderArticlesGracefully([provider], {}, { ignoreCachedFailures: true });
+    expect(fetchLatest).toHaveBeenCalledTimes(2);
+  });
+
   it("short-caches empty provider responses to avoid retry amplification", async () => {
     const fetchLatest = vi.fn(async (): Promise<ProviderFetchResult> => ({
       provider: "GDELT",

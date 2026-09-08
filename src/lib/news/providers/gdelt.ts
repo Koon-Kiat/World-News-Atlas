@@ -157,7 +157,7 @@ export class GdeltProvider implements NewsProvider {
     requiresCredentials: false,
   } as const;
 
-  constructor(private readonly timeoutMs = 8_000) {}
+  constructor(private readonly timeoutMs = 30_000) {}
 
   private async request(
     query: string,
@@ -286,7 +286,9 @@ export class GdeltProvider implements NewsProvider {
     );
     const successful = settled.flatMap((result) => result.status === "fulfilled" ? result.value.articles : []);
     if (successful.length === 0 && settled.every((result) => result.status === "rejected")) {
-      throw new ProviderError(this.name, "REQUEST_FAILED", "GDELT discovery failed");
+      // Preserve HTTP/authentication errors instead of masking every failure as
+      // transient. The ingestion handler needs the code to decide retryability.
+      throw settled[0].reason;
     }
     const unique = new Map(successful.map((article) => [article.url, article]));
     const discoveryCursors: Record<string, string | null> = { ...existingCursors };

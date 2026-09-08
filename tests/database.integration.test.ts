@@ -222,6 +222,29 @@ describe("D1 news integration", () => {
     expect(fetchLatest).toHaveBeenCalledOnce();
   });
 
+  it("makes a fresh provider attempt on a signed retry instead of replaying its cached 503", async () => {
+    const secret = "integration-only-long-hmac-secret-at-least-32-chars";
+    let now = new Date();
+    const fetchLatest = vi.fn().mockRejectedValueOnce(new ProviderError("GDELT", "HTTP_503", "transient"))
+      .mockResolvedValue({ provider: "GDELT", articles: [], receivedAt: now.toISOString(), exhausted: true, continuation: null });
+    vi.spyOn(providers, "createConfiguredProviders").mockReturnValue([{ name: "GDELT",
+      capabilities: { latest: true, search: true, languages: true, sourceMetadata: true, requiresCredentials: false }, fetchLatest, search: fetchLatest }]);
+    const body = JSON.stringify({ requestId: "cached-provider-failure", scope: "global", stageLimit: 1 });
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const nonce = crypto.randomUUID().replaceAll("-", ""); const timestamp = String(Math.floor(now.getTime() / 1000));
+      const request = new Request("https://example.test/api/internal/ingest/run", { method: "POST", body, headers: {
+        "Content-Type": "application/json", "X-Ingest-Timestamp": timestamp, "X-Ingest-Nonce": nonce,
+        "X-Ingest-Signature": await signIngestionPayload(secret, timestamp, nonce, body),
+      } });
+      const response = await handleIngestionRequest(request, { secret, now: () => now, store });
+      expect(response.status).toBe(attempt === 0 ? 503 : 200);
+      expect(await response.json()).toMatchObject({ state: attempt === 0 ? "FAILED_RETRYABLE" : "SUCCEEDED",
+        summary: { providerFailures: attempt === 0 ? [{ provider: "GDELT", code: "HTTP_503" }] : [] } });
+      now = new Date(now.getTime() + 1000);
+    }
+    expect(fetchLatest).toHaveBeenCalledTimes(2);
+  });
+
   it("returns running/completed signed retries without duplicating ingestion and retains nonce rejection", async () => {
     const secret = "integration-only-long-hmac-secret-at-least-32-chars";
     const now = new Date();

@@ -4,6 +4,12 @@ import { buildGdeltDiscoveryQueries, GdeltProvider } from "@/lib/news/providers/
 afterEach(() => vi.unstubAllGlobals());
 
 describe("GDELT discovery planning", () => {
+  it("preserves permanent HTTP failures across the discovery branches", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("Forbidden", { status: 403 })));
+    await expect(new GdeltProvider().search("Japan", {
+      countries: ["JP"], from: new Date("2026-09-07"), to: new Date("2026-09-08"),
+    })).rejects.toMatchObject({ provider: "GDELT", code: "HTTP_403" });
+  });
   it("issues separate English and Japanese discovery queries for Japan", () => {
     const queries = buildGdeltDiscoveryQueries('("Japan" OR "日本" OR "日本国")', {
       countries: ["JP"],

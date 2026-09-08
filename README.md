@@ -70,6 +70,8 @@ Transport failures and HTTP 408/425/429/500/502/503/504 receive at most three at
 
 See [optimization results and requirement audit](docs/optimization-results.md) for measurements, validation and limitations.
 
+Ingestion retries bypass cached provider failures while retaining successful-result caching and in-flight request coalescing. GDELT gets a separate 30-second request timeout because valid archive searches can exceed the general eight-second timeout; its ingestion stage remains bounded to 32 seconds. Workflow reports include sanitized provider names and error codes, so an upstream error is distinguishable from an internal or transport failure. After changing or removing a Sites runtime secret, publish a saved version to apply the new environment revision to the Worker.
+
 ## Quick start with no services or API keys
 
 Requirements: Node.js 24.15.0 or newer and npm.
@@ -105,6 +107,7 @@ The scheduled GitHub workflow never receives database credentials. It makes seve
 | `NEWS_INGEST_HMAC_SECRET` | Hosted ingestion | Server-only random secret shared with the GitHub workflow; use at least 32 characters. |
 | `NEWSAPI_KEY` | No | Enables NewsAPI ingestion. Missing credentials disable only this adapter. |
 | `GDELT_MODE` | No | `auto` (default) enables credential-free GDELT for 7d/30d country requests; `on` enables it wherever appropriate; `off` disables it. |
+| `NEWS_GDELT_TIMEOUT_MS` | No | GDELT request timeout; defaults to 30,000 ms and is bounded to 8,000–30,000 ms. Other providers retain their general timeout. |
 | `GDELT_ENABLED` | No | Legacy compatibility switch used only when `GDELT_MODE` is unset. |
 | `NEWS_FIXTURES_ENABLED` | No | Opts into fixture fallback for local development or ingestion tests; defaults to `false`. |
 | `NEWS_PROVIDER_TIMEOUT_MS` | No | External request timeout, clamped to 2–30 seconds; defaults to 8 seconds. |
