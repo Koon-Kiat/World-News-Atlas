@@ -2,13 +2,15 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import dynamic from "next/dynamic";
+import { relativeTime } from "@/lib/relative-time";
 import { CountryFlag } from "@/components/CountryFlag";
 import { useSavedStories } from "@/hooks/useSavedStories";
 import { getCountryName } from "@/lib/news/countries/metadata";
 import { approvedArticleUrl, approvedImageUrl } from "@/lib/news/image-policy";
 import type { ArticleView, StoryView } from "@/lib/news/types";
 import { isSafeHttpUrl } from "@/lib/news/url";
-import { StoryReader } from "./StoryReader";
+const StoryReader = dynamic(() => import("./StoryReader").then((module) => module.StoryReader));
 
 function displayImageUrl(
   imageUrl: string | null | undefined,
@@ -22,13 +24,6 @@ function displayImageUrl(
   }
   if (approvedArticleUrl(articleUrl)) return `/api/image?article=${encodeURIComponent(articleUrl!)}${topicParameter}`;
   return null;
-}
-
-function relativeTime(value: string): string {
-  const hours = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 3_600_000));
-  if (hours < 1) return "Just now";
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
 }
 
 function ArticleLink({ article }: { article: ArticleView }) {
@@ -53,7 +48,8 @@ function ArticleLink({ article }: { article: ArticleView }) {
   );
 }
 
-export function StoryCard({ story, featured = false }: { story: StoryView; featured?: boolean }) {
+export function StoryCard({ story, featured = false, referenceTime }: { story: StoryView; featured?: boolean; referenceTime?: string }) {
+  const displayTime = (value: string) => referenceTime ? relativeTime(value, referenceTime) : value.slice(0, 10);
   const [readerOpen, setReaderOpen] = useState(false);
   const savedStories = useSavedStories();
   const closeReader = useCallback(() => setReaderOpen(false), []);
@@ -114,7 +110,7 @@ export function StoryCard({ story, featured = false }: { story: StoryView; featu
         <div className="story-kicker">
           <span>{story.topics[0] ?? "World"}</span>
           <span aria-hidden="true">•</span>
-          <time dateTime={story.lastUpdatedAt}>{relativeTime(story.lastUpdatedAt)}</time>
+          <time dateTime={story.lastUpdatedAt}>{displayTime(story.lastUpdatedAt)}</time>
         </div>
         <h3>{story.title}</h3>
         {story.summary && <p className="story-summary">{story.summary}</p>}
@@ -147,7 +143,7 @@ export function StoryCard({ story, featured = false }: { story: StoryView; featu
                 <li key={article.id}>
                   <div>
                     <strong>{article.source.name}</strong>
-                    <span>{article.source.countryCode ? getCountryName(article.source.countryCode) : "International"} · {relativeTime(article.publishedAt)}</span>
+                    <span>{article.source.countryCode ? getCountryName(article.source.countryCode) : "International"} · {displayTime(article.publishedAt)}</span>
                   </div>
                   <ArticleLink article={article} />
                 </li>

@@ -1,19 +1,24 @@
 // @vitest-environment node
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { convertV4MiniflareOptions, Miniflare } from "miniflare";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clusterArticles } from "@/lib/news/cluster";
 import { loadDatabaseCoverage, loadDatabaseStories } from "@/lib/news/data-store";
 import { D1NewsStore } from "@/lib/news/d1-store";
+import { D1RateLimitStore } from "@/lib/news/distributed-rate-limit";
+import { D1IngestionRequestStore, INGESTION_LEASE_MS, INGESTION_RECORD_TTL_MS } from "@/lib/news/ingestion-requests";
+import { handleIngestionRequest } from "@/lib/news/ingest-route";
+import { signIngestionPayload } from "@/lib/news/ingest-auth";
+import type { IngestionSummary } from "@/lib/news/ingest";
 import { persistStoryCandidates } from "@/lib/news/persistence";
 import { buildNewsResponse } from "@/lib/news/query";
 import { canonicalSourceId } from "@/lib/news/sources/registry";
 import type { NewsStore } from "@/lib/news/store";
 import type { NewsQuery, NormalizedArticle } from "@/lib/news/types";
 
-const migration = readFileSync("drizzle/0000_world_news_d1.sql", "utf8")
-  .split("--> statement-breakpoint").map((statement) => statement.trim()).filter(Boolean);
+const migration = readdirSync("drizzle").filter((file) => file.endsWith(".sql")).sort()
+  .flatMap((file) => readFileSync(`drizzle/${file}`, "utf8").split("--> statement-breakpoint").map((statement) => statement.trim()).filter(Boolean));
 const baseQuery: NewsQuery = { countries: [], sourcePerspective: "all", sources: [], period: "30d", sort: "newest", page: 1, pageSize: 12 };
 
 let miniflare: Miniflare;
@@ -63,6 +68,65 @@ afterEach(async () => {
 });
 
 describe("D1 news integration", () => {
+  it("shares rate limits across independent instances and expires quotas without storing IP addresses", async () => {
+    const first = new D1RateLimitStore(database);
+    const second = new D1RateLimitStore(database);
+    const options = { limit: 2, windowMs: 1000 };
+    expect((await first.increment("203.0.113.2", options, 1000)).allowed).toBe(true);
+    expect((await second.increment("203.0.113.2", options, 1001)).allowed).toBe(true);
+    expect(await first.increment("203.0.113.2", options, 1002)).toMatchObject({ allowed: false, remaining: 0, retryAfterSeconds: 1 });
+    const row = await database.prepare("SELECT client_key FROM api_rate_limit").first<{ client_key: string }>();
+    expect(row?.client_key).toMatch(/^[a-f0-9]{64}$/);
+    expect((await second.increment("203.0.113.2", options, 2001)).allowed).toBe(true);
+  });
+
+  it("atomically claims logical operations and recovers stale leases without rerunning a failed key", async () => {
+    const first = new D1IngestionRequestStore(database);
+    const second = new D1IngestionRequestStore(database);
+    const now = new Date();
+    const results = await Promise.all([first.claim("same-operation", "digest", now), second.claim("same-operation", "digest", now)]);
+    expect(results.map((result) => result.state).sort()).toEqual(["ACCEPTED", "RUNNING"]);
+    expect((await first.claim("other-operation", "digest", now)).state).toBe("BUSY");
+    expect((await first.claim("same-operation", "changed-digest", now)).state).toBe("CONFLICT");
+    const stale = new Date(now.getTime() + INGESTION_LEASE_MS + 1);
+    expect((await second.claim("same-operation", "digest", stale)).state).toBe("FAILED");
+    expect((await second.claim("other-operation", "digest", stale)).state).toBe("ACCEPTED");
+    expect(await first.renew("same-operation", stale)).toBe(false);
+    const expired = new Date(now.getTime() + INGESTION_RECORD_TTL_MS + 1);
+    await first.claim("fresh-operation", "digest", expired);
+    expect(await database.prepare("SELECT request_id FROM ingestion_logical_request WHERE request_id = 'same-operation'").first()).toBeNull();
+  });
+
+  it("returns running/completed signed retries without duplicating ingestion and retains nonce rejection", async () => {
+    const secret = "integration-only-long-hmac-secret-at-least-32-chars";
+    const now = new Date();
+    const body = JSON.stringify({ requestId: "logical-operation-0001", scope: "global", stageLimit: 1 });
+    const signed = async (raw = body, nonce = crypto.randomUUID().replaceAll("-", "")) => {
+      const timestamp = String(Math.floor(now.getTime() / 1000));
+      return new Request("https://example.test/api/internal/ingest/run", { method: "POST", body: raw, headers: {
+        "Content-Type": "application/json", "X-Ingest-Timestamp": timestamp, "X-Ingest-Nonce": nonce,
+        "X-Ingest-Signature": await signIngestionPayload(secret, timestamp, nonce, raw),
+      } });
+    };
+    let finish: ((summary: IngestionSummary) => void) | undefined;
+    const running = new Promise<IngestionSummary>((resolve) => { finish = resolve; });
+    const run = vi.fn(async () => running);
+    const dependencies = { secret, now: () => now, store, run };
+    const firstRequest = await signed(body, "a".repeat(32));
+    const first = handleIngestionRequest(firstRequest, dependencies);
+    await vi.waitFor(() => expect(run).toHaveBeenCalledOnce(), { timeout: 5000 });
+    const replay = await handleIngestionRequest(await signed(), dependencies);
+    expect(replay.status).toBe(202); expect(await replay.json()).toMatchObject({ state: "RUNNING" });
+    expect((await handleIngestionRequest(await signed(body, "a".repeat(32)), dependencies)).status).toBe(409);
+    const completed = { runId: "run-original", stored: 7, storiesUpdated: 4, stagesProcessed: 1, providersFailed: 0, persisted: true } as IngestionSummary;
+    finish!(completed);
+    expect((await first).status).toBe(200);
+    const retry = await handleIngestionRequest(await signed(), dependencies);
+    expect(retry.status).toBe(200); expect(await retry.json()).toMatchObject({ summary: completed });
+    expect(run).toHaveBeenCalledOnce();
+    expect((await handleIngestionRequest(await signed(body.replace('"global"', '"countries"')), dependencies)).status).toBe(409);
+  }, 20_000);
+
   it("persists and reclusters idempotently with every relational link intact", async () => {
     const initial = article("cluster-a", "Japan launches a regional technology programme", [{ code: "JP", name: "Japan", relevanceScore: 1 }]);
     await persistStoryCandidates(clusterArticles([initial]), store);

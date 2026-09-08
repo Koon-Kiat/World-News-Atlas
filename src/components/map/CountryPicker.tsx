@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { CountryFlag } from "@/components/CountryFlag";
 import { getCountryName, listCountries } from "@/lib/news/countries/metadata";
 
@@ -32,6 +32,9 @@ interface CountryPickerProps {
 export function CountryPicker({ selectedCountries, onSelect }: CountryPickerProps) {
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const inputId = useId();
+  const listId = `${inputId}-suggestions`;
   const matches = useMemo(() => {
     const search = normalizedSearchValue(query);
     if (!search) return [];
@@ -54,11 +57,12 @@ export function CountryPicker({ selectedCountries, onSelect }: CountryPickerProp
     onSelect(code);
     setQuery("");
     setExpanded(false);
+    setActiveIndex(-1);
   }
 
   return (
     <div className="country-picker">
-      <label htmlFor="country-search">
+      <label htmlFor={inputId}>
         <span>Choose a country</span>
         <small>Search every country by name or code</small>
       </label>
@@ -67,37 +71,50 @@ export function CountryPicker({ selectedCountries, onSelect }: CountryPickerProp
           <path d="m21 21-4.7-4.7m2.2-5.3a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" />
         </svg>
         <input
-          id="country-search"
+          id={inputId}
           type="search"
           value={query}
           autoComplete="off"
           placeholder="Start typing: Japan, SG, Canada…"
           role="combobox"
           aria-autocomplete="list"
-          aria-expanded={expanded && matches.length > 0}
-          aria-controls="country-suggestions"
+          aria-expanded={expanded && Boolean(query.trim())}
+          aria-controls={expanded && query.trim() ? listId : undefined}
+          aria-activedescendant={expanded && matches[activeIndex] ? `${listId}-${matches[activeIndex].code}` : undefined}
+          onBlur={() => { setExpanded(false); setActiveIndex(-1); }}
           onFocus={() => setExpanded(true)}
           onChange={(event) => {
             setQuery(event.target.value);
             setExpanded(true);
+            setActiveIndex(-1);
           }}
           onKeyDown={(event) => {
-            if (event.key === "Escape") setExpanded(false);
-            if (event.key === "Enter" && matches[0]) {
+            if (event.key === "Escape") { setExpanded(false); setActiveIndex(-1); }
+            if ((event.key === "ArrowDown" || event.key === "ArrowUp") && matches.length) {
               event.preventDefault();
-              choose(matches[0].code);
+              setExpanded(true);
+              setActiveIndex((index) => event.key === "ArrowDown"
+                ? (index + 1) % matches.length : (index <= 0 ? matches.length - 1 : index - 1));
+            }
+            if (event.key === "Enter" && expanded && matches[activeIndex]) {
+              event.preventDefault();
+              choose(matches[activeIndex].code);
             }
           }}
         />
       </div>
       {expanded && query.trim() && (
-        <div id="country-suggestions" className="country-suggestions" role="listbox">
+        <div id={listId} className="country-suggestions" role="listbox" aria-label="Country suggestions">
           {matches.length > 0 ? (
-            matches.map((country) => (
+            matches.map((country, index) => (
               <button
                 type="button"
                 role="option"
                 aria-selected={selectedCountries.includes(country.code)}
+                id={`${listId}-${country.code}`}
+                tabIndex={-1}
+                data-active={activeIndex === index || undefined}
+                onMouseEnter={() => setActiveIndex(index)}
                 key={country.code}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(country.code)}

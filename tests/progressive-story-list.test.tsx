@@ -1,4 +1,5 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { render } from "./render-saved";
+import { act, cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProgressiveStoryList } from "@/components/WorldNewsExplorer";
 import { getFixtureStories } from "@/data/fixture-news";

@@ -29,7 +29,8 @@ describe("client identity", () => {
         "x-forwarded-for": "192.0.2.5, 198.51.100.1",
       },
     });
-    expect(clientKey(request)).toBe("203.0.113.7");
+    expect(clientKey(request, true)).toBe("203.0.113.7");
+    expect(clientKey(request, false)).toBe("anonymous");
   });
 
   it("rejects malformed spoofed address values", () => {
@@ -39,12 +40,18 @@ describe("client identity", () => {
     expect(clientKey(request)).toBe("anonymous");
   });
 
-  it("uses validated conventional proxy headers when no platform address exists", () => {
+  it("never uses attacker-controlled conventional forwarding headers", () => {
     expect(clientKey(new Request("https://example.test/api/news", {
       headers: { "x-real-ip": "198.51.100.9", "x-forwarded-for": "192.0.2.5" },
-    }))).toBe("198.51.100.9");
+    }), true)).toBe("anonymous");
     expect(clientKey(new Request("https://example.test/api/news", {
       headers: { "x-forwarded-for": "192.0.2.5, 198.51.100.1" },
-    }))).toBe("192.0.2.5");
+    }), true)).toBe("anonymous");
+  });
+
+  it("normalizes equivalent IPv6 identities", () => {
+    const first = new Request("https://example.test", { headers: { "cf-connecting-ip": "2001:db8::1" } });
+    const second = new Request("https://example.test", { headers: { "cf-connecting-ip": "2001:0db8:0:0:0:0:0:1" } });
+    expect(clientKey(first, true)).toBe(clientKey(second, true));
   });
 });

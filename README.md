@@ -42,6 +42,34 @@ D1-backed reads use a bounded indexed candidate path and provider/country/window
 
 The browser calls only this application's `/api/news` route. Provider credentials and RSS configuration are never exposed through public environment variables or client components.
 
+### Initial rendering and progressive coverage
+
+`/country` and `/compare` render up to 12 stored stories in the initial HTML. The server gives D1 1.2 seconds to return useful data; unavailable, empty or slow storage returns the normal shell and lets client/live discovery recover. External providers never run on this HTML path. Hydration reuses matching stored results. Partial stored coverage establishes a live/hybrid continuation when the list approaches the viewport, keeping the initial stories visible.
+
+D1 ranks the full configured candidate pool using compact article metadata, then retrieves display text/URLs only for the selected page. Complete database-backed API responses use the same bounded display query. Batched relations and grouped reconstruction replace serial per-chunk reads; hybrid reconciliation still loads full candidates for cross-provider clustering. Default corpus/candidate limits, ranking, source diversity, country rotation and time windows are unchanged. Pagination retains one request at a time, aborts on filter changes, prefetches within 500px, deduplicates and sorts results, bounds automatic no-growth retries, and always permits a manual retry. Searches debounce for 400ms; Enter/Search submits immediately.
+
+Ordinary database responses retain the API's public HTTP cache policy. The browser no longer forces every request to bypass that cache. Live responses and explicit continuations use `no-store`; an active continuation is not replaced by a newly complete database window. The map, landing globe and reader have separate client chunks and reserved placeholders. Complete flag geography remains available, with flags emitted as separate cached SVG assets instead of embedded into global CSS.
+
+### Production security and local state
+
+The production news limiter uses an atomic D1 counter shared across Workers (90 requests per 60 seconds) behind an inexpensive local limiter. It trusts Cloudflare's canonical `CF-Connecting-IP` only with the Workers D1 binding; conventional forwarded headers are ignored. IP keys are hashed. Storage is bounded to 10,000 keys with indexed expiry cleanup, saturated counters, and no eviction of active quotas. Denials return 429 with `Retry-After`; unavailable distributed storage fails closed with 503 in production. No external service is required.
+
+Document CSP uses a fresh request nonce for framework scripts and a same-origin prepaint theme script. Image and production connection sources are restricted to the application origin (plus data images). Vinext already renders documents on request; the native Next backend explicitly uses `connection()` so prerendered inline scripts cannot violate the nonce policy. Document HTML is not shared-cacheable; API and hashed-asset caching remain independent. Inline styles remain necessary for React's map transforms, progress effects and theme variables. `/api/health` returns only `{"status":"ok"}`. Images stream through the existing reviewed host/path/redirect boundary with a 6MiB running byte bound and a seven-second deadline covering both headers and body.
+
+One root saved-story provider performs one initial storage read and maintains one cross-tab listener. The existing `worldline:saved-stories:v1` key now contains `{ "version": 2, "stories": [...] }`: the complete nested snapshot is validated, bounded to 50 saved stories, and safe legacy arrays are migrated on read. Invalid/corrupt/future data is rejected. Restricted storage or quota failures show a non-blocking status; clear-all offers a ten-second in-memory Undo.
+
+Service-worker caches are explicitly versioned (`v3`). Navigation stays network-first; only successful, non-redirected, non-private, cacheable known routes can be saved. API, authenticated, cross-origin and query-string resources are excluded. Hashed assets have an 80-entry bound. A small static offline page remains available when dynamic/private documents cannot be cached; offline content does not claim to be current news.
+
+### Scheduled ingestion protocol
+
+The workflow retains `global -> countries -> countries`; the two country invocations advance different persisted rotating shards. Each invocation signs a stable logical `requestId` in the exact HMAC body and creates fresh timestamps/nonces for retries. D1 atomically records `RUNNING`, `SUCCEEDED` or `FAILED`; duplicates return current/recorded results without executing ingestion again. Reusing an ID with different input is rejected. Failed IDs are terminal for seven days; a later scheduled ID resumes durable stage checkpoints. Cleanup expires old records in bounded batches.
+
+An expiring production lease protects manual and scheduled requests alike: 180-second leases renew during bounded work, with a 150-second execution budget checked between provider and persistence operations. Provider batches have a 32-second outer deadline, independent failures and saved partial results. A provider failure remains visible as a failed logical operation (422), with successful stored counts retained. Crashed/expired work cannot renew or finish another operation's lease.
+
+Transport failures and HTTP 408/425/429/500/502/503/504 receive at most three attempts with exponential backoff, jitter and capped `Retry-After`. Permanent 4xx errors are not retried. Matching 202 running/busy responses use separate bounded polling (at most 12 polls), allowing valid long work to complete after a lost response. Every scope has a five-minute total deadline, ten-second connection timeout and at most 90 seconds per HTTP request; the workflow allows 18 minutes for all three scopes and setup. Later scopes run even after failure. The final exit code fails if any scope failed. Validated summaries include run ID, stage/stored/story counts and sanitized status/duration in the Actions summary. Legacy signed callers without a logical ID remain accepted but cannot safely retry with a new nonce.
+
+See [optimization results and requirement audit](docs/optimization-results.md) for measurements, validation and limitations.
+
 ## Quick start with no services or API keys
 
 Requirements: Node.js 24.15.0 or newer and npm.
@@ -220,14 +248,14 @@ Typed values:
 
 Internal pages power infinite continuation only; the normal interface has no numbered-page navigation. Response metadata separates materialized story clusters from individual articles and distinguishes `hasMore`, `discoveryExhausted`, `archiveCoverageComplete`, `coverageComplete`, `coverageDegraded`, `coverageStatus`, and `corpusLimitReached`. A finite Bing/RSS stop or safety cap can make `hasMore=false` without claiming complete 30-day coverage. The UI labels such counts as discovered/currently available coverage. If process-local state disappears between scroll requests, the continuation ID is rejected explicitly and the interface replaces the stale feed with a fresh first page instead of silently appending a restarted corpus.
 
-Invalid combinations return a sanitized `400` response. Live responses are `no-store` because requesting continuation can expand the server-side corpus even when an internal page repeats. A best-effort per-instance rate limit remains; multi-instance production should move live corpus and limiter state to shared infrastructure such as Redis or Durable Objects.
+Invalid combinations return a sanitized `400` response. Live responses and explicit continuations are `no-store` because requesting continuation can expand the server-side corpus even when an internal page repeats. D1 enforces production quotas across instances. Live continuation corpora remain process-local; expired or unavailable continuations return an explicit reset and recover through the existing discovery path.
 
 ## Caching and request control
 
 - Live query corpora are cached for 60 minutes, capped at 40 entries, and keyed by countries, perspective, source IDs, topic, language, period, sort, search, and non-secret provider configuration.
 - Provider requests are coalesced while in flight. Successful results are cached for five minutes, empty results for 45 seconds, and failures for 20 seconds, preventing rapid retry amplification.
 - Provider caching is capped at 160 entries. The request limiter is capped at 2,000 client windows and trusts the deployment-provided Cloudflare client address before generic proxy headers.
-- The cache and limiter expose small store interfaces so a multi-instance deployment can replace process-local state with Redis, Durable Objects, or KV without changing the API contract.
+- The live cache exposes a small store interface for a future shared implementation. The production limiter already uses the supported Sites D1 binding; no Redis, Durable Object or paid dependency is required.
 - A single live stage processes no more than `NEWS_LIVE_BATCH_SIZE` candidates. Raw provider round-robin is preserved, but only query-relevant articles consume period-aware corpus capacity. Bing runs at most two upstream plans per stage and 18 over the finite plan set.
 - The browser prefetches cached internal pages until roughly 30–50 stories are ready ahead. When the server-side matching buffer reaches `NEWS_LIVE_LOW_WATER`, one further bounded provider stage can run. Opening the page does not continuously refetch providers while enough cached material remains.
 

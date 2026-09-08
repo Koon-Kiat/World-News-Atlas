@@ -59,6 +59,7 @@ export interface NewsIngestionOptions {
   stageLimit?: number;
   countryBatchSize?: number;
   snapshotTo?: Date;
+  beforeWork?: () => Promise<void>;
 }
 
 function boundedNumber(value: number | undefined, fallback: number, minimum: number, maximum: number): number {
@@ -211,6 +212,7 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
       );
 
       while (!exhausted && !coverageComplete) {
+        await options.beforeWork?.();
         if (summary.stagesProcessed >= stageLimit || providerStages >= providerStageBudget) {
           if (summary.stagesProcessed >= stageLimit) summary.budgetExhausted = true;
           if (summary.stagesProcessed >= stageLimit) break outer;
@@ -235,7 +237,8 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
           continuation: continuation ?? undefined,
         };
         const search = countryCode ? buildCountryDiscoveryQuery([countryCode]) : undefined;
-        const batch = await fetchProviderArticlesGracefully([provider], search && provider.name !== "RSS" ? { ...request, query: search } : request);
+        const batch = await fetchProviderArticlesGracefully([provider], search && provider.name !== "RSS" ? { ...request, query: search } : request, { deadlineMs: 32_000 });
+        await options.beforeWork?.();
         summary.stagesProcessed += 1;
         providerStages += 1;
         summary.providersFailed += batch.failures.length;
@@ -258,14 +261,14 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
         let stored = 0;
         let storiesUpdated = 0;
         if (shouldPersist && deduplicated.articles.length > 0) {
-          const result = await persistStoryCandidates(await clusterArticlesHybrid(deduplicated.articles), store!);
+          const result = await persistStoryCandidates(await clusterArticlesHybrid(deduplicated.articles), store!, options.beforeWork);
           stored = result.storedArticles;
           storiesUpdated = result.storiesUpdated;
           summary.stored += stored;
           summary.storiesUpdated += storiesUpdated;
         }
 
-        continuation = batch.continuations[provider.name] ?? null;
+        continuation = batch.continuations[provider.name] ?? (batch.failures.length ? continuation : null);
         exhausted = batch.exhaustedProviders.includes(provider.name);
         const stageFailure = batch.failures[0];
         if (terminalIngestionFailure(stageFailure?.code)) exhausted = true;
@@ -292,6 +295,7 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
           coveredTo: mergedCoverage.coveredTo,
           lastSuccessfulAt: batch.failures.length === 0 ? new Date().toISOString() : checkpoint?.lastSuccessfulAt,
         };
+        await options.beforeWork?.();
         await stateStore.save(checkpoint);
         if (coverageComplete || exhausted) summary.checkpointsCompleted += 1;
         await stateStore.finishStage(stageId, {

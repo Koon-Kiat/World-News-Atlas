@@ -20,6 +20,7 @@ const localBindingConfig = {
           binding: d1,
           database_name: "world-news-atlas-d1",
           database_id: SITE_CREATOR_PLACEHOLDER_DATABASE_ID,
+          migrations_dir: "drizzle",
         },
       ]
     : [],
@@ -41,6 +42,9 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    // Keep the complete flag set as individually cached assets, rather than
+    // inlining hundreds of SVGs into every route's CSS.
+    build: { assetsInlineLimit: 0 },
     css: { postcss: { plugins: [tailwindcss()] } },
     server: isCodexSeatbeltSandbox
       ? { watch: { useFsEvents: false, usePolling: true } }
@@ -50,7 +54,9 @@ export default defineConfig(async () => {
       sites(),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
-        config: localBindingConfig,
+        // A plain override concatenates Wrangler binding arrays, declaring DB
+        // twice. Mutate the resolved local config to replace those arrays.
+        config: (config) => { Object.assign(config, localBindingConfig); },
       }),
     ],
   };

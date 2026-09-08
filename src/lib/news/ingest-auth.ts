@@ -58,7 +58,7 @@ export async function verifyIngestionAuth(
   const rawTimestamp = Number(headers.timestamp);
   if (!Number.isSafeInteger(rawTimestamp)) return null;
   const timestampMs = headers.timestamp.length <= 10 ? rawTimestamp * 1_000 : rawTimestamp;
-  if (Math.abs(now.getTime() - timestampMs) > AUTH_WINDOW_MS) return null;
+  if (Math.abs(now.getTime() - timestampMs) >= AUTH_WINDOW_MS) return null;
   const key = await hmacKey(secret, ["verify"]);
   const valid = await crypto.subtle.verify("HMAC", key, hexToBuffer(signature), new TextEncoder().encode(`${headers.timestamp}.${headers.nonce}.${rawBody}`));
   return valid ? { nonce: headers.nonce, receivedAt: now, expiresAt: new Date(timestampMs + AUTH_WINDOW_MS) } : null;

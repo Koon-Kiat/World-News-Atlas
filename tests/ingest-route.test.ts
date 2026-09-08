@@ -22,6 +22,7 @@ function summary(): IngestionSummary {
 function replayProtectedStore(): NewsStore {
   const nonces = new Set<string>();
   return {
+    ingestionRequests: { claim: vi.fn(async () => ({ state: "ACCEPTED" })), renew: vi.fn(async () => true), finish: vi.fn(async () => {}) },
     persistStoryCandidates: vi.fn(), loadStories: vi.fn(), loadCoverage: vi.fn(), load: vi.fn(), save: vi.fn(),
     startStage: vi.fn(), finishStage: vi.fn(), nextCountryBatch: vi.fn(), deleteExpiredIngestionNonces: vi.fn(async () => 0),
     claimIngestionNonce: vi.fn(async (nonce: string) => {
@@ -70,5 +71,28 @@ describe("signed ingestion route", () => {
     const invalidBody = JSON.stringify({ scope: "global", unexpected: true });
     expect((await handleIngestionRequest(await signedRequest(invalidBody, { nonce: "fedcba9876543210fedcba9876543210" }), { secret, store, now: () => now, run })).status).toBe(400);
     expect(run).not.toHaveBeenCalled();
+  });
+
+  it("rejects the exact timestamp expiry boundary and bounds an unstated oversized body", async () => {
+    const store = replayProtectedStore(); const run = vi.fn(async () => summary());
+    const body = JSON.stringify({ scope: "global" });
+    const timestamp = String(now.getTime() / 1000 - 300);
+    expect((await handleIngestionRequest(await signedRequest(body, { timestamp }), { secret, store, now: () => now, run })).status).toBe(401);
+    expect((await handleIngestionRequest(await signedRequest("x".repeat(1025)), { secret, store, now: () => now, run })).status).toBe(413);
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("records partial provider failure with retained counts and never reruns a failed logical key", async () => {
+    const store = replayProtectedStore(); const partial = { ...summary(), providersFailed: 1 };
+    const run = vi.fn(async () => partial);
+    const body = JSON.stringify({ requestId: "logical-failed-request", scope: "global" });
+    const dependencies = { secret, store, now: () => now, run };
+    const response = await handleIngestionRequest(await signedRequest(body), dependencies);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({ state: "FAILED", summary: { stored: 3, providersFailed: 1 } });
+    expect(store.ingestionRequests.finish).toHaveBeenCalledWith("logical-failed-request", "FAILED", partial, now);
+    vi.mocked(store.ingestionRequests.claim).mockResolvedValue({ state: "FAILED", summary: partial });
+    const retry = await handleIngestionRequest(await signedRequest(body, { nonce: "fedcba9876543210fedcba9876543210" }), dependencies);
+    expect(retry.status).toBe(422); expect(run).toHaveBeenCalledOnce();
   });
 });

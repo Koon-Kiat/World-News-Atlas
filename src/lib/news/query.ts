@@ -356,9 +356,10 @@ export function buildNewsResponse(
     continuationId?: string;
     continuationReset?: boolean;
   } = {},
+  now = new Date(),
 ): NewsResponse {
   const preserveOrder = dataSource === "live";
-  const result = queryStories(stories, query, new Date(), { preserveOrder });
+  const result = queryStories(stories, query, now, { preserveOrder });
   const corpusComplete = corpus.corpusComplete ?? true;
   const discoveryExhausted = corpus.discoveryExhausted ?? corpusComplete;
   const archiveCoverageComplete = corpus.archiveCoverageComplete ?? true;
@@ -399,7 +400,7 @@ export function buildNewsResponse(
       dataSource,
       sourceFacets: result.sourceFacets,
       languageFacets: result.languageFacets,
-      generatedAt: new Date().toISOString(),
+      generatedAt: now.toISOString(),
       notice,
     },
   };
