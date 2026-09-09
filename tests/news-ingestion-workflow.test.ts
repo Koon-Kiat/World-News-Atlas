@@ -10,6 +10,15 @@ function success(body: string) {
     summary: { runId: "run-test", persisted: true, stagesProcessed: 4, stored: 10, storiesUpdated: 9, providersFailed: 0 } } };
 }
 describe("scheduled ingestion", () => {
+  it("reports bounded provider error codes without accepting raw messages or Markdown", () => {
+    const report = ingestionMarkdown([{ scope: "global", invocation: 1, success: false, attempts: 3, durationMs: 100,
+      category: "http_422", summary: { ...success('{}').json.summary, providerFailures: [
+        { provider: "GDELT", code: "REQUEST_FAILED" }, { provider: "NEWSAPI", code: "HTTP_401" },
+        { provider: "RSS", code: "secret|injected\ntext" }, { provider: "UNKNOWN", code: "HTTP_500" },
+      ] } }]);
+    expect(report).toContain("GDELT: REQUEST_FAILED, NEWSAPI: HTTP_401");
+    expect(report).not.toContain("secret"); expect(report).not.toContain("UNKNOWN");
+  });
   it("preserves cadence, manual dispatch, concurrency and a bounded job timeout", () => {
     const workflow = readFileSync(".github/workflows/news-ingestion.yml", "utf8");
     expect(workflow).toContain('cron: "*/30 * * * *"');

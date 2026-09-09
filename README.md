@@ -70,6 +70,8 @@ Transport failures and HTTP 408/425/429/500/502/503/504 receive at most three at
 
 See [optimization results and requirement audit](docs/optimization-results.md) for measurements, validation and limitations.
 
+Ingestion retries bypass cached provider failures while retaining successful-result caching and in-flight request coalescing. GDELT gets a separate 30-second request timeout because valid archive searches can exceed the general eight-second timeout. Its branch starts are spaced by 5.5 seconds per Worker, with one 31-second budget for queued requests and response bodies beneath the 32-second ingestion stage deadline. Successful branches retain their results and cursors while unfinished branches remain resumable. GDELT country searches use English-index terms with the existing original-language filters and publisher branches; short native phrases can be rejected even with HTTP 200. Recognized query rejection is terminal (`INVALID_QUERY`), while provider throttling returns a bounded 30-second `Retry-After` before the same logical request resumes. Workflow reports include sanitized provider names and error codes, so an upstream error is distinguishable from an internal or transport failure. After changing a Sites runtime secret, publish a saved version and verify the effective provider configuration through ingestion. To disable NewsAPI, explicitly clear `NEWSAPI_KEY` to an empty value before publishing; deleting the settings entry alone can leave a previously deployed Worker secret active.
+
 ## Quick start with no services or API keys
 
 Requirements: Node.js 24.15.0 or newer and npm.
@@ -105,6 +107,7 @@ The scheduled GitHub workflow never receives database credentials. It makes seve
 | `NEWS_INGEST_HMAC_SECRET` | Hosted ingestion | Server-only random secret shared with the GitHub workflow; use at least 32 characters. |
 | `NEWSAPI_KEY` | No | Enables NewsAPI ingestion. Missing credentials disable only this adapter. |
 | `GDELT_MODE` | No | `auto` (default) enables credential-free GDELT for 7d/30d country requests; `on` enables it wherever appropriate; `off` disables it. |
+| `NEWS_GDELT_TIMEOUT_MS` | No | GDELT request timeout; defaults to 30,000 ms and is bounded to 8,000–30,000 ms. Other providers retain their general timeout. |
 | `GDELT_ENABLED` | No | Legacy compatibility switch used only when `GDELT_MODE` is unset. |
 | `NEWS_FIXTURES_ENABLED` | No | Opts into fixture fallback for local development or ingestion tests; defaults to `false`. |
 | `NEWS_PROVIDER_TIMEOUT_MS` | No | External request timeout, clamped to 2–30 seconds; defaults to 8 seconds. |
