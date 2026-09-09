@@ -113,6 +113,14 @@ export function buildGdeltDiscoveryQueries(
   query: string,
   request: ProviderFetchRequest = {},
 ): string[] {
+  // DOC searches English translations. Native aliases such as "新加坡" are
+  // rejected as short phrases; language filters still select original coverage.
+  if (request.countries?.length && query === buildCountryDiscoveryQuery(request.countries)) {
+    query = discoveryProfilesForCountries(request.countries).map(({ primaryNames }) => {
+      const names = primaryNames.filter((name) => [...name].length >= 4).slice(0, 2).map((name) => `"${name}"`);
+      return names.length === 1 ? names[0] : `(${names.join(" OR ")})`;
+    }).join(" ");
+  }
   const explicitTargetDomains = [...new Set((request.sourceTargets ?? []).flatMap((target) => [
     ...target.domains,
     ...(target.providerIdentifiers.GDELT ?? []),
@@ -122,7 +130,7 @@ export function buildGdeltDiscoveryQueries(
     : "";
   const sourceCountry = gdeltSourceCountry(request);
   const sourceCountryFilter = sourceCountry ? `sourcecountry:${sourceCountry}` : "";
-  const base = [query, domainFilter, sourceCountryFilter].filter(Boolean).join(" AND ");
+  const base = [query, domainFilter, sourceCountryFilter].filter(Boolean).join(" ");
   const languages = gdeltLanguageNames(request);
   const primaryBranches = languages.length > 0
     ? languages.map((language) => `${base} sourcelang:${language}`)
@@ -211,7 +219,10 @@ export class GdeltProvider implements NewsProvider {
     const body = await boundedText(response.body, 2 * 1024 * 1024, AbortSignal.timeout(Math.max(1, deadline - Date.now())));
     let json: unknown;
     try { json = JSON.parse(body); }
-    catch { throw new ProviderError(this.name, "INVALID_RESPONSE", "GDELT response was not JSON"); }
+    catch {
+      const code = body.trim() === "The specified phrase is too short." ? "INVALID_QUERY" : "INVALID_RESPONSE";
+      throw new ProviderError(this.name, code, "GDELT response was not JSON");
+    }
     const parsed = gdeltResponseSchema.safeParse(json);
     if (!parsed.success) {
       throw new ProviderError(this.name, "INVALID_RESPONSE", "GDELT response was not usable");

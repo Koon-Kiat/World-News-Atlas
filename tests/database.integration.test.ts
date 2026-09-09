@@ -202,7 +202,7 @@ describe("D1 news integration", () => {
     expect(gdelt.fetchLatest).toHaveBeenCalledTimes(2);
   }, 20_000);
 
-  it.each(["HTTP_401", "HTTP_403", "HTTP_400", "PROVIDER_LIMIT", "MISSING_CREDENTIAL"])("does not rerun terminal provider failure %s", async (code) => {
+  it.each(["HTTP_401", "HTTP_403", "HTTP_400", "PROVIDER_LIMIT", "MISSING_CREDENTIAL", "INVALID_QUERY"])("does not rerun terminal provider failure %s", async (code) => {
     const secret = "integration-only-long-hmac-secret-at-least-32-chars";
     const now = new Date();
     const fetchLatest = vi.fn(async (): Promise<ProviderFetchResult> => { throw new ProviderError("RSS", code, "permanent"); });

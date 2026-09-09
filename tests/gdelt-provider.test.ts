@@ -1,9 +1,33 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildGdeltDiscoveryQueries, GdeltProvider, resetGdeltRequestPacingForTesting } from "@/lib/news/providers/gdelt";
+import { buildCountryDiscoveryQuery } from "@/lib/news/countries/discovery";
 
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); resetGdeltRequestPacingForTesting(); });
 
 describe("GDELT discovery planning", () => {
+  it.each(["SG", "JP", "CN", "AE", "GB"])("uses English-index country terms while preserving original-language branches for %s", (code) => {
+    const query = buildCountryDiscoveryQuery([code])!;
+    const branches = buildGdeltDiscoveryQueries(query, { countries: [code], sourcePerspective: "all" });
+    const existingLanes = buildGdeltDiscoveryQueries("climate", { countries: [code], sourcePerspective: "all" });
+    expect(branches.map((branch) => branch.match(/sourcelang:\w+/)?.[0]))
+      .toEqual(existingLanes.map((branch) => branch.match(/sourcelang:\w+/)?.[0]));
+    expect(branches.filter((branch) => /domainis:/.test(branch)).length)
+      .toBe(existingLanes.filter((branch) => /domainis:/.test(branch)).length);
+    expect(branches.every((branch) => !/[\u3400-\u9fff]/.test(branch))).toBe(true);
+    expect(branches.some((branch) => /Singapore|Japan|China|United/.test(branch))).toBe(true);
+    expect(branches.flatMap((branch) => [...branch.matchAll(/"([^"]+)"/gu)]).every((match) => [...match[1]].length >= 4)).toBe(true);
+  });
+
+  it("preserves explicit topic queries in a selected country", () => {
+    expect(buildGdeltDiscoveryQueries("climate", { countries: ["SG"] })[0]).toContain("climate");
+  });
+
+  it("recognizes an HTTP 200 query rejection as terminal instead of transient JSON failure", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("The specified phrase is too short.\n", { status: 200 })));
+    await expect(new GdeltProvider(30_000, 0).search('"新加坡"'))
+      .rejects.toMatchObject({ provider: "GDELT", code: "INVALID_QUERY" });
+  });
+
   it("preserves permanent HTTP failures across the discovery branches", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("Forbidden", { status: 403 })));
     await expect(new GdeltProvider(30_000, 0).search("Japan", {

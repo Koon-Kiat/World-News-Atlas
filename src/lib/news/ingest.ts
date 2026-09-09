@@ -109,7 +109,7 @@ function checkpointCoversWindow(
 
 export function terminalIngestionFailure(code: string | undefined): boolean {
   if (!code) return false;
-  if (code === "PROVIDER_LIMIT" || code === "MISSING_CREDENTIAL") return true;
+  if (code === "PROVIDER_LIMIT" || code === "MISSING_CREDENTIAL" || code === "INVALID_QUERY") return true;
   const status = Number(code.match(/^HTTP_(\d{3})$/)?.[1]);
   return Number.isInteger(status) && status >= 400 && status < 500 && ![408, 409, 425, 429].includes(status);
 }

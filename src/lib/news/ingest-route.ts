@@ -101,7 +101,9 @@ export async function handleIngestionRequest(request: Request, dependencies: Ing
     await beforeWork();
     const state = await store.ingestionRequests.finish(requestId, token,
       terminalFailure ? "FAILED_TERMINAL" : summary.providersFailed > 0 ? "FAILED_RETRYABLE" : "SUCCEEDED", summary, currentTime());
-    return Response.json({ requestId, state, summary }, { status: state === "SUCCEEDED" ? 200 : state === "FAILED_RETRYABLE" ? 503 : 422, headers: { "Cache-Control": "no-store" } });
+    const headers: Record<string, string> = { "Cache-Control": "no-store" };
+    if (state === "FAILED_RETRYABLE" && summary.providerFailures?.some(({ code }) => code === "HTTP_429")) headers["Retry-After"] = "30";
+    return Response.json({ requestId, state, summary }, { status: state === "SUCCEEDED" ? 200 : state === "FAILED_RETRYABLE" ? 503 : 422, headers });
   } catch (error) {
     let state: Exclude<IngestionRequestState, "RUNNING"> = terminalFailure || (error instanceof ProviderError && terminalIngestionFailure(error.code)) ? "FAILED_TERMINAL" : "FAILED_RETRYABLE";
     try { state = await store.ingestionRequests.finish(requestId, token, state, null, currentTime()); } catch {}
