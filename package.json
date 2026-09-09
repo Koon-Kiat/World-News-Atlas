@@ -32,7 +32,7 @@
     "drizzle-orm": "^0.45.2",
     "flag-icons": "^7.5.0",
     "i18n-iso-countries": "^7.14.0",
-    "next": "16.3.2",
+    "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "rss-parser": "^3.13.0",
@@ -60,7 +60,7 @@
     "@vitejs/plugin-rsc": "^0.5.26",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
-    "eslint-config-next": "16.3.2",
+    "eslint-config-next": "16.3.4",
     "jsdom": "^30.0.1",
     "miniflare": "^5.20260831.0-alpha",
     "react-server-dom-webpack": "^19.2.8",
@@ -75,6 +75,9 @@
   "overrides": {
     "@esbuild-kit/core-utils": {
       "esbuild": "^0.25.0"
+    },
+    "miniflare": {
+      "sharp": "0.35.4"
     }
   },
   "type": "module"
