@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildGdeltDiscoveryQueries, GdeltProvider } from "@/lib/news/providers/gdelt";
+import { buildGdeltDiscoveryQueries, GdeltProvider, resetGdeltRequestPacingForTesting } from "@/lib/news/providers/gdelt";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); resetGdeltRequestPacingForTesting(); });
 
 describe("GDELT discovery planning", () => {
   it("preserves permanent HTTP failures across the discovery branches", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("Forbidden", { status: 403 })));
-    await expect(new GdeltProvider().search("Japan", {
+    await expect(new GdeltProvider(30_000, 0).search("Japan", {
       countries: ["JP"], from: new Date("2026-09-07"), to: new Date("2026-09-08"),
     })).rejects.toMatchObject({ provider: "GDELT", code: "HTTP_403" });
   });
@@ -68,7 +68,7 @@ describe("GDELT discovery planning", () => {
       }] }), { status: 200 });
     }));
 
-    const provider = new GdeltProvider();
+    const provider = new GdeltProvider(30_000, 0);
     const first = await provider.search("Japan", {
       language: "en",
       from: new Date("2026-08-28T00:00:00Z"),
@@ -107,7 +107,7 @@ describe("GDELT discovery planning", () => {
       }] }), { status: 200 });
     }));
 
-    const provider = new GdeltProvider();
+    const provider = new GdeltProvider(30_000, 0);
     const result = await provider.search("world", {
       language: "en",
       period: "30d",
@@ -143,7 +143,7 @@ describe("GDELT discovery planning", () => {
       }] }), { status: 200 });
     }));
 
-    const provider = new GdeltProvider();
+    const provider = new GdeltProvider(30_000, 0);
     const request = {
       countries: ["JP"],
       from: new Date("2026-08-28T00:00:00Z"),
@@ -166,5 +166,62 @@ describe("GDELT discovery planning", () => {
     expect(requestedUrls).toHaveLength(3);
     expect(requestedUrls[2].searchParams.get("query")).toContain("sourcelang:japanese");
     expect(requestedUrls[2].searchParams.get("enddatetime")).toBe("20260830055959");
+  });
+});
+
+describe("GDELT request pacing", () => {
+  const request = {
+    language: "en", period: "30d" as const,
+    from: new Date("2026-08-02T00:00:00Z"), to: new Date("2026-09-01T00:00:00Z"), limit: 9,
+  };
+
+  it("spaces discovery branches instead of sending a throttled burst", async () => {
+    vi.useFakeTimers();
+    const started = Date.now();
+    const starts: number[] = [];
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      starts.push(Date.now() - started);
+      return Response.json({ articles: [] });
+    }));
+    const pending = new GdeltProvider().search("world", request);
+    await vi.advanceTimersByTimeAsync(11_000);
+    await pending;
+    expect(starts).toEqual([0, 5_500, 11_000]);
+  });
+
+  it("keeps completed branches and resumes timed-out work within one stage budget", async () => {
+    vi.useFakeTimers();
+    const urls: URL[] = [];
+    let slow = true;
+    vi.stubGlobal("fetch", vi.fn((input: string | URL, init?: RequestInit) => {
+      const url = new URL(String(input));
+      urls.push(url);
+      const respond = () => Response.json({ articles: [{
+        url: `https://example.com/${url.searchParams.get("startdatetime")}`,
+        title: "World report", seendate: `${url.searchParams.get("startdatetime")!.slice(0, 8)}T120000Z`,
+      }] });
+      if (!slow) return Promise.resolve(respond());
+      return new Promise<Response>((resolve, reject) => {
+        const timer = setTimeout(() => resolve(respond()), 21_000);
+        init?.signal?.addEventListener("abort", () => { clearTimeout(timer); reject(new Error("aborted")); }, { once: true });
+      });
+    }));
+    const provider = new GdeltProvider();
+    const pending = provider.search("world", request);
+    await vi.advanceTimersByTimeAsync(31_000);
+    const first = await pending;
+    expect(first.articles).toHaveLength(2);
+    expect(first.exhausted).toBe(false);
+    expect(Object.values(first.continuation!.discoveryCursors!)).toEqual([null, null]);
+
+    slow = false;
+    const resumed = provider.search("world", { ...request, continuation: first.continuation! });
+    await vi.advanceTimersByTimeAsync(11_000);
+    await resumed;
+    const firstStarts = urls.slice(0, 3).map((url) => url.searchParams.get("startdatetime"));
+    const resumedStarts = urls.slice(3).map((url) => url.searchParams.get("startdatetime"));
+    expect(resumedStarts[0]).toBe(firstStarts[2]);
+    expect(resumedStarts).not.toContain(firstStarts[0]);
+    expect(resumedStarts).not.toContain(firstStarts[1]);
   });
 });

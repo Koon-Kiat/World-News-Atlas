@@ -1,9 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createConfiguredProviders, gdeltModeFromEnvironment, gdeltTimeoutFromEnvironment, shouldEnableGdelt } from "@/lib/news/providers";
+import { resetGdeltRequestPacingForTesting } from "@/lib/news/providers/gdelt";
 
-afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.useRealTimers(); });
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.useRealTimers(); resetGdeltRequestPacingForTesting(); });
 
 describe("archive provider configuration", () => {
+  it("does not configure NewsAPI when its credential is removed or explicitly cleared", () => {
+    vi.stubEnv("NEWSAPI_KEY", undefined);
+    expect(createConfiguredProviders().some(({ name }) => name === "NEWSAPI")).toBe(false);
+    vi.stubEnv("NEWSAPI_KEY", "");
+    expect(createConfiguredProviders().some(({ name }) => name === "NEWSAPI")).toBe(false);
+  });
   it("allows a legitimate 21-second GDELT response independently of the eight-second general timeout", async () => {
     vi.useFakeTimers();
     vi.stubEnv("GDELT_MODE", "on"); vi.stubEnv("NEWS_PROVIDER_TIMEOUT_MS", "8000");
