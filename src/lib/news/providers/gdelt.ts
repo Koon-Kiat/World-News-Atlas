@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { boundedText } from "@/lib/bounded-stream";
 import {
   buildCountryDiscoveryQuery,
   discoveryProfilesForCountries,
@@ -47,6 +48,20 @@ const GDELT_LANGUAGE_NAMES_BY_CODE: Record<string, string> = Object.fromEntries(
   Object.entries(LANGUAGE_CODES).map(([name, code]) => [code, name]),
 );
 const GDELT_BRANCHES_PER_STAGE = 3;
+const GDELT_REQUEST_INTERVAL_MS = 5_500;
+const GDELT_STAGE_BUDGET_MS = 31_000;
+let nextRequestAt = 0;
+
+async function waitForRequestSlot(deadline: number, intervalMs: number): Promise<void> {
+  if (intervalMs <= 0) return;
+  const now = Date.now();
+  const startAt = Math.max(now, nextRequestAt);
+  if (startAt >= deadline) throw new ProviderError("GDELT", "STAGE_TIMEOUT", "GDELT request budget exhausted");
+  nextRequestAt = startAt + intervalMs;
+  if (startAt > now) await new Promise((resolve) => setTimeout(resolve, startAt - now));
+}
+
+export function resetGdeltRequestPacingForTesting(): void { nextRequestAt = 0; }
 
 const GDELT_SOURCE_COUNTRY_NAMES: Readonly<Record<string, string>> = {
   US: "unitedstates",
@@ -98,6 +113,14 @@ export function buildGdeltDiscoveryQueries(
   query: string,
   request: ProviderFetchRequest = {},
 ): string[] {
+  // DOC searches English translations. Native aliases such as "新加坡" are
+  // rejected as short phrases; language filters still select original coverage.
+  if (request.countries?.length && query === buildCountryDiscoveryQuery(request.countries)) {
+    query = discoveryProfilesForCountries(request.countries).map(({ primaryNames }) => {
+      const names = primaryNames.filter((name) => [...name].length >= 4).slice(0, 2).map((name) => `"${name}"`);
+      return names.length === 1 ? names[0] : `(${names.join(" OR ")})`;
+    }).join(" ");
+  }
   const explicitTargetDomains = [...new Set((request.sourceTargets ?? []).flatMap((target) => [
     ...target.domains,
     ...(target.providerIdentifiers.GDELT ?? []),
@@ -107,7 +130,7 @@ export function buildGdeltDiscoveryQueries(
     : "";
   const sourceCountry = gdeltSourceCountry(request);
   const sourceCountryFilter = sourceCountry ? `sourcecountry:${sourceCountry}` : "";
-  const base = [query, domainFilter, sourceCountryFilter].filter(Boolean).join(" AND ");
+  const base = [query, domainFilter, sourceCountryFilter].filter(Boolean).join(" ");
   const languages = gdeltLanguageNames(request);
   const primaryBranches = languages.length > 0
     ? languages.map((language) => `${base} sourcelang:${language}`)
@@ -157,12 +180,15 @@ export class GdeltProvider implements NewsProvider {
     requiresCredentials: false,
   } as const;
 
-  constructor(private readonly timeoutMs = 8_000) {}
+  constructor(private readonly timeoutMs = 30_000, private readonly requestIntervalMs = GDELT_REQUEST_INTERVAL_MS) {}
 
   private async request(
     query: string,
     request: ProviderFetchRequest = {},
+    deadline = Date.now() + GDELT_STAGE_BUDGET_MS,
   ): Promise<ProviderFetchResult> {
+    await waitForRequestSlot(deadline, this.requestIntervalMs);
+    if (Date.now() >= deadline) throw new ProviderError(this.name, "STAGE_TIMEOUT", "GDELT request budget exhausted");
     const url = new URL("https://api.gdeltproject.org/api/v2/doc/doc");
     url.searchParams.set("query", query);
     url.searchParams.set("mode", "artlist");
@@ -182,14 +208,22 @@ export class GdeltProvider implements NewsProvider {
 
     let response: Response;
     try {
-      response = await fetchWithTimeout(url, { headers: { Accept: "application/json" } }, this.timeoutMs);
+      response = await fetchWithTimeout(url, { headers: { Accept: "application/json" } }, Math.min(this.timeoutMs, deadline - Date.now()));
     } catch {
       throw new ProviderError(this.name, "REQUEST_FAILED", "GDELT request failed");
     }
     if (!response.ok) {
+      await response.body?.cancel();
       throw new ProviderError(this.name, `HTTP_${response.status}`, "GDELT returned an error");
     }
-    const parsed = gdeltResponseSchema.safeParse(await response.json());
+    const body = await boundedText(response.body, 2 * 1024 * 1024, AbortSignal.timeout(Math.max(1, deadline - Date.now())));
+    let json: unknown;
+    try { json = JSON.parse(body); }
+    catch {
+      const code = body.trim() === "The specified phrase is too short." ? "INVALID_QUERY" : "INVALID_RESPONSE";
+      throw new ProviderError(this.name, code, "GDELT response was not JSON");
+    }
+    const parsed = gdeltResponseSchema.safeParse(json);
     if (!parsed.success) {
       throw new ProviderError(this.name, "INVALID_RESPONSE", "GDELT response was not usable");
     }
@@ -249,6 +283,9 @@ export class GdeltProvider implements NewsProvider {
   }
 
   async search(query: string, request: ProviderFetchRequest = {}): Promise<ProviderFetchResult> {
+    // Space branch starts, but share one deadline. Slow/throttled branches keep
+    // their cursors pending without discarding branches that already succeeded.
+    const deadline = Date.now() + GDELT_STAGE_BUDGET_MS;
     const discoveryQueries = buildGdeltDiscoveryQueries(query, request);
     const discoveryBranches = gdeltDiscoveryBranches(discoveryQueries, request);
     const existingCursors = request.continuation?.discoveryCursors;
@@ -281,12 +318,14 @@ export class GdeltProvider implements NewsProvider {
           to: branch.to,
           limit: perBranchLimit,
           continuation: branchBefore ? { before: branchBefore } : undefined,
-        });
+        }, deadline);
       }),
     );
     const successful = settled.flatMap((result) => result.status === "fulfilled" ? result.value.articles : []);
     if (successful.length === 0 && settled.every((result) => result.status === "rejected")) {
-      throw new ProviderError(this.name, "REQUEST_FAILED", "GDELT discovery failed");
+      // Preserve HTTP/authentication errors instead of masking every failure as
+      // transient. The ingestion handler needs the code to decide retryability.
+      throw settled[0].reason;
     }
     const unique = new Map(successful.map((article) => [article.url, article]));
     const discoveryCursors: Record<string, string | null> = { ...existingCursors };

@@ -120,7 +120,10 @@ export function ingestionMarkdown(results) {
     "| --- | --- | ---: | --- | ---: | ---: | ---: | ---: | --- |"];
   for (const result of results) {
     const summary = result.summary;
-    lines.push(`| ${result.scope} (${result.invocation}) | ${result.success ? "Success" : "Failed"} | ${result.attempts} | ${summary?.runId ?? "—"} | ${summary?.stagesProcessed ?? "—"} | ${summary?.stored ?? "—"} | ${summary?.storiesUpdated ?? "—"} | ${(result.durationMs / 1000).toFixed(1)}s | ${result.category} |`);
+    const failures = Array.isArray(summary?.providerFailures) ? summary.providerFailures.slice(0, 4)
+      .filter((failure) => ["NEWSAPI", "GDELT", "RSS", "OTHER"].includes(failure?.provider) && /^[A-Z][A-Z0-9_]{0,63}$/.test(failure?.code ?? ""))
+      .map((failure) => `${failure.provider}: ${failure.code}`).join(", ") : "";
+    lines.push(`| ${result.scope} (${result.invocation}) | ${result.success ? "Success" : "Failed"} | ${result.attempts} | ${summary?.runId ?? "—"} | ${summary?.stagesProcessed ?? "—"} | ${summary?.stored ?? "—"} | ${summary?.storiesUpdated ?? "—"} | ${(result.durationMs / 1000).toFixed(1)}s | ${result.category}${failures ? ` (${failures})` : ""} |`);
   }
   return `${lines.join("\n")}\n`;
 }
