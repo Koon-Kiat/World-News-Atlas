@@ -55,6 +55,13 @@ export function validSummary(value) {
       Number.isSafeInteger(value[field]) && value[field] >= 0);
 }
 
+export function summaryHasUsefulProgress(value) {
+  if (!validSummary(value)) return false;
+  const progressFields = ["stored", "storiesUpdated", "received", "normalized", "accepted", "checkpointsCompleted"];
+  if (progressFields.some((field) => Number.isSafeInteger(value[field]) && value[field] > 0)) return true;
+  return Number.isSafeInteger(value.providersAttempted) && value.providersAttempted > value.providersFailed;
+}
+
 export async function runScheduledIngestion({ url, secret, bypassToken = "", period = "30d", runKey = randomUUID(),
   send = sendIngestionRequest, wait = sleep, random = Math.random, now = Date.now }) {
   const endpoint = new URL(url);
@@ -84,12 +91,19 @@ export async function runScheduledIngestion({ url, secret, bypassToken = "", per
         const response = await send(url, headers, body, Math.min(REQUEST_TIMEOUT_MS, deadline - now()));
         result.status = response.status;
         const json = response.json;
-        if (validSummary(json?.summary)) result.summary = json.summary;
+        const summaryValid = validSummary(json?.summary);
+        if (summaryValid) result.summary = json.summary;
+        const sameRequest = json?.requestId === requestId;
+        const completed = sameRequest && summaryValid && json.state === "SUCCEEDED";
+        const degraded = sameRequest && summaryValid && ["FAILED_RETRYABLE", "FAILED_TERMINAL"].includes(json.state) &&
+          summaryHasUsefulProgress(json.summary);
+        if (completed || degraded) {
+          result.success = true;
+          result.category = json.summary.providersFailed > 0 || degraded ? "degraded" : "success";
+          break;
+        }
         if (response.status >= 200 && response.status < 300) {
-          if (json?.requestId === requestId && json.state === "SUCCEEDED" && validSummary(json.summary) && json.summary.providersFailed === 0) {
-            result.success = true; result.category = "success"; break;
-          }
-          const pending = response.status === 202 && json?.requestId === requestId && ["RUNNING", "BUSY"].includes(json.state);
+          const pending = response.status === 202 && sameRequest && ["RUNNING", "BUSY"].includes(json.state);
           result.category = pending ? json.state.toLowerCase() : "invalid_response";
           if (pending) polls++; else failures++;
           retry = true;
@@ -123,7 +137,8 @@ export function ingestionMarkdown(results) {
     const failures = Array.isArray(summary?.providerFailures) ? summary.providerFailures.slice(0, 4)
       .filter((failure) => ["NEWSAPI", "GDELT", "RSS", "OTHER"].includes(failure?.provider) && /^[A-Z][A-Z0-9_]{0,63}$/.test(failure?.code ?? ""))
       .map((failure) => `${failure.provider}: ${failure.code}`).join(", ") : "";
-    lines.push(`| ${result.scope} (${result.invocation}) | ${result.success ? "Success" : "Failed"} | ${result.attempts} | ${summary?.runId ?? "—"} | ${summary?.stagesProcessed ?? "—"} | ${summary?.stored ?? "—"} | ${summary?.storiesUpdated ?? "—"} | ${(result.durationMs / 1000).toFixed(1)}s | ${result.category}${failures ? ` (${failures})` : ""} |`);
+    const label = result.success ? result.category === "degraded" ? "Degraded" : "Success" : "Failed";
+    lines.push(`| ${result.scope} (${result.invocation}) | ${label} | ${result.attempts} | ${summary?.runId ?? "—"} | ${summary?.stagesProcessed ?? "—"} | ${summary?.stored ?? "—"} | ${summary?.storiesUpdated ?? "—"} | ${(result.durationMs / 1000).toFixed(1)}s | ${result.category}${failures ? ` (${failures})` : ""} |`);
   }
   return `${lines.join("\n")}\n`;
 }
