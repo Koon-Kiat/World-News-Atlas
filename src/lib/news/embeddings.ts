@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { boundedText } from "@/lib/bounded-stream";
 
 export interface TextEmbeddingProvider {
   readonly id: string;
@@ -14,6 +15,7 @@ const embeddingResponseSchema = z.object({
 
 const OPENAI_EMBEDDINGS_URL = "https://api.openai.com/v1/embeddings";
 const MAX_BATCH_SIZE = 64;
+const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 
 function boundedTimeout(value: string | undefined): number {
   const parsed = Number(value ?? 5_000);
@@ -34,13 +36,14 @@ export class OpenAiTextEmbeddingProvider implements TextEmbeddingProvider {
 
   async embed(texts: string[]): Promise<number[][]> {
     const embeddings: number[][] = [];
-    for (let offset = 0; offset < texts.length; offset += MAX_BATCH_SIZE) {
-      const batch = texts.slice(offset, offset + MAX_BATCH_SIZE);
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), this.timeoutMs);
-      let response: Response;
-      try {
-        response = await fetch(OPENAI_EMBEDDINGS_URL, {
+    // One budget covers all batches and their bodies; headers alone do not
+    // complete a request. Clustering can fall back when this optional work ends.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    try {
+      for (let offset = 0; offset < texts.length; offset += MAX_BATCH_SIZE) {
+        const batch = texts.slice(offset, offset + MAX_BATCH_SIZE);
+        const response = await fetch(OPENAI_EMBEDDINGS_URL, {
           method: "POST",
           signal: controller.signal,
           headers: {
@@ -49,22 +52,25 @@ export class OpenAiTextEmbeddingProvider implements TextEmbeddingProvider {
           },
           body: JSON.stringify({ model: this.model, input: batch }),
         });
-      } finally {
-        clearTimeout(timer);
+        if (!response.ok) {
+          await response.body?.cancel();
+          throw new Error(`Embedding provider returned HTTP ${response.status}`);
+        }
+        const parsed = embeddingResponseSchema.safeParse(JSON.parse(await boundedText(response.body, MAX_RESPONSE_BYTES, controller.signal)));
+        if (!parsed.success || parsed.data.data.length !== batch.length) {
+          throw new Error("Embedding provider returned an invalid response");
+        }
+        const ordered = [...parsed.data.data].sort((first, second) => first.index - second.index);
+        const dimension = ordered[0]?.embedding.length;
+        if (!dimension || ordered.some((entry, index) => entry.index !== index || entry.embedding.length !== dimension)) {
+          throw new Error("Embedding provider returned inconsistent vectors");
+        }
+        embeddings.push(...ordered.map(({ embedding }) => embedding));
       }
-      if (!response.ok) throw new Error(`Embedding provider returned HTTP ${response.status}`);
-      const parsed = embeddingResponseSchema.safeParse(await response.json());
-      if (!parsed.success || parsed.data.data.length !== batch.length) {
-        throw new Error("Embedding provider returned an invalid response");
-      }
-      const ordered = [...parsed.data.data].sort((first, second) => first.index - second.index);
-      const dimension = ordered[0]?.embedding.length;
-      if (!dimension || ordered.some((entry, index) => entry.index !== index || entry.embedding.length !== dimension)) {
-        throw new Error("Embedding provider returned inconsistent vectors");
-      }
-      embeddings.push(...ordered.map(({ embedding }) => embedding));
+      return embeddings;
+    } finally {
+      clearTimeout(timer);
     }
-    return embeddings;
   }
 }
 
