@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildGdeltDiscoveryQueries, GdeltProvider, resetGdeltRequestPacingForTesting } from "@/lib/news/providers/gdelt";
 import { buildCountryDiscoveryQuery } from "@/lib/news/countries/discovery";
+import { MemoryGdeltRateControl } from "@/lib/news/providers/gdelt-rate-control";
 
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); resetGdeltRequestPacingForTesting(); });
 
@@ -199,6 +200,58 @@ describe("GDELT request pacing", () => {
     from: new Date("2026-08-02T00:00:00Z"), to: new Date("2026-09-01T00:00:00Z"), limit: 9,
   };
 
+  it.each([429, 503])("persists HTTP %s cooldown, stops further branches, and recovers after expiry", async (status) => {
+    vi.useFakeTimers();
+    const fetch = vi.fn().mockResolvedValueOnce(new Response("busy", { status, headers: { "Retry-After": "60" } }))
+      .mockImplementation(async () => Response.json({ articles: [] }));
+    vi.stubGlobal("fetch", fetch);
+    const control = new MemoryGdeltRateControl();
+    const first = new GdeltProvider(30_000, 0, control);
+    const second = new GdeltProvider(30_000, 0, control);
+    await expect(first.search("world", request)).rejects.toMatchObject({ code: `HTTP_${status}`, retryAfterMs: expect.any(Number) });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await expect(second.search("world", request)).rejects.toMatchObject({ code: "PROVIDER_COOLDOWN" });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(61_000);
+    const recovered = await second.search("world", request);
+    expect(recovered.failures).toEqual([]);
+    expect(fetch).toHaveBeenCalledTimes(4);
+  });
+
+  it("retains useful branches and the exact pending cursor through repeated throttling", async () => {
+    vi.useFakeTimers();
+    const urls: string[] = [];
+    let calls = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL) => {
+      urls.push(String(input)); calls++;
+      return calls === 1 ? Response.json({ articles: [] }) : new Response("busy", { status: 429, headers: { "Retry-After": "30" } });
+    }));
+    const provider = new GdeltProvider(30_000, 0, new MemoryGdeltRateControl());
+    const first = await provider.search("world", request);
+    expect(first.failures?.[0].code).toBe("HTTP_429");
+    expect(Object.values(first.continuation!.discoveryCursors!)).toEqual([null]);
+    expect(first.exhausted).toBe(false);
+    await vi.advanceTimersByTimeAsync(31_000);
+    await expect(provider.search("world", { ...request, continuation: first.continuation! })).rejects.toMatchObject({ code: "HTTP_429" });
+    expect(urls[2]).toBe(urls[1]); expect(urls[2]).not.toBe(urls[0]);
+  });
+
+  it.each(["not JSON", '{"wrong": []}', '{"articles":[{"url":1}]}'])("rejects malformed success payload %s", async (payload) => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(payload)));
+    await expect(new GdeltProvider(30_000, 0).search("world")).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+  });
+
+  it("cancels a stalled response body at the request timeout", async () => {
+    vi.useFakeTimers();
+    const cancel = vi.fn();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(new ReadableStream({ cancel }))));
+    const pending = new GdeltProvider(100, 0).search("world");
+    const assertion = expect(pending).rejects.toMatchObject({ code: "STAGE_TIMEOUT" });
+    await vi.advanceTimersByTimeAsync(100);
+    await assertion;
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
   it("spaces discovery branches instead of sending a throttled burst", async () => {
     vi.useFakeTimers();
     const started = Date.now();
@@ -234,18 +287,18 @@ describe("GDELT request pacing", () => {
     const pending = provider.search("world", request);
     await vi.advanceTimersByTimeAsync(31_000);
     const first = await pending;
-    expect(first.articles).toHaveLength(2);
+    expect(first.articles).toHaveLength(1);
     expect(first.exhausted).toBe(false);
-    expect(Object.values(first.continuation!.discoveryCursors!)).toEqual([null, null]);
+    expect(Object.values(first.continuation!.discoveryCursors!)).toEqual([null]);
+    expect(first.failures).toEqual([{ provider: "GDELT", code: "STAGE_TIMEOUT" }]);
 
     slow = false;
     const resumed = provider.search("world", { ...request, continuation: first.continuation! });
     await vi.advanceTimersByTimeAsync(11_000);
     await resumed;
-    const firstStarts = urls.slice(0, 3).map((url) => url.searchParams.get("startdatetime"));
-    const resumedStarts = urls.slice(3).map((url) => url.searchParams.get("startdatetime"));
-    expect(resumedStarts[0]).toBe(firstStarts[2]);
+    const firstStarts = urls.slice(0, 2).map((url) => url.searchParams.get("startdatetime"));
+    const resumedStarts = urls.slice(2).map((url) => url.searchParams.get("startdatetime"));
+    expect(resumedStarts[0]).toBe(firstStarts[1]);
     expect(resumedStarts).not.toContain(firstStarts[0]);
-    expect(resumedStarts).not.toContain(firstStarts[1]);
   });
 });

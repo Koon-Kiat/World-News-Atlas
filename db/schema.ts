@@ -138,8 +138,15 @@ export const ingestionLogicalRequests = sqliteTable("ingestion_logical_request",
   updatedAt: integer("updated_at").notNull(),
   attempts: integer("attempts").notNull().default(0), attemptToken: text("attempt_token").notNull().default(""),
   planJson: text("plan_json"), terminalFailure: integer("terminal_failure", { mode: "boolean" }).notNull().default(false),
+  retryAt: integer("retry_at").notNull().default(0),
 }, (table) => [index("ingestion_logical_expiry_idx").on(table.expiresAt), index("ingestion_logical_state_lease_idx").on(table.state, table.leaseUntil)]);
 export const ingestionOperationLock = sqliteTable("ingestion_operation_lock", {
   id: text("id").primaryKey(), requestId: text("request_id").notNull(), leaseUntil: integer("lease_until").notNull(),
   attemptToken: text("attempt_token").notNull().default(""),
+});
+
+export const providerRequestControl = sqliteTable("provider_request_control", {
+  provider: text("provider").primaryKey(), nextRequestAt: integer("next_request_at").notNull(),
+  cooldownUntil: integer("cooldown_until").notNull(), failures: integer("failures").notNull(),
+  lastFailureAt: integer("last_failure_at").notNull(),
 });

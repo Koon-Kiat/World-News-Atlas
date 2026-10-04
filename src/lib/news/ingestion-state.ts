@@ -54,7 +54,7 @@ export interface IngestionStateStore {
   save(checkpoint: IngestionCheckpoint): Promise<void>;
   startStage(stage: IngestionStageRecord): Promise<string | null>;
   finishStage(id: string | null, result: IngestionStageResult): Promise<void>;
-  nextCountryBatch(size: number): Promise<string[]>;
+  nextCountryBatch(size: number, mode?: IngestionMode): Promise<string[]>;
 }
 
 export const HIGH_VOLUME_COUNTRIES = ["US", "GB", "CN", "JP", "SG", "DE", "FR", "IN", "AU", "CA"] as const;

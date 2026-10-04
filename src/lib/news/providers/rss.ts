@@ -7,7 +7,8 @@ import { publicationDateInRange, trustedPublicationDate } from "../publication-d
 import { registrableDomain } from "../sources/domain";
 import { metadataExcerpt } from "../text";
 import type { ProviderArticle, ProviderFetchRequest, ProviderFetchResult } from "../types";
-import { type NewsProvider, ProviderError } from "./provider";
+import { branchFailures, rejectProviderResponse, throwBranchFailure, type NewsProvider, ProviderError } from "./provider";
+import { boundedText } from "@/lib/bounded-stream";
 
 const MAX_FEED_BYTES = 2 * 1024 * 1024;
 const FEEDS_PER_STAGE = 4;
@@ -116,38 +117,40 @@ export async function assertTrustedFeedUrl(value: string): Promise<URL> {
   return url;
 }
 
-async function fetchFeed(feedUrl: string, timeoutMs: number): Promise<string> {
-  let current = await assertTrustedFeedUrl(feedUrl);
+async function fetchFeed(feedUrl: string, timeoutMs: number, parentSignal?: AbortSignal): Promise<string> {
+  const controller = new AbortController();
+  const signal = parentSignal ? AbortSignal.any([parentSignal, controller.signal]) : controller.signal;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+  let current: URL;
+  try { current = await assertTrustedFeedUrl(feedUrl); }
+  catch { throw new ProviderError("RSS", "INVALID_CONFIGURATION", "RSS feed URL is not trusted"); }
   for (let redirect = 0; redirect <= 2; redirect += 1) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    let response: Response;
-    try {
-      response = await fetch(current, {
+      const response = await fetch(current, {
         redirect: "manual",
-        signal: controller.signal,
+        signal,
         headers: {
           Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml",
           "User-Agent": "WorldNewsAtlas/1.0",
         },
       });
-    } finally {
-      clearTimeout(timer);
-    }
     if (response.status >= 300 && response.status < 400) {
+      await response.body?.cancel();
       const location = response.headers.get("location");
-      if (!location || redirect === 2) throw new Error("RSS redirect could not be followed safely");
-      current = await assertTrustedFeedUrl(new URL(location, current).toString());
+      if (!location || redirect === 2) throw new ProviderError("RSS", "INVALID_RESPONSE", "RSS redirect limit exceeded");
+      try { current = await assertTrustedFeedUrl(new URL(location, current).toString()); }
+      catch { throw new ProviderError("RSS", "INVALID_RESPONSE", "RSS redirect is not trusted"); }
       continue;
     }
-    if (!response.ok) throw new Error(`RSS feed returned HTTP ${response.status}`);
-    const declaredLength = Number(response.headers.get("content-length") ?? 0);
-    if (declaredLength > MAX_FEED_BYTES) throw new Error("RSS feed exceeds the size limit");
-    const bytes = await response.arrayBuffer();
-    if (bytes.byteLength > MAX_FEED_BYTES) throw new Error("RSS feed exceeds the size limit");
-    return new TextDecoder().decode(bytes);
+    if (!response.ok) await rejectProviderResponse("RSS", response);
+    try { return await boundedText(response.body, MAX_FEED_BYTES, signal); }
+    catch { throw new ProviderError("RSS", signal.aborted ? "STAGE_TIMEOUT" : "RESPONSE_TOO_LARGE", "RSS feed body could not be accepted"); }
   }
-  throw new Error("RSS redirect limit exceeded");
+  throw new ProviderError("RSS", "INVALID_RESPONSE", "RSS redirect limit exceeded");
+  } catch (error) {
+    if (error instanceof ProviderError) throw error;
+    throw new ProviderError("RSS", signal.aborted ? "STAGE_TIMEOUT" : "REQUEST_FAILED", "RSS request failed");
+  } finally { clearTimeout(timer); }
 }
 
 export class RssProvider implements NewsProvider {
@@ -213,8 +216,10 @@ export class RssProvider implements NewsProvider {
     });
     const settled = await Promise.allSettled(
       feeds.map(async (feed) => {
-        const xml = await fetchFeed(feed.feedUrl, this.timeoutMs);
-        const parsed = await this.parser.parseString(xml);
+        const xml = await fetchFeed(feed.feedUrl, this.timeoutMs, request.signal);
+        let parsed;
+        try { parsed = await this.parser.parseString(xml); }
+        catch { throw new ProviderError(this.name, "INVALID_RESPONSE", "RSS response was not usable"); }
         let truncatedDescriptionCount = 0;
         const articles = parsed.items.flatMap<ProviderArticle>((item, index) => {
           const publishedAt = trustedPublicationDate([item.isoDate, item.pubDate]);
@@ -262,14 +267,15 @@ export class RssProvider implements NewsProvider {
       ),
     });
     if (feeds.length > 0 && articles.length === 0 && settled.every((result) => result.status === "rejected")) {
-      throw new ProviderError(this.name, "ALL_FEEDS_FAILED", "All configured RSS feeds failed");
+      throwBranchFailure(this.name, settled);
     }
-    feeds.forEach(({ feedUrl }) => completedPlanIds.add(feedUrl));
-    const nextOffset = offset + feeds.length;
+    successful.forEach(({ feed: { feedUrl } }) => completedPlanIds.add(feedUrl));
+    const nextOffset = completedPlanIds.size;
     const exhausted = perspectiveFeeds.every(({ feedUrl }) => completedPlanIds.has(feedUrl));
     return {
       provider: this.name,
       articles,
+      failures: branchFailures(this.name, settled),
       receivedAt: new Date().toISOString(),
       continuation: exhausted ? null : { offset: nextOffset, completedPlanIds: [...completedPlanIds] },
       exhausted,

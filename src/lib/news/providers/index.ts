@@ -2,6 +2,7 @@ import { z } from "zod";
 import { DEFAULT_RSS_FEEDS, type RssFeedConfig } from "@/config/news-sources";
 import { MemoryTtlCache } from "../bounded-cache";
 import { logNews } from "../logger";
+import { IngestionError } from "../ingestion-outcome";
 import { canonicalSourceId, domainFromUrl } from "../sources/registry";
 import type {
   NewsPeriod,
@@ -10,13 +11,14 @@ import type {
   ProviderCoverageProgress,
   ProviderFetchRequest,
   ProviderFetchResult,
+  ProviderFailure,
   ProviderName,
 } from "../types";
 import { BingNewsProvider } from "./bing-news";
 import { GdeltProvider } from "./gdelt";
 import { NewsApiProvider } from "./newsapi";
 import type { NewsProvider } from "./provider";
-import { ProviderError } from "./provider";
+import { providerFailure } from "./provider";
 import { RssProvider } from "./rss";
 
 const rssFeedSchema = z.object({
@@ -63,8 +65,7 @@ export function rssFeedsFromEnvironment(): RssFeedConfig[] {
       coverageCountries: feed.coverageCountries?.map((code) => code.toUpperCase()),
     }));
   } catch {
-    logNews("warn", "rss_config_invalid", { configured: true });
-    return DEFAULT_RSS_FEEDS;
+    throw new IngestionError("INVALID_CONFIGURATION");
   }
 }
 
@@ -73,9 +74,11 @@ export type GdeltMode = "auto" | "on" | "off";
 export function gdeltModeFromEnvironment(): GdeltMode {
   const configured = process.env.GDELT_MODE?.trim().toLowerCase();
   if (configured === "auto" || configured === "on" || configured === "off") return configured;
+  if (configured) throw new IngestionError("INVALID_CONFIGURATION");
   const legacy = process.env.GDELT_ENABLED?.trim().toLowerCase();
   if (legacy === "true") return "on";
   if (legacy === "false") return "off";
+  if (legacy) throw new IngestionError("INVALID_CONFIGURATION");
   return "auto";
 }
 
@@ -111,7 +114,7 @@ export function createConfiguredProviders(options: { period?: NewsPeriod; countr
 
 export interface ProviderBatchResult {
   articles: ProviderArticle[];
-  failures: Array<{ provider: ProviderName; code: string }>;
+  failures: ProviderFailure[];
   providerCounts: Partial<Record<ProviderName, number>>;
   continuations: Partial<Record<ProviderName, ProviderContinuationState | null>>;
   exhaustedProviders: ProviderName[];
@@ -121,7 +124,7 @@ export interface ProviderBatchResult {
 
 interface ProviderOutcome {
   result?: ProviderFetchResult;
-  failure?: { provider: ProviderName; code: string };
+  failure?: ProviderFailure;
 }
 
 const PROVIDER_RESULT_TTL_MS = 5 * 60_000;
@@ -165,9 +168,9 @@ async function fetchProviderOnce(
     });
     return { result };
   } catch (error) {
-    const code = error instanceof ProviderError ? error.code : "UNEXPECTED_FAILURE";
-    logNews("warn", "provider_fetch_failed", { provider: provider.name, code });
-    return { failure: { provider: provider.name, code } };
+    const failure = providerFailure(provider.name, error);
+    logNews("warn", "provider_fetch_failed", { ...failure });
+    return { failure };
   }
 }
 
@@ -175,22 +178,29 @@ async function fetchProviderCached(
   provider: NewsProvider,
   request: ProviderFetchRequest,
   ignoreCachedFailures = false,
+  deadlineMs = 32_000,
 ): Promise<ProviderOutcome> {
   const key = providerRequestKey(provider, request);
   const cached = providerResultCache.get(key);
-  if (cached && !(cached.failure && ignoreCachedFailures)) return cached;
+  if (cached && !((cached.failure || cached.result?.failures?.length) && ignoreCachedFailures)) return cached;
 
   const existing = providerRequestsInFlight.get(key);
   if (existing) return existing;
 
-  while (providerRequestsInFlight.size >= MAX_PROVIDER_CACHE_ENTRIES) {
-    const oldestKey = providerRequestsInFlight.keys().next().value;
-    if (oldestKey === undefined) break;
-    providerRequestsInFlight.delete(oldestKey);
-  }
+  // Never evict active work: that permits the same request to start again.
+  if (providerRequestsInFlight.size >= MAX_PROVIDER_CACHE_ENTRIES) return { failure: { provider: provider.name, code: "PROVIDER_BUSY" } };
 
-  const pending = fetchProviderOnce(provider, request).then((outcome) => {
-    const ttlMs = outcome.failure
+  const controller = new AbortController();
+  const signal = request.signal ? AbortSignal.any([request.signal, controller.signal]) : controller.signal;
+  let timer: ReturnType<typeof setTimeout>;
+  const deadline = new Promise<ProviderOutcome>((resolve) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      resolve({ failure: { provider: provider.name, code: "STAGE_TIMEOUT" } });
+    }, deadlineMs);
+  });
+  const pending = Promise.race([fetchProviderOnce(provider, { ...request, signal }), deadline]).then((outcome) => {
+    const ttlMs = outcome.failure || outcome.result?.failures?.length
       ? PROVIDER_FAILURE_TTL_MS
       : outcome.result?.articles.length
         ? PROVIDER_RESULT_TTL_MS
@@ -202,6 +212,7 @@ async function fetchProviderCached(
   try {
     return await pending;
   } finally {
+    clearTimeout(timer!);
     if (providerRequestsInFlight.get(key) === pending) providerRequestsInFlight.delete(key);
   }
 }
@@ -212,7 +223,7 @@ async function fetchProviderWithinDeadline(
   deadlineMs: number | undefined,
   ignoreCachedFailures: boolean | undefined,
 ): Promise<ProviderOutcome> {
-  const pending = fetchProviderCached(provider, request, ignoreCachedFailures);
+  const pending = fetchProviderCached(provider, request, ignoreCachedFailures, deadlineMs);
   if (deadlineMs === undefined) return pending;
 
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -256,6 +267,7 @@ export async function fetchProviderArticlesGracefully(
   outcomes.forEach((outcome, index) => {
     const provider = providers[index];
     if (outcome.result) {
+      failures.push(...(outcome.result.failures ?? []));
       articles.push(...outcome.result.articles);
       providerCounts[provider.name] = outcome.result.articles.length;
       continuations[provider.name] = outcome.result.continuation ?? null;

@@ -6,6 +6,12 @@ afterEach(() => {
 });
 
 describe("NewsAPI provider", () => {
+  it.each(["not JSON", '{"status":"ok"}', '{"status":"error","sources":[]}'])("rejects malformed source metadata: %s", async (body) => {
+    const fetchMock = vi.fn(async () => new Response(body));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(new NewsApiProvider("test-key").fetchLatest()).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
   it("retries without a date range when NewsAPI rejects hosted date parameters", async () => {
     const requestedUrls: string[] = [];
     const fetchMock = vi.fn(async (input: string | URL) => {

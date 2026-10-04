@@ -239,6 +239,8 @@ export interface ProviderArticle {
 }
 
 export interface ProviderFetchRequest {
+  /** Cancels the whole stage, including pacing, metadata, redirects and bodies. */
+  signal?: AbortSignal;
   from?: Date;
   to?: Date;
   query?: string;
@@ -262,6 +264,8 @@ export interface ProviderCapabilities {
 export interface ProviderFetchResult {
   provider: ProviderName;
   articles: ProviderArticle[];
+  /** Partial branch failures remain visible alongside successful articles. */
+  failures?: ProviderFailure[];
   receivedAt: string;
   continuation?: ProviderContinuationState | null;
   exhausted?: boolean;
@@ -275,6 +279,12 @@ export interface ProviderFetchResult {
     countryQueries?: string[];
     outOfWindow?: number;
   };
+}
+
+export interface ProviderFailure {
+  provider: ProviderName;
+  code: string;
+  retryAfterMs?: number;
 }
 
 export interface NormalizedArticle extends ArticleView {

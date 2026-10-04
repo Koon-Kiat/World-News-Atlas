@@ -11,13 +11,15 @@ import {
 } from "./ingestion-state";
 import { getConfiguredNewsStore } from "./configured-store";
 import { logNews } from "./logger";
+import { IngestionError, terminalIngestionFailure } from "./ingestion-outcome";
+export { terminalIngestionFailure } from "./ingestion-outcome";
 import { normalizeProviderArticles } from "./normalize";
 import { newsPeriodHours } from "./periods";
 import { persistStoryCandidates } from "./persistence";
 import { createConfiguredProviders, fetchProviderArticlesGracefully } from "./providers";
 import type { NewsProvider } from "./providers/provider";
 import type { NewsStore } from "./store";
-import type { NewsPeriod, NewsQuery, ProviderContinuationState, ProviderName } from "./types";
+import type { NewsPeriod, NewsQuery, ProviderContinuationState, ProviderFailure } from "./types";
 
 const DEFAULT_STAGE_LIMIT = 24;
 const DEFAULT_COUNTRY_BATCH_SIZE = 8;
@@ -31,7 +33,8 @@ export interface IngestionSummary {
   stagesProcessed: number;
   providersAttempted: number;
   providersFailed: number;
-  providerFailures?: Array<{ provider: ProviderName; code: string }>;
+  providerFailures?: ProviderFailure[];
+  usefulStages?: number;
   received: number;
   normalized: number;
   articlesWithCountries: number;
@@ -63,6 +66,7 @@ export interface NewsIngestionOptions {
   beforeWork?: () => Promise<void>;
   onPlan?: (plan: IngestionPlan) => Promise<void>;
   onTerminalFailure?: () => Promise<void>;
+  deadline?: number;
 }
 
 export interface IngestionPlan {
@@ -102,16 +106,9 @@ function checkpointCoversWindow(
   windowStart: Date,
   windowEnd: Date,
 ): boolean {
-  if (!checkpoint || checkpoint.status === "FAILED" || (!checkpoint.coverageComplete && !checkpoint.exhausted)) return false;
+  if (!checkpoint || checkpoint.status !== "SUCCEEDED" || (!checkpoint.coverageComplete && !checkpoint.exhausted)) return false;
   return new Date(checkpoint.windowStart).getTime() <= windowStart.getTime() &&
     new Date(checkpoint.windowEnd).getTime() >= windowEnd.getTime();
-}
-
-export function terminalIngestionFailure(code: string | undefined): boolean {
-  if (!code) return false;
-  if (code === "PROVIDER_LIMIT" || code === "MISSING_CREDENTIAL" || code === "INVALID_QUERY") return true;
-  const status = Number(code.match(/^HTTP_(\d{3})$/)?.[1]);
-  return Number.isInteger(status) && status >= 400 && status < 500 && ![408, 409, 425, 429].includes(status);
 }
 
 function extendedWindow(
@@ -138,7 +135,7 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
   const snapshotFrom = new Date(snapshotTo.getTime() - newsPeriodHours(period) * 3_600_000);
   const store = options.store ?? (options.persist === false ? null : await getConfiguredNewsStore());
   const shouldPersist = options.persist ?? Boolean(store);
-  if (shouldPersist && !store) throw new Error("D1 persistence was requested but the Sites DB binding is unavailable");
+  if (shouldPersist && !store) throw new IngestionError("STORAGE_UNAVAILABLE");
   const stateStore = options.stateStore ?? store ?? new MemoryIngestionStateStore();
   const stageLimit = boundedNumber(options.stageLimit ?? Number(process.env.NEWS_INGESTION_STAGE_LIMIT), DEFAULT_STAGE_LIMIT, 1, 200);
   const countryBatchSize = boundedNumber(options.countryBatchSize ?? Number(process.env.NEWS_INGESTION_COUNTRY_BATCH_SIZE), DEFAULT_COUNTRY_BATCH_SIZE, 1, 40);
@@ -148,9 +145,10 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
     stageLimit,
     providersForAllShards.length,
   );
+  await options.beforeWork?.();
   const countries = options.countries !== undefined
     ? [...new Set(options.countries.map((code) => code.toUpperCase()))]
-    : options.providers ? [] : await stateStore.nextCountryBatch(effectiveCountryBatchSize);
+    : options.providers ? [] : await stateStore.nextCountryBatch(effectiveCountryBatchSize, mode);
   const shards: Array<string | null> = countries.length > 0 ? countries : [null];
   // Persist the resolved scope/window before any provider or story writes.
   // A transport retry then resumes these checkpoints, not the next rotation.
@@ -164,6 +162,7 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
     stagesProcessed: 0,
     providersAttempted: 0,
     providersFailed: 0,
+    usefulStages: 0,
     providerFailures: [],
     received: 0,
     normalized: 0,
@@ -189,9 +188,13 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
     for (const provider of providers) {
       summary.providersAttempted += 1;
       const discoveryKey = discoveryKeyFor({ mode, countryCode, period });
-      const prior = await stateStore.load(discoveryKey, provider.name);
+      const saved = await stateStore.load(discoveryKey, provider.name);
+      // Old windows cannot claim coverage across an unobserved gap. Incremental
+      // discovery also must not stay trapped in a snapshot outside its period.
+      const prior = saved && new Date(saved.windowEnd).getTime() >= snapshotFrom.getTime() ? saved : null;
       if (checkpointCoversWindow(prior, snapshotFrom, snapshotTo)) {
         summary.checkpointsCompleted += 1;
+        summary.usefulStages! += 1;
         continue;
       }
       const reusable = prior && !prior.coverageComplete && !prior.exhausted;
@@ -202,6 +205,7 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
       const providerWindowEnd = reusable ? new Date(prior.windowEnd) : requestedWindow.to;
       if (providerWindowStart.getTime() >= providerWindowEnd.getTime()) {
         summary.checkpointsCompleted += 1;
+        summary.usefulStages! += 1;
         continue;
       }
       let continuation: ProviderContinuationState | null = reusable ? prior.cursor : null;
@@ -251,7 +255,7 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
         };
         const search = countryCode ? buildCountryDiscoveryQuery([countryCode]) : undefined;
         const batch = await fetchProviderArticlesGracefully([provider], search && provider.name !== "RSS" ? { ...request, query: search } : request, {
-          deadlineMs: 32_000, ignoreCachedFailures: true,
+          deadlineMs: Math.max(1, Math.min(32_000, (options.deadline ?? Infinity) - Date.now())), ignoreCachedFailures: true,
         });
         await options.beforeWork?.();
         if (batch.failures.some((failure) => terminalIngestionFailure(failure.code))) {
@@ -275,7 +279,7 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
         const deduplicated = deduplicateArticles(runUnique);
         deduplicated.articles.forEach(({ canonicalUrl }) => seenCanonicalUrls.add(canonicalUrl));
         summary.accepted += deduplicated.articles.length;
-        summary.duplicatesRemoved += relevant.accepted.length - deduplicated.articles.length + deduplicated.duplicateCount;
+        summary.duplicatesRemoved += relevant.accepted.length - deduplicated.articles.length;
 
         let stored = 0;
         let storiesUpdated = 0;
@@ -286,11 +290,11 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
           summary.stored += stored;
           summary.storiesUpdated += storiesUpdated;
         }
+        if (batch.failures.length === 0 || stored > 0) summary.usefulStages! += 1;
 
         continuation = batch.continuations[provider.name] ?? (batch.failures.length ? continuation : null);
         exhausted = batch.exhaustedProviders.includes(provider.name);
         const stageFailure = batch.failures[0];
-        if (terminalIngestionFailure(stageFailure?.code)) exhausted = true;
         const mergedCoverage = mergeCoverage(checkpoint, batch.providerCoverage[provider.name]);
         coverageComplete = mergedCoverage.coverageComplete;
         checkpoint = {
@@ -300,7 +304,7 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
           language: null,
           mode,
           status: stageFailure
-            ? terminalIngestionFailure(stageFailure.code) ? "PARTIAL" : "FAILED"
+            ? "FAILED"
             : exhausted || coverageComplete ? "SUCCEEDED" : "PARTIAL",
           windowStart: checkpointWindowStart.toISOString(),
           windowEnd: checkpointWindowEnd.toISOString(),
@@ -316,7 +320,7 @@ export async function runNewsIngestion(options: NewsIngestionOptions = {}): Prom
         };
         await options.beforeWork?.();
         await stateStore.save(checkpoint);
-        if (coverageComplete || exhausted) summary.checkpointsCompleted += 1;
+        if (!stageFailure && (coverageComplete || exhausted)) summary.checkpointsCompleted += 1;
         await stateStore.finishStage(stageId, {
           status: stageFailure ? "FAILED" : exhausted || coverageComplete ? "SUCCEEDED" : "PARTIAL",
           cursor: continuation,

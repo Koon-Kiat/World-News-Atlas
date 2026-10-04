@@ -3,7 +3,8 @@ import { logNews } from "../logger";
 import { publicationDateInRange, trustedPublicationDate } from "../publication-date";
 import type { ProviderArticle, ProviderFetchRequest, ProviderFetchResult } from "../types";
 import { historicalDiscoveryWindows } from "./historical-windows";
-import { fetchWithTimeout, type NewsProvider, ProviderError } from "./provider";
+import { branchFailures, fetchProviderText, throwBranchFailure, type NewsProvider, ProviderError } from "./provider";
+import { terminalIngestionFailure } from "../ingestion-outcome";
 
 const newsApiResponseSchema = z.object({
   status: z.string(),
@@ -24,15 +25,14 @@ const newsApiResponseSchema = z.object({
 });
 
 const newsApiSourcesSchema = z.object({
-  status: z.string(),
+  status: z.literal("ok"),
   sources: z
     .array(
       z.object({
         id: z.string(),
         country: z.string().regex(/^[a-z]{2}$/).optional(),
       }),
-    )
-    .default([]),
+    ),
 });
 
 const NEWSAPI_LANGUAGES = new Set(["ar", "de", "en", "es", "fr", "he", "it", "nl", "no", "pt", "ru", "sv", "ud", "zh"]);
@@ -58,27 +58,31 @@ export class NewsApiProvider implements NewsProvider {
     if (!apiKey.trim()) throw new ProviderError(this.name, "MISSING_CREDENTIAL", "NewsAPI is disabled");
   }
 
-  private async fetchSourceCountries(): Promise<Map<string, string>> {
+  private async fetchSourceCountries(signal?: AbortSignal): Promise<Map<string, string>> {
     if (this.sourceCountriesCache && this.sourceCountriesCache.expiresAt > Date.now()) {
       return this.sourceCountriesCache.value;
     }
     if (this.sourceCountriesInFlight) return this.sourceCountriesInFlight;
     const pending = (async () => {
       try {
-        const response = await fetchWithTimeout(
+        const { text } = await fetchProviderText(this.name,
           "https://newsapi.org/v2/top-headlines/sources",
-          { headers: { "X-Api-Key": this.apiKey, Accept: "application/json" } },
+          { headers: { "X-Api-Key": this.apiKey, Accept: "application/json" }, signal },
           this.timeoutMs,
         );
-        if (!response.ok) return new Map<string, string>();
-        const parsed = newsApiSourcesSchema.safeParse(await response.json());
-        if (!parsed.success || parsed.data.status !== "ok") return new Map<string, string>();
+        let json: unknown;
+        try { json = JSON.parse(text); }
+        catch { throw new ProviderError(this.name, "INVALID_RESPONSE", "NewsAPI metadata was not JSON"); }
+        const parsed = newsApiSourcesSchema.safeParse(json);
+        if (!parsed.success) throw new ProviderError(this.name, "INVALID_RESPONSE", "NewsAPI metadata was not usable");
         return new Map(
           parsed.data.sources.flatMap((source) =>
             source.country ? [[source.id, source.country.toUpperCase()] as const] : [],
           ),
         );
-      } catch {
+      } catch (error) {
+        if (signal?.aborted || error instanceof ProviderError && terminalIngestionFailure(error.code)) throw error;
+        logNews("warn", "newsapi_source_metadata_unavailable", { provider: this.name });
         return new Map<string, string>();
       }
     })();
@@ -96,7 +100,7 @@ export class NewsApiProvider implements NewsProvider {
     query: string,
     request: ProviderFetchRequest = {},
   ): Promise<ProviderFetchResult> {
-    const sourceCountries = await this.fetchSourceCountries();
+    const sourceCountries = await this.fetchSourceCountries(request.signal);
     const url = new URL("https://newsapi.org/v2/everything");
     url.searchParams.set("q", query);
     url.searchParams.set("sortBy", "publishedAt");
@@ -130,35 +134,34 @@ export class NewsApiProvider implements NewsProvider {
       sourceIdentifierCount: sourceIdentifiers.length,
       domainCount: domains.length,
     });
-    let response: Response;
+    let text: string;
     let retriedWithoutHostedDates = false;
     try {
-      response = await fetchWithTimeout(
+      ({ text } = await fetchProviderText(this.name,
         url,
-        { headers: { "X-Api-Key": this.apiKey, Accept: "application/json" } },
+        { headers: { "X-Api-Key": this.apiKey, Accept: "application/json" }, signal: request.signal },
         this.timeoutMs,
-      );
-      if (response.status === 400 && (url.searchParams.has("from") || url.searchParams.has("to"))) {
+      ));
+    } catch (error) {
+      if (error instanceof ProviderError && error.code === "HTTP_400" && (url.searchParams.has("from") || url.searchParams.has("to"))) {
         url.searchParams.delete("from");
         url.searchParams.delete("to");
         retriedWithoutHostedDates = true;
-        response = await fetchWithTimeout(
+        ({ text } = await fetchProviderText(this.name,
           url,
-          { headers: { "X-Api-Key": this.apiKey, Accept: "application/json" } },
+          { headers: { "X-Api-Key": this.apiKey, Accept: "application/json" }, signal: request.signal },
           this.timeoutMs,
-        );
+        ));
+      } else {
+        if (error instanceof ProviderError && error.code === "HTTP_426") throw new ProviderError(this.name, "PROVIDER_LIMIT", "NewsAPI plan result limit was reached");
+        throw error;
       }
-    } catch {
-      throw new ProviderError(this.name, "REQUEST_FAILED", "NewsAPI request failed");
     }
-    if (!response.ok) {
-      if (response.status === 426) {
-        throw new ProviderError(this.name, "PROVIDER_LIMIT", "NewsAPI plan result limit was reached");
-      }
-      throw new ProviderError(this.name, `HTTP_${response.status}`, "NewsAPI returned an error");
-    }
-    const parsed = newsApiResponseSchema.safeParse(await response.json());
-    if (!parsed.success || parsed.data.status !== "ok") {
+    let json: unknown;
+    try { json = JSON.parse(text); }
+    catch { throw new ProviderError(this.name, "INVALID_RESPONSE", "NewsAPI response was not JSON"); }
+    const parsed = newsApiResponseSchema.safeParse(json);
+    if (!parsed.success || parsed.data.status !== "ok" || !parsed.data.articles) {
       throw new ProviderError(this.name, "INVALID_RESPONSE", "NewsAPI response was not usable");
     }
     if (retriedWithoutHostedDates) {
@@ -284,9 +287,7 @@ export class NewsApiProvider implements NewsProvider {
     })));
     const successful = settled.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
     if (successful.length === 0) {
-      const rejected = settled.find((result) => result.status === "rejected");
-      if (rejected?.status === "rejected") throw rejected.reason;
-      throw new ProviderError(this.name, "REQUEST_FAILED", "NewsAPI historical discovery failed");
+      throwBranchFailure(this.name, settled);
     }
 
     const discoveryPages: Record<string, number | null> = { ...existingPages };
@@ -306,6 +307,7 @@ export class NewsApiProvider implements NewsProvider {
     return {
       provider: this.name,
       articles: dated.slice(0, request.limit ?? 100),
+      failures: branchFailures(this.name, settled),
       receivedAt: new Date().toISOString(),
       continuation: exhausted ? null : {
         discoveryPages,

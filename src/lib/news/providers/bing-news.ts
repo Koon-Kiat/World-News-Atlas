@@ -9,7 +9,7 @@ import { inferArticleLanguage } from "../language";
 import { logNews } from "../logger";
 import { publicationDateInRange, trustedPublicationDate } from "../publication-date";
 import type { ProviderArticle, ProviderFetchRequest, ProviderFetchResult } from "../types";
-import { fetchWithTimeout, type NewsProvider, ProviderError } from "./provider";
+import { branchFailures, fetchProviderText, throwBranchFailure, type NewsProvider, ProviderError } from "./provider";
 
 const MAX_FEED_BYTES = 2 * 1024 * 1024;
 const MAX_DISCOVERY_QUERIES = 18;
@@ -219,34 +219,20 @@ export class BingNewsProvider implements NewsProvider {
     url.searchParams.set("format", "rss");
     url.searchParams.set("mkt", plan.market);
 
-    let response: Response;
-    try {
-      response = await fetchWithTimeout(
+    const { text: xml } = await fetchProviderText(this.name,
         url,
         {
+          signal: request.signal,
           headers: {
             Accept: "application/rss+xml, application/xml, text/xml",
             "User-Agent": "WorldNewsAtlas/1.0",
           },
         },
-        this.timeoutMs,
+        this.timeoutMs, MAX_FEED_BYTES,
       );
-    } catch {
-      throw new ProviderError(this.name, "REQUEST_FAILED", "Bing News RSS request failed");
-    }
-    if (!response.ok) {
-      throw new ProviderError(this.name, `HTTP_${response.status}`, "Bing News RSS returned an error");
-    }
-    const declaredLength = Number(response.headers.get("content-length") ?? 0);
-    if (declaredLength > MAX_FEED_BYTES) {
-      throw new ProviderError(this.name, "RESPONSE_TOO_LARGE", "Bing News RSS response was too large");
-    }
-    const xml = await response.text();
-    if (new TextEncoder().encode(xml).byteLength > MAX_FEED_BYTES) {
-      throw new ProviderError(this.name, "RESPONSE_TOO_LARGE", "Bing News RSS response was too large");
-    }
-
-    const parsed = await this.parser.parseString(xml);
+    let parsed;
+    try { parsed = await this.parser.parseString(xml); }
+    catch { throw new ProviderError(this.name, "INVALID_RESPONSE", "Bing News RSS response was not usable"); }
     const articles = parsed.items.flatMap<ProviderArticle>((item, index) => {
       const articleUrl = originalArticleUrl(item.link);
       if (!articleUrl || !item.title) return [];
@@ -321,16 +307,17 @@ export class BingNewsProvider implements NewsProvider {
     );
     const successful = settled.flatMap((result) => result.status === "fulfilled" ? result.value.articles : []);
     if (successful.length === 0 && settled.every((result) => result.status === "rejected")) {
-      throw new ProviderError(this.name, "REQUEST_FAILED", "Bing News RSS discovery failed");
+      throwBranchFailure(this.name, settled);
     }
     const unique = new Map<string, ProviderArticle>();
     for (const article of successful) unique.set(article.url, article);
-    stagePlans.forEach(({ id }) => completedPlanIds.add(id));
-    const nextOffset = offset + stagePlans.length;
+    stagePlans.forEach(({ id }, index) => { if (settled[index].status === "fulfilled") completedPlanIds.add(id); });
+    const nextOffset = completedPlanIds.size;
     const exhausted = discoveryPlans.every(({ id }) => completedPlanIds.has(id));
     return {
       provider: this.name,
       articles: [...unique.values()].slice(0, request.limit ?? 250),
+      failures: branchFailures(this.name, settled),
       receivedAt: new Date().toISOString(),
       continuation: exhausted ? null : {
         offset: nextOffset,
