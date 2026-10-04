@@ -192,7 +192,7 @@ class FailingProvider implements NewsProvider {
 
   fetchLatest(): Promise<ProviderFetchResult> {
     this.calls += 1;
-    return Promise.reject(new Error("temporary provider failure"));
+    return Promise.reject(new ProviderError(this.name, "REQUEST_FAILED", "temporary provider failure"));
   }
 
   search(): Promise<ProviderFetchResult> {
@@ -420,7 +420,7 @@ describe("incremental live corpus", () => {
     expect(first.corpusComplete).toBe(false);
     expect(first.discoveryExhausted).toBe(false);
 
-    await vi.advanceTimersByTimeAsync(1_501);
+    await vi.advanceTimersByTimeAsync(31_001);
     const final = await loadNewsDataset(query(1));
     const response = buildNewsResponse(
       final.stories,
@@ -430,11 +430,33 @@ describe("incremental live corpus", () => {
       final,
     );
 
-    expect(failing.calls).toBe(1);
+    expect(failing.calls).toBe(2);
     expect(final.corpusComplete).toBe(true);
     expect(final.discoveryExhausted).toBe(true);
     expect(final.coverageStatus).toBe("degraded");
     expect(response.meta).toMatchObject({ hasMore: false, nextPage: null });
+  });
+
+  it("keeps successful branch continuation while respecting a transient provider cooldown", async () => {
+    const provider = new PagedProvider("GDELT", 5);
+    const fetchLatest = provider.fetchLatest.bind(provider);
+    const fetch = vi.spyOn(provider, "fetchLatest").mockImplementationOnce(async (request = {}) => ({
+      ...await fetchLatest({ ...request, limit: 1 }),
+      failures: [{ provider: "GDELT", code: "HTTP_429", retryAfterMs: 60_000 }],
+    }));
+    setLiveProviderFactoryForTesting(() => [provider]);
+    const first = await loadNewsDataset(query(1));
+    expect(first.stories).toHaveLength(1);
+    expect(first.coverageDegraded).toBe(true);
+    expect(first.coverageReasons).toContain("PROVIDER_GDELT_RATE_LIMITED");
+    await vi.advanceTimersByTimeAsync(59_999);
+    await loadNewsDataset(query(1));
+    expect(fetch).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(2);
+    const recovered = await loadNewsDataset(query(1));
+    expect(provider.offsets).toEqual([0, 1]);
+    expect(recovered.stories).toHaveLength(5);
+    expect(recovered.discoveryExhausted).toBe(true);
   });
 
   it("marks an expired process-local continuation as reset instead of silently reusing it", async () => {
