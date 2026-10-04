@@ -30,12 +30,14 @@ export function useSearchHistory() {
     if (!value) return;
     const next = [value, ...readHistory().filter((item) => item.toLocaleLowerCase("en") !== value.toLocaleLowerCase("en"))]
       .slice(0, MAX_HISTORY_ITEMS);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); }
+    catch { /* Search remains usable when browser storage is unavailable. */ }
     setHistory(next);
   }, []);
 
   const clear = useCallback(() => {
-    window.localStorage.removeItem(STORAGE_KEY);
+    try { window.localStorage.removeItem(STORAGE_KEY); }
+    catch { /* Clear the in-memory list even when persistent storage is blocked. */ }
     setHistory([]);
   }, []);
 

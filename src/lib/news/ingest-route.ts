@@ -8,6 +8,8 @@ import type { IngestionRequestState } from "./ingestion-requests";
 import { ProviderError } from "./providers/provider";
 import { logNews } from "./logger";
 import type { NewsStore } from "./store";
+import { classifyIngestionOutcome, ingestionFailureKind, IngestionError, ingestionRetryAfterMs } from "./ingestion-outcome";
+import type { IngestionSummary } from "./ingest";
 
 const MAX_BODY_BYTES = 1_024;
 const requestSchema = z.object({
@@ -27,6 +29,24 @@ interface IngestionHandlerDependencies {
 
 function jsonError(status: number, error: string, requestId: string): Response {
   return Response.json({ error, requestId }, { status, headers: { "Cache-Control": "no-store" } });
+}
+
+function operationResponse(requestId: string, state: Exclude<IngestionRequestState, "RUNNING">, summary?: IngestionSummary,
+  retryAfterMs = ingestionRetryAfterMs(summary?.providerFailures), attempts?: number, reason?: string): Response {
+  const accepted = state === "SUCCEEDED" || state === "DEGRADED";
+  const outcome = accepted ? state === "SUCCEEDED" ? "SUCCESS" : "DEGRADED"
+    : state === "FAILED_TERMINAL" ? "TERMINAL_FAILURE" : "RETRYABLE_FAILURE";
+  return Response.json({ requestId, state, outcome, summary, attempts, retryEligible: state === "FAILED_RETRYABLE",
+    reason: reason ?? (state === "RETRY_BUDGET_EXHAUSTED" ? "RETRY_BUDGET_EXHAUSTED" : undefined), retryAfterMs }, {
+    status: accepted ? 200 : state === "FAILED_TERMINAL" ? 422 : 503,
+    headers: { "Cache-Control": "no-store", ...(retryAfterMs > 0 ? { "Retry-After": String(Math.ceil(retryAfterMs / 1000)) } : {}) },
+  });
+}
+
+function internalFailureCode(error: unknown): "INVALID_STATE" | "STORAGE_UNAVAILABLE" {
+  // Database schema/integrity faults require operator repair. Never print SQL.
+  return error instanceof Error && /no such (?:table|column)|has no column|SQLITE_SCHEMA|syntax error|constraint failed/i.test(error.message)
+    ? "INVALID_STATE" : "STORAGE_UNAVAILABLE";
 }
 
 export async function handleIngestionRequest(request: Request, dependencies: IngestionHandlerDependencies = {}): Promise<Response> {
@@ -53,6 +73,7 @@ export async function handleIngestionRequest(request: Request, dependencies: Ing
   let store: NewsStore;
   let token: string;
   let plan: IngestionPlan | undefined;
+  let attempts: number | undefined;
   try {
     const configured = dependencies.store === undefined ? await getConfiguredNewsStore() : dependencies.store;
     if (!configured) return jsonError(503, "Ingestion storage is unavailable.", requestId);
@@ -62,25 +83,30 @@ export async function handleIngestionRequest(request: Request, dependencies: Ing
     const digest = createHash("sha256").update(rawBody).digest("hex");
     const claim = await store.ingestionRequests.claim(requestId, digest, now);
     if (claim.state === "CONFLICT") return jsonError(409, "Logical request does not match the accepted operation.", requestId);
-    if (claim.state === "SUCCEEDED") return Response.json({ requestId, state: claim.state, summary: claim.summary }, { headers: { "Cache-Control": "no-store" } });
-    if (claim.state === "FAILED_TERMINAL") return Response.json({ requestId, state: claim.state, error: "The accepted operation cannot be retried.", summary: claim.summary }, { status: 422, headers: { "Cache-Control": "no-store" } });
+    if (claim.state === "SUCCEEDED" || claim.state === "DEGRADED" || claim.state === "FAILED_TERMINAL" || claim.state === "FAILED_RETRYABLE" || claim.state === "RETRY_BUDGET_EXHAUSTED") {
+      return operationResponse(requestId, claim.state, claim.summary, claim.retryAfterMs, claim.attempts);
+    }
     if (claim.state === "RUNNING" || claim.state === "BUSY") return Response.json({ requestId, state: claim.state }, {
       status: 202, headers: { "Cache-Control": "no-store", "Retry-After": "15" },
     });
     if (claim.state !== "ACCEPTED") throw new Error("Unexpected ingestion claim");
     token = claim.token;
+    store = store.forIngestion?.(requestId, token) ?? store;
     plan = claim.plan;
-  } catch {
-    logNews("error", "ingestion_request_storage_failed", { requestId });
+    attempts = claim.attempts;
+  } catch (error) {
+    const code = error instanceof IngestionError ? error.code : internalFailureCode(error);
+    logNews("error", "ingestion_request_storage_failed", { requestId, code });
+    if (ingestionFailureKind(code) === "terminal") return operationResponse(requestId, "FAILED_TERMINAL", undefined, 0, undefined, code);
     return jsonError(503, "Ingestion storage is temporarily unavailable.", requestId);
   }
   const deadline = Date.now() + 150_000;
   let nextRenewalAt = 0;
   const currentTime = () => dependencies.now?.() ?? new Date();
   const beforeWork = async () => {
-    if (Date.now() >= deadline) throw new Error("Ingestion deadline exceeded");
+    if (Date.now() >= deadline) throw new IngestionError("OPERATION_TIMEOUT");
     if (Date.now() < nextRenewalAt) return;
-    if (!await store.ingestionRequests.renew(requestId, token, currentTime())) throw new Error("Ingestion lease expired");
+    if (!await store.ingestionRequests.renew(requestId, token, currentTime())) throw new IngestionError("LEASE_LOST");
     nextRenewalAt = Date.now() + 10_000;
   };
   let terminalFailure = false;
@@ -96,19 +122,22 @@ export async function handleIngestionRequest(request: Request, dependencies: Ing
         terminalFailure = true;
         await store.ingestionRequests.markTerminalFailure(requestId, token, currentTime());
       },
-      store, stateStore: store, persist: true, beforeWork,
+      store, stateStore: store, persist: true, beforeWork, deadline,
     });
     await beforeWork();
+    const outcome = terminalFailure ? "TERMINAL_FAILURE" : classifyIngestionOutcome(summary);
     const state = await store.ingestionRequests.finish(requestId, token,
-      terminalFailure ? "FAILED_TERMINAL" : summary.providersFailed > 0 ? "FAILED_RETRYABLE" : "SUCCEEDED", summary, currentTime());
-    const headers: Record<string, string> = { "Cache-Control": "no-store" };
-    if (state === "FAILED_RETRYABLE" && summary.providerFailures?.some(({ code }) => code === "HTTP_429")) headers["Retry-After"] = "30";
-    return Response.json({ requestId, state, summary }, { status: state === "SUCCEEDED" ? 200 : state === "FAILED_RETRYABLE" ? 503 : 422, headers });
+      outcome === "SUCCESS" ? "SUCCEEDED" : outcome === "DEGRADED" ? "DEGRADED" : outcome === "TERMINAL_FAILURE" ? "FAILED_TERMINAL" : "FAILED_RETRYABLE", summary, currentTime());
+    logNews(outcome === "DEGRADED" ? "warn" : outcome === "SUCCESS" ? "info" : "error", "ingestion_request_completed", {
+      requestId, outcome, state, attempts, stored: summary.stored, providerFailures: summary.providerFailures,
+    });
+    return operationResponse(requestId, state, summary, undefined, attempts);
   } catch (error) {
-    let state: Exclude<IngestionRequestState, "RUNNING"> = terminalFailure || (error instanceof ProviderError && terminalIngestionFailure(error.code)) ? "FAILED_TERMINAL" : "FAILED_RETRYABLE";
-    try { state = await store.ingestionRequests.finish(requestId, token, state, null, currentTime()); } catch {}
-    logNews("error", "ingestion_request_failed", { requestId });
-    if (state === "FAILED_TERMINAL") return Response.json({ requestId, state, error: "The accepted operation cannot be retried." }, { status: 422, headers: { "Cache-Control": "no-store" } });
-    return jsonError(500, "Ingestion did not complete.", requestId);
+    const code = error instanceof IngestionError || error instanceof ProviderError ? error.code : internalFailureCode(error);
+    let state: Exclude<IngestionRequestState, "RUNNING"> = terminalFailure || terminalIngestionFailure(code) ? "FAILED_TERMINAL" : "FAILED_RETRYABLE";
+    try { state = await store.ingestionRequests.finish(requestId, token, state, null, currentTime()); }
+    catch { logNews("error", "ingestion_request_finalize_failed", { requestId, code: "STORAGE_OR_LEASE_FAILURE" }); }
+    logNews("error", "ingestion_request_failed", { requestId, code, state });
+    return operationResponse(requestId, state, undefined, 0, attempts, code);
   }
 }

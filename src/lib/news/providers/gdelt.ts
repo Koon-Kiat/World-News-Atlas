@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { boundedText } from "@/lib/bounded-stream";
 import {
   buildCountryDiscoveryQuery,
   discoveryProfilesForCountries,
@@ -9,8 +8,9 @@ import { countryNameToCode, getCountryName } from "../countries/metadata";
 import { logNews } from "../logger";
 import { publicationDateInRange, trustedPublicationDate } from "../publication-date";
 import type { ProviderArticle, ProviderFetchRequest, ProviderFetchResult } from "../types";
-import { fetchWithTimeout, type NewsProvider, ProviderError } from "./provider";
+import { branchFailures, fetchProviderText, throwBranchFailure, type NewsProvider, ProviderError } from "./provider";
 import { historicalDiscoveryWindows } from "./historical-windows";
+import { configuredGdeltRateControl, GDELT_REQUEST_INTERVAL_MS, resetGdeltRateControlForTesting, waitForProviderSlot, type GdeltRateControl } from "./gdelt-rate-control";
 
 const gdeltResponseSchema = z.object({
   articles: z
@@ -24,8 +24,7 @@ const gdeltResponseSchema = z.object({
         language: z.string().optional(),
         sourcecountry: z.string().optional(),
       }),
-    )
-    .default([]),
+    ),
 });
 
 const LANGUAGE_CODES: Record<string, string> = {
@@ -48,20 +47,8 @@ const GDELT_LANGUAGE_NAMES_BY_CODE: Record<string, string> = Object.fromEntries(
   Object.entries(LANGUAGE_CODES).map(([name, code]) => [code, name]),
 );
 const GDELT_BRANCHES_PER_STAGE = 3;
-const GDELT_REQUEST_INTERVAL_MS = 5_500;
 const GDELT_STAGE_BUDGET_MS = 31_000;
-let nextRequestAt = 0;
-
-async function waitForRequestSlot(deadline: number, intervalMs: number): Promise<void> {
-  if (intervalMs <= 0) return;
-  const now = Date.now();
-  const startAt = Math.max(now, nextRequestAt);
-  if (startAt >= deadline) throw new ProviderError("GDELT", "STAGE_TIMEOUT", "GDELT request budget exhausted");
-  nextRequestAt = startAt + intervalMs;
-  if (startAt > now) await new Promise((resolve) => setTimeout(resolve, startAt - now));
-}
-
-export function resetGdeltRequestPacingForTesting(): void { nextRequestAt = 0; }
+export const resetGdeltRequestPacingForTesting = resetGdeltRateControlForTesting;
 
 const GDELT_SOURCE_COUNTRY_NAMES: Readonly<Record<string, string>> = {
   US: "unitedstates",
@@ -180,14 +167,27 @@ export class GdeltProvider implements NewsProvider {
     requiresCredentials: false,
   } as const;
 
-  constructor(private readonly timeoutMs = 30_000, private readonly requestIntervalMs = GDELT_REQUEST_INTERVAL_MS) {}
+  constructor(private readonly timeoutMs = 30_000, private readonly requestIntervalMs = GDELT_REQUEST_INTERVAL_MS,
+    private readonly rateControl?: GdeltRateControl) {}
 
   private async request(
     query: string,
     request: ProviderFetchRequest = {},
     deadline = Date.now() + GDELT_STAGE_BUDGET_MS,
   ): Promise<ProviderFetchResult> {
-    await waitForRequestSlot(deadline, this.requestIntervalMs);
+    const control = this.rateControl ?? await configuredGdeltRateControl();
+    // Reserve only a start that can happen now. Crashes cannot strand a queue.
+    while (true) {
+      if (request.signal?.aborted || Date.now() >= deadline) throw new ProviderError(this.name, "STAGE_TIMEOUT", "GDELT request budget exhausted");
+      let slot;
+      try { slot = await control.acquire(Date.now(), this.requestIntervalMs); }
+      catch { throw new ProviderError(this.name, "STORAGE_UNAVAILABLE", "Provider coordination unavailable"); }
+      if (slot.granted) break;
+      if (slot.cooldown || Date.now() + slot.waitMs >= deadline) {
+        throw new ProviderError(this.name, slot.cooldown ? "PROVIDER_COOLDOWN" : "PROVIDER_BUSY", "GDELT request deferred", slot.waitMs);
+      }
+      await waitForProviderSlot(slot.waitMs, request.signal);
+    }
     if (Date.now() >= deadline) throw new ProviderError(this.name, "STAGE_TIMEOUT", "GDELT request budget exhausted");
     const url = new URL("https://api.gdeltproject.org/api/v2/doc/doc");
     url.searchParams.set("query", query);
@@ -206,17 +206,16 @@ export class GdeltProvider implements NewsProvider {
     url.searchParams.set("startdatetime", gdeltApiDate(rangeStart));
     url.searchParams.set("enddatetime", gdeltApiDate(rangeEnd));
 
-    let response: Response;
-    try {
-      response = await fetchWithTimeout(url, { headers: { Accept: "application/json" } }, Math.min(this.timeoutMs, deadline - Date.now()));
-    } catch {
-      throw new ProviderError(this.name, "REQUEST_FAILED", "GDELT request failed");
-    }
-    if (!response.ok) {
-      await response.body?.cancel();
-      throw new ProviderError(this.name, `HTTP_${response.status}`, "GDELT returned an error");
-    }
-    const body = await boundedText(response.body, 2 * 1024 * 1024, AbortSignal.timeout(Math.max(1, deadline - Date.now())));
+    const { text: body } = await fetchProviderText(this.name, url,
+      { headers: { Accept: "application/json" }, signal: request.signal }, Math.min(this.timeoutMs, deadline - Date.now()),
+      2 * 1024 * 1024, async (response) => {
+        if (![429, 503].includes(response.status)) return;
+        await response.body?.cancel();
+        let delay: number;
+        try { delay = await control.defer(response.headers.get("retry-after"), Date.now(), Math.floor(Math.random() * 1000)); }
+        catch { throw new ProviderError(this.name, "STORAGE_UNAVAILABLE", "Provider cooldown could not be saved"); }
+        throw new ProviderError(this.name, `HTTP_${response.status}`, "GDELT request deferred", delay);
+      });
     let json: unknown;
     try { json = JSON.parse(body); }
     catch {
@@ -309,29 +308,34 @@ export class GdeltProvider implements NewsProvider {
       };
     }
     const perBranchLimit = Math.max(1, Math.ceil((request.limit ?? 250) / activeBranches.length));
-    const settled = await Promise.allSettled(
-      activeBranches.map((branch) => {
+    const settled: PromiseSettledResult<ProviderFetchResult>[] = [];
+    for (const branch of activeBranches) {
         const branchBefore = existingCursors?.[branch.id] ?? request.continuation?.before;
-        return this.request(branch.query, {
+        try { settled.push({ status: "fulfilled", value: await this.request(branch.query, {
           ...request,
           from: branch.from,
           to: branch.to,
           limit: perBranchLimit,
           continuation: branchBefore ? { before: branchBefore } : undefined,
-        }, deadline);
-      }),
-    );
+        }, deadline) }); }
+        catch (reason) {
+          settled.push({ status: "rejected", reason });
+          // No extra branch requests after a failure; the remaining branches
+          // retain their cursor and a future operation can resume them.
+          break;
+        }
+    }
     const successful = settled.flatMap((result) => result.status === "fulfilled" ? result.value.articles : []);
     if (successful.length === 0 && settled.every((result) => result.status === "rejected")) {
       // Preserve HTTP/authentication errors instead of masking every failure as
       // transient. The ingestion handler needs the code to decide retryability.
-      throw settled[0].reason;
+      throwBranchFailure(this.name, settled);
     }
     const unique = new Map(successful.map((article) => [article.url, article]));
     const discoveryCursors: Record<string, string | null> = { ...existingCursors };
     activeBranches.forEach((branch, index) => {
       const result = settled[index];
-      if (result.status === "fulfilled") {
+      if (result?.status === "fulfilled") {
         discoveryCursors[branch.id] = result.value.continuation?.before ?? null;
       }
     });
@@ -349,6 +353,7 @@ export class GdeltProvider implements NewsProvider {
     return {
       provider: this.name,
       articles: [...unique.values()].slice(0, request.limit ?? 250),
+      failures: branchFailures(this.name, settled),
       receivedAt: new Date().toISOString(),
       continuation: exhausted
         ? null
@@ -371,7 +376,7 @@ export class GdeltProvider implements NewsProvider {
       },
       diagnostics: {
         received: fulfilled.reduce((total, result) => total + (result.diagnostics?.received ?? result.articles.length), 0),
-        plansAttempted: activeBranches.length,
+        plansAttempted: settled.length,
         plansCompleted: discoveryBranches.filter(({ id }) => discoveryCursors[id] === null).length,
         languages: gdeltLanguageNames(request),
         countryQueries: activeBranches.map(({ query: branchQuery }) => branchQuery),

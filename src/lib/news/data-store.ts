@@ -5,6 +5,8 @@ import { clusterArticlesHybridIncremental } from "./cluster";
 import { queryRelevantArticles, type QueryRejectionReason } from "./acceptance";
 import { deduplicateArticles } from "./deduplicate";
 import { logNews } from "./logger";
+import { ingestionRetryAfterMs, terminalIngestionFailure } from "./ingestion-outcome";
+import { retryDelayMs } from "./retry-policy.mjs";
 import { normalizeProviderArticles } from "./normalize";
 import {
   createConfiguredProviders,
@@ -50,7 +52,6 @@ const DEFAULT_LIVE_CORPUS_ABSOLUTE_MAX = 1_000;
 const DEFAULT_LIVE_LOW_WATER = 24;
 const DEFAULT_DATABASE_CANDIDATE_LIMIT = 1_000;
 const MAX_CONSECUTIVE_PROVIDER_FAILURES = 2;
-const LIVE_PROVIDER_RETRY_DELAY_MS = 1_500;
 interface LiveCorpusState {
   id: string;
   articles: NormalizedArticle[];
@@ -191,15 +192,6 @@ function takeDiverseArticles<T>(batches: T[][], limit: number): T[] {
     if (!added) break;
   }
   return selected;
-}
-
-function terminalProviderFailure(code: string): boolean {
-  if (code === "PROVIDER_LIMIT") return true;
-  const status = Number(code.match(/^HTTP_(\d{3})$/)?.[1]);
-  return Number.isInteger(status) &&
-    status >= 400 &&
-    status < 500 &&
-    ![408, 409, 425, 429].includes(status);
 }
 
 function providerConfigurationFingerprint(): string {
@@ -472,7 +464,8 @@ async function discoverLiveStage(
     })));
 
     for (const { provider, result } of results) {
-      const failure = result.failures.find(({ provider: failedProvider }) => failedProvider === provider.name);
+      const failures = result.failures.filter(({ provider: failedProvider }) => failedProvider === provider.name);
+      const failure = failures.find(({ code }) => terminalIngestionFailure(code)) ?? failures[0];
       if (failure) {
         const failureCount = (state.providerFailureCounts.get(provider.name) ?? 0) + 1;
         state.providerFailureCounts.set(provider.name, failureCount);
@@ -480,7 +473,7 @@ async function discoverLiveStage(
           ? "rate_limited"
           : failure.code === "MISSING_CREDENTIAL"
             ? "missing_credential"
-            : terminalProviderFailure(failure.code)
+            : terminalIngestionFailure(failure.code)
               ? "terminal_error"
               : failure.code === "REQUEST_FAILED" || failure.code === "STAGE_TIMEOUT"
                 ? "timeout"
@@ -490,7 +483,7 @@ async function discoverLiveStage(
         metric.health = health;
         if (failure.code === "PROVIDER_LIMIT") metric.exhaustionReason = "provider_limit";
         const retryBudgetExhausted = failureCount >= MAX_CONSECUTIVE_PROVIDER_FAILURES;
-        if (terminalProviderFailure(failure.code) || retryBudgetExhausted) {
+        if (terminalIngestionFailure(failure.code) || retryBudgetExhausted) {
           state.exhaustedProviders.add(provider.name);
           state.providerRetryAfter.delete(provider.name);
           logNews("warn", "live_provider_unavailable", {
@@ -500,22 +493,25 @@ async function discoverLiveStage(
             retry_budget_exhausted: retryBudgetExhausted,
           });
         } else {
-          state.providerRetryAfter.set(provider.name, Date.now() + LIVE_PROVIDER_RETRY_DELAY_MS);
+          state.providerRetryAfter.set(provider.name, Date.now() + Math.max(ingestionRetryAfterMs(failures),
+            retryDelayMs(null, { attempt: failureCount })));
         }
-        continue;
+      } else {
+        state.providerFailureCounts.delete(provider.name);
+        state.providerRetryAfter.delete(provider.name);
       }
       const continuation = result.continuations[provider.name];
-      state.providerFailureCounts.delete(provider.name);
-      state.providerRetryAfter.delete(provider.name);
       if (continuation) state.providerStates.set(provider.name, continuation);
-      else state.providerStates.delete(provider.name);
-      if (result.exhaustedProviders.includes(provider.name)) state.exhaustedProviders.add(provider.name);
+      else if (provider.name in result.continuations) state.providerStates.delete(provider.name);
+      if (!failure && result.exhaustedProviders.includes(provider.name)) state.exhaustedProviders.add(provider.name);
       const coverage = result.providerCoverage[provider.name];
       if (coverage) state.providerCoverage.set(provider.name, coverage);
       const diagnostics = result.providerDiagnostics[provider.name];
       const providerMetric = providerDiagnostics(state, provider.name);
-      providerMetric.health = result.exhaustedProviders.includes(provider.name) ? "exhausted" : "active";
-      state.providerHealth.set(provider.name, providerMetric.health);
+      if (!failure) {
+        providerMetric.health = result.exhaustedProviders.includes(provider.name) ? "exhausted" : "active";
+        state.providerHealth.set(provider.name, providerMetric.health);
+      }
       providerMetric.received += diagnostics?.received ?? result.providerCounts[provider.name] ?? 0;
       providerMetric.plansAttempted += diagnostics?.plansAttempted ?? 0;
       providerMetric.plansCompleted = Math.max(providerMetric.plansCompleted, diagnostics?.plansCompleted ?? 0);

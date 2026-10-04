@@ -151,6 +151,7 @@ describe("provider normalization", () => {
   });
 
   it("logs aggregate language, publisher-country, local-Japan, and source-resolution metrics", () => {
+    vi.stubEnv("NEWS_DIAGNOSTIC_QUIET", "false");
     const output: string[] = [];
     const consoleSpy = vi.spyOn(console, "info").mockImplementation((message) => output.push(String(message)));
     try {
@@ -167,6 +168,7 @@ describe("provider normalization", () => {
       }]);
     } finally {
       consoleSpy.mockRestore();
+      vi.unstubAllEnvs();
     }
     const entry = JSON.parse(output.at(-1)!);
     expect(entry).toMatchObject({

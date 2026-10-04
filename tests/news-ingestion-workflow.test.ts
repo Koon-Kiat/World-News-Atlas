@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { runScheduledIngestion, ingestionMarkdown, ingestionExitCode, isTransientStatus, REQUEST_TIMEOUT_MS, CONNECT_TIMEOUT_MS } from "../scripts/scheduled-ingestion.mjs";
+import { runScheduledIngestion, scheduledIngestionMode, ARCHIVE_SCHEDULE, ingestionMarkdown, ingestionExitCode, isTransientStatus, REQUEST_TIMEOUT_MS, CONNECT_TIMEOUT_MS } from "../scripts/scheduled-ingestion.mjs";
 
 const secret = "test-only-secret-at-least-thirty-two-characters";
 function success(body: string) {
@@ -132,6 +132,46 @@ describe("scheduled ingestion", () => {
       send: async (_url: string, _headers: Record<string, string>, body: string) =>
         JSON.parse(body).scope === "global" ? { status: 403, json: null } : success(body) }, report);
     expect(code).toBe(1);
-    expect(report).toHaveBeenCalledWith(expect.stringContaining("countries (3) | Success"));
+    expect(report).toHaveBeenCalledWith(expect.stringContaining("country-rotation-next | SUCCESS"));
+  });
+  it("separates scheduled incremental discovery and archive reconciliation, preserving manual periods", () => {
+    expect(scheduledIngestionMode({ eventName: "schedule", schedule: "*/30 * * * *" })).toEqual({ period: "24h", mode: "incremental" });
+    expect(scheduledIngestionMode({ eventName: "schedule", schedule: ARCHIVE_SCHEDULE })).toEqual({ period: "30d", mode: "backfill" });
+    for (const period of ["latest", "24h", "7d", "30d"]) expect(scheduledIngestionMode({ eventName: "workflow_dispatch", period }).period).toBe(period);
+    expect(() => scheduledIngestionMode({ period: "invalid" })).toThrow();
+  });
+  it.each(["60", "Thu, 01 Jan 1970 00:01:00 GMT"])("respects a server cooldown beyond the old 30-second clamp: %s", async (retryAfter) => {
+    let time = 0;
+    const starts: number[] = [];
+    const result = await runScheduledIngestion({ url: "https://example.test/ingest", secret, now: () => time, random: () => 0,
+      wait: async (ms: number) => { time += ms; }, send: async (_url: string, _headers: Record<string, string>, body: string) => {
+        starts.push(time);
+        return starts.length === 1 ? { status: 503, retryAfter, json: null } : success(body);
+      } });
+    expect(starts[1]).toBe(60_000); expect(result.success).toBe(true);
+  });
+  it("stops within the deadline without shortening a long provider cooldown", async () => {
+    const wait = vi.fn(async () => {});
+    const send = vi.fn(async () => ({ status: 503, retryAfter: "900", json: null }));
+    const result = await runScheduledIngestion({ url: "https://example.test/ingest", secret, wait, send, now: () => 0 });
+    expect(send).toHaveBeenCalledTimes(3); expect(wait).not.toHaveBeenCalled();
+    expect(result.results.every((r: { category: string }) => r.category === "cooldown_exceeds_deadline")).toBe(true);
+  });
+  it("does not retry a semantically transient but exhausted logical operation", async () => {
+    const send = vi.fn(async (_url: string, _headers: Record<string, string>, body: string) => ({ status: 503,
+      json: { requestId: JSON.parse(body).requestId, state: "RETRY_BUDGET_EXHAUSTED", retryEligible: false } }));
+    const result = await runScheduledIngestion({ url: "https://example.test/ingest", secret, send });
+    expect(send).toHaveBeenCalledTimes(3); expect(result.success).toBe(false);
+  });
+  it("exits successfully for explicit degraded results while reporting the provider failure", async () => {
+    const report = vi.fn(async () => {});
+    const code = await ingestionExitCode({ url: "https://example.test/ingest", secret,
+      send: async (_url: string, _headers: Record<string, string>, body: string) => {
+        const response = success(body);
+        return { ...response, retryAfter: "60", json: { ...response.json, state: "DEGRADED", outcome: "DEGRADED",
+          summary: { ...response.json.summary, providersFailed: 1, providerFailures: [{ provider: "GDELT", code: "HTTP_429", retryAfterMs: 60_000 }] } } };
+      } }, report);
+    expect(code).toBe(0); expect(report).toHaveBeenCalledWith(expect.stringContaining("**Outcome: DEGRADED**"));
+    expect(report).toHaveBeenCalledWith(expect.stringContaining("GDELT: HTTP_429"));
   });
 });

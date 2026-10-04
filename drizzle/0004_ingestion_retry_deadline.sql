@@ -1,0 +1,1 @@
+ALTER TABLE `ingestion_logical_request` ADD `retry_at` integer DEFAULT 0 NOT NULL;

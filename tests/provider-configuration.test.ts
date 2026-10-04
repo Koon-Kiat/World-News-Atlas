@@ -5,6 +5,13 @@ import { resetGdeltRequestPacingForTesting } from "@/lib/news/providers/gdelt";
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.useRealTimers(); resetGdeltRequestPacingForTesting(); });
 
 describe("archive provider configuration", () => {
+  it("rejects invalid operator configuration instead of silently selecting defaults", () => {
+    vi.stubEnv("RSS_FEEDS_JSON", "not JSON");
+    expect(() => createConfiguredProviders()).toThrow("INVALID_CONFIGURATION");
+    vi.stubEnv("RSS_FEEDS_JSON", "[]");
+    vi.stubEnv("GDELT_MODE", "sometimes");
+    expect(() => createConfiguredProviders()).toThrow("INVALID_CONFIGURATION");
+  });
   it("does not configure NewsAPI when its credential is removed or explicitly cleared", () => {
     vi.stubEnv("NEWSAPI_KEY", undefined);
     expect(createConfiguredProviders().some(({ name }) => name === "NEWSAPI")).toBe(false);
@@ -21,6 +28,9 @@ describe("archive provider configuration", () => {
     const provider = createConfiguredProviders({ period: "30d", countries: ["US"] }).find(({ name }) => name === "GDELT")!;
     const checked = expect(provider.fetchLatest({ countries: [], from: new Date("2026-09-07"), to: new Date("2026-09-08") }))
       .resolves.toMatchObject({ provider: "GDELT", articles: [], exhausted: true });
+    // Runtime binding discovery is asynchronous. Advance the response clock
+    // only after the request actually starts, not while loading that binding.
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
     await vi.advanceTimersByTimeAsync(21_000);
     await checked;
   });

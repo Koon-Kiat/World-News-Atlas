@@ -9,9 +9,23 @@ function SearchHarness({ onSearch }: { onSearch: () => void }) {
 }
 
 beforeEach(() => window.localStorage.clear());
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("header search history", () => {
+  it("still searches and clears in-memory history when browser storage rejects writes", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new DOMException("Full", "QuotaExceededError"); });
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => { throw new DOMException("Blocked", "SecurityError"); });
+    const onSearch = vi.fn();
+    render(<SearchHarness onSearch={onSearch} />);
+    const input = screen.getByRole("searchbox", { name: "Search news" });
+    fireEvent.change(input, { target: { value: "Sendai" } });
+    fireEvent.submit(input.closest("form")!);
+    expect(onSearch).toHaveBeenCalledOnce();
+    fireEvent.focus(input);
+    expect(screen.getByRole("button", { name: "Sendai" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear history" }));
+    expect(screen.queryByRole("button", { name: "Sendai" })).not.toBeInTheDocument();
+  });
   it("stores submitted searches, reuses them, and clears the list", () => {
     const onSearch = vi.fn();
     render(<SearchHarness onSearch={onSearch} />);

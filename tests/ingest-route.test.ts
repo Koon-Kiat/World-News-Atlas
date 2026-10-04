@@ -48,14 +48,14 @@ async function signedRequest(body: string, overrides: Record<string, string> = {
 }
 
 describe("signed ingestion route", () => {
-  it("gives throttled providers a bounded cooldown before retrying the same logical request", async () => {
-    const partial: IngestionSummary = { ...summary(), providersFailed: 1, providerFailures: [{ provider: "GDELT", code: "HTTP_429" }] };
+  it("completes useful work as degraded and reports the upstream cooldown", async () => {
+    const partial: IngestionSummary = { ...summary(), providersFailed: 1, providerFailures: [{ provider: "GDELT", code: "HTTP_429", retryAfterMs: 60_000 }] };
     const response = await handleIngestionRequest(await signedRequest(JSON.stringify({ requestId: "throttled-operation", scope: "global" })), {
       secret, store: replayProtectedStore(), now: () => now, run: async () => partial,
     });
-    expect(response.status).toBe(503);
-    expect(response.headers.get("Retry-After")).toBe("30");
-    await expect(response.json()).resolves.toMatchObject({ requestId: "throttled-operation", state: "FAILED_RETRYABLE" });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Retry-After")).toBe("60");
+    await expect(response.json()).resolves.toMatchObject({ requestId: "throttled-operation", state: "DEGRADED", outcome: "DEGRADED", retryEligible: false });
   });
 
   it("accepts a valid bounded request and rejects nonce replay", async () => {
