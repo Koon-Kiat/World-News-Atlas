@@ -58,6 +58,7 @@
     "@types/topojson-client": "^3.1.5",
     "@vitejs/plugin-react": "^6.1.0",
     "@vitejs/plugin-rsc": "^0.5.26",
+    "braces": "file:vendor/braces",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
@@ -73,6 +74,7 @@
     "wrangler": "^4.92.0"
   },
   "overrides": {
+    "braces": "$braces",
     "@esbuild-kit/core-utils": {
       "esbuild": "^0.25.0"
     },

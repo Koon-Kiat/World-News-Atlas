@@ -339,3 +339,5 @@ npm audit
 ```
 
 The test suite additionally covers D1 migrations and relational persistence, signed ingestion and replay rejection, multilingual discovery/markets, large country corpora through bounded continuation, archive windows, checkpoint resume, partial-database supplementation, complete-database live-call avoidance, article-based periods, provider filtering, representative-consistent clustering, and honest completion semantics.
+
+Build tooling uses a [local braces security backport](vendor/braces/README.md) until a verified upstream fix is released. Its source, license and provenance are committed; clean installs need no patch script. Security regression tests cover the patched parser, AST walkers and installed glob callers. Keep the full dependency audit enabled alongside these tests.

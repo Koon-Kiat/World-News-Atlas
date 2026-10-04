@@ -87,7 +87,7 @@ The schema is additive, but old Workers do not understand the new outcome states
 
 No validated exploitable P0 security finding is asserted. Remaining decisions:
 
-- **Unpatched development dependency:** braces 3.0.3 has [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm), with no published patch at audit time. It reaches ESLint and Vinext build-time glob handling through fast-glob/micromatch. No public runtime input-to-pattern path was established. Eight npm audit package entries describe that one advisory and its dependency ancestors. The production audit is clear; the full high-severity audit still exits nonzero. The CI gate is unchanged. Downgrading Next lint configuration to 14.x or Vinext to 0.0.15, as npm suggests, would be an unjustified compatibility regression. Track the upstream patch before release clearance.
+- **Locally maintained development dependency:** braces 3.0.3 has [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm), with no published patch as of 5 October 2026. It reaches ESLint and Vinext build-time glob handling through fast-glob/micromatch. No public runtime input-to-pattern path was established. The final change replaces it with the committed, MIT-licensed `@world-news-atlas/braces@3.0.3-wna.1` backport described below. The full audit gate remains unchanged. Maintaining this fork, testing it, and returning to a verified upstream release are explicit responsibilities; an audit result alone cannot certify local source.
 - **RSS DNS binding:** feeds are operator-configured, and redirects/address checks exist, but lookup and fetch are separate and IPv6 filtering is incomplete. No visitor-controlled feed or reachable malicious redirect path was established. A network-level allowlist or pinned DNS connection needs a platform-specific design; no speculative SSRF rewrite or exploitability claim is made.
 - **Existing bounds and algorithms:** bounded quadratic clustering/deduplication, heuristic country/language/source inference, capped candidate windows and article upsert round trips remain. There is no reproduced production bottleneck justifying an algorithm/index rewrite. Rankings and heuristic accuracy are not claimed to be exhaustive.
 - **Developer tooling:** Drizzle's esbuild-kit dependencies and ESLint 9 emit deprecation notices. Existing esbuild protection remains. Broad major migrations are deferred rather than mixed into ingestion remediation. The pinned, manually invoked geography updater is not a production request path; it still merits a separate bounded-download/schema-validation improvement.
@@ -101,18 +101,58 @@ Load reductions come from avoiding half-hour archive discovery, stopping GDELT b
 
 Structured summaries expose outcome, pass, provider/code, requests/attempts, counts, duration and cooldown. They do not print HMAC payloads, credentials, provider bodies or raw SQL/internal exceptions. DEGRADED is operationally accepted and visibly different from SUCCESS. Internal/storage/state errors remain failures.
 
+## Dependabot remediation
+
+The authenticated GitHub alert inventory on 5 October 2026 contained 32 open
+alerts against the original `main` revision. All affected dependency families
+are addressed in this change:
+
+| Package | Open alerts before merge | Installed remediation |
+|---|---:|---|
+| Next.js | 1 | 16.3.8, above the advisory's 16.3.6 fix |
+| Undici | 21 | 7.29.1 and 8.11.2; both major-version paths updated |
+| fast-uri | 3 | 3.1.8 |
+| brace-expansion | 6 | 1.1.21 and 5.0.12 |
+| braces | 1 | Local `@world-news-atlas/braces@3.0.3-wna.1` fork |
+
+The original braces package exhausted the stack on a 9,997-character nested
+brace pattern in compile/expand and on a 20,000-level direct AST in all three
+recursive public walkers. Ordinary glob expansion succeeded in the same
+baseline. The backport caps combined brace/parenthesis nesting at 100, enforces
+the bound independently in compile/expand/stringify, and detects cyclic AST
+parent links during expansion. Oversized and non-finite `maxDepth` options cannot
+disable the bound. Errors are explicit; malformed inputs are not silently
+truncated or accepted.
+
+Source provenance, upstream commit, original tarball integrity, installation
+requirements and removal procedure are in [the fork README](../vendor/braces/README.md).
+The root file dependency and override install the same committed source for all
+callers without a postinstall patch. Registry advisory matching does not inspect
+local forks, so the 20 project regression cases also verify every installed
+braces/micromatch resolution and exercise the real glob callers. No alert is
+dismissed and no audit exclusion is added.
+
+The upstream core compatibility command (`mocha 'test/braces.*.js'
+test/minimatch.js test/multiples.js test/readme.js test/regression.js`) passes all
+148 cases in an isolated validation copy. A broader 904-case upstream suite
+was compared against the original npm package: failures decrease from 50 to 42,
+with all eight previously failing security tests repaired and **no new failed
+cases**. The remaining 42 legacy Bash-compatibility expectations fail identically
+on the original package and are outside this security backport; this is not a
+claim that the entire upstream suite passes.
+
 ## Tests and validation
 
 Deterministic coverage includes numeric/date/malformed/past/large/missing Retry-After, GDELT success/429/recovery/repeated429/503/query rejection/timeout/malformed/partial branches/cursors, success/degraded/terminal/internal outcomes, retry exhaustion, cooldown eligibility, corrupted plans/cursors, lease expiry/stale tokens, same/conflicting logical requests, replay, cross-instance pacing/rotation, fresh/legacy migrations and checkpoint loss recovery. Scheduler tests cover every mode, explicit pass names, cooldowns longer than 30 seconds, insufficient deadline, bounded retries/polls and degraded/nonzero outcomes. Additional tests cover partial-story preservation, partial live progress, metadata corruption, embedding stream bounds and localStorage failures.
 
-Final local validation on 4 October 2026: **378 tests in 45 files, lint, TypeScript, both production builds and migration checks pass.** The production dependency audit reports zero vulnerabilities. The full dependency audit fails on the one unresolved development advisory described above, represented by eight high-severity package entries. The existing CI audit gate will therefore remain red until that dependency issue is resolved; this report does not claim all release gates are green.
+Final local validation on 5 October 2026: **398 tests in 46 files, lint, TypeScript, both production builds and migration checks pass after a clean `npm ci`.** Both production-only and full dependency audits report zero vulnerabilities. The earlier 4 October validation passed 378 tests but failed the full audit on eight package entries arising from the single braces advisory; the subsequent backport resolves that gate without changing its command. GitHub CI must also pass on the PR's final commit before squash merge.
 
 The following is the command ledger for validation and dependency changes. Repeated identical commands are consolidated; earlier failures are retained. Redirection to local logs and shell exit-code plumbing are omitted. Raw logs are retained under `work/validation/` and excluded from Git.
 
 | Command | Result |
 |---|---|
 | `npm ci` | PASS, including clean reinstall after all dependency changes; deprecation notices remain |
-| `npm run check` | Final PASS: lint, type generation/TypeScript and 378 tests. Initial run: 357 passed, two failed because of ambient quiet logging and fake-clock ordering; both repaired and rerun |
+| `npm run check` | Final PASS: lint, type generation/TypeScript and 398 tests. Initial run: 357 passed, two failed because of ambient quiet logging and fake-clock ordering; both repaired and rerun |
 | `npm run lint` | PASS; also included in final check |
 | `npx tsc --noEmit --pretty false` | PASS during implementation; final check also runs canonical `npm run typecheck` |
 | `npm run build` | PASS on final source; Vinext emits its existing static route-classification limitation |
@@ -120,9 +160,9 @@ The following is the command ledger for validation and dependency changes. Repea
 | `npm run db:generate -- --name=provider_rate_control` | PASS; generated additive 0003 migration and metadata |
 | `npm run db:generate -- --name=ingestion_retry_deadline` | PASS; generated additive 0004 migration and metadata |
 | `npm run db:check` | PASS, including final migration chain |
-| `npm audit --json` | Nonzero initially and after updates; reports retained and each remaining dependency path evaluated |
+| `npm audit --json` | Nonzero before the braces backport; each remaining dependency path evaluated |
 | `npm audit --omit=dev --audit-level=high` | PASS, zero vulnerabilities |
-| `npm audit --audit-level=high` | FAIL: eight high package entries from unpatched braces; gate preserved |
+| `npm audit --audit-level=high` | Final PASS, zero vulnerabilities; previously failed on eight braces-related entries; gate preserved |
 | `npm --version` | PASS, environment inspection |
 | `npm view next@16.3 version` | PASS, patch availability checked |
 | `npm view braces version` | PASS, published version checked against advisory |
@@ -134,6 +174,11 @@ The following is the command ledger for validation and dependency changes. Repea
 | `npm install --save-dev 'miniflare@^5.20261001.0-alpha'` | PASS; existing 5.x prerelease line retained |
 | `npm update undici --depth=10` | PASS; nested copies updated within dependency ranges |
 | `git diff --check` (with `core.safecrlf=false` for inspection) | PASS; no whitespace errors |
+| `npm install --ignore-scripts --no-audit` | PASS; regenerated lockfile for the local fork. Initial override-only resolution was invalid; corrected with a root file dependency plus `$braces` override and verified by clean install |
+| `npx vitest run tests/braces-security.test.ts` | PASS, 20 cases; initial setup exposed the file-resolution issue and one incorrect expected regex string, both corrected |
+| `node --check` for every vendored JavaScript file | PASS |
+| Upstream core Mocha command listed above | PASS, 148 cases |
+| Upstream `mocha 'test/*.js' --reporter json`, original versus backport | Comparison PASS: zero new failed cases, eight security cases repaired. Broad suite itself still has 42 inherited failures, as detailed above |
 
 `npm run check` invokes `npm run lint`, `npm run typecheck` (`next typegen && tsc --noEmit`) and `npm test` (`vitest run`). These are the repository's canonical commands, not substituted partial checks. Focused test commands were:
 
@@ -174,12 +219,13 @@ Paths are repository-relative. The inventory includes the dependency commit as w
 | `docs/ingestion-reliability-report.md` | Root causes, decisions, evidence, command ledger, risks and file inventory |
 | `docs/optimization-results.md` | Mark September evidence as historical and link current policy |
 | `docs/production-deployment.md` | New migration probes, release order and behavioral rollback compatibility |
+| `eslint.config.mjs` | Exclude preserved upstream CommonJS source from application lint rules; security regressions exercise it |
 | `drizzle/0003_provider_rate_control.sql` | Add shared provider control table |
 | `drizzle/0004_ingestion_retry_deadline.sql` | Add retry_at without rewriting history |
 | `drizzle/meta/0003_snapshot.json` | Generated schema snapshot for 0003 |
 | `drizzle/meta/0004_snapshot.json` | Generated schema snapshot for 0004 |
 | `drizzle/meta/_journal.json` | Register the two forward migrations |
-| `package.json` | Available security patch versions and Miniflare update within its existing major line |
+| `package.json` | Available security patch versions, Miniflare update within its major line and reproducible local braces override |
 | `package-lock.json` | Reproducible patched dependency graph |
 | `scripts/migrate-production.mjs` | Verify new provider-control and retry-deadline columns |
 | `scripts/scheduled-ingestion.mjs` | Named passes, schedule selection, stable IDs, shared delays and explicit summaries |
@@ -203,6 +249,7 @@ Paths are repository-relative. The inventory includes the dependency commit as w
 | `src/lib/news/store.ts` | Optional immutable ingestion-scoped store binding |
 | `src/lib/news/types.ts` | Cancellation and structured partial provider failures |
 | `tests/database.integration.test.ts` | Real D1 cooldown/rotation, migration preservation, retry states, corrupt state, story membership and all-write fencing |
+| `tests/braces-security.test.ts` | Malicious strings/ASTs, depth boundaries, cycles, compatibility and installed transitive glob resolution |
 | `tests/embeddings.test.ts` | Stalled-body cancellation and oversized response rejection |
 | `tests/gdelt-provider.test.ts` | Throttling/recovery, shared delays, sequential partial results and terminal failures |
 | `tests/ingest-route.test.ts` | Degraded status/cooldown with authentication and replay regressions retained |
@@ -216,14 +263,24 @@ Paths are repository-relative. The inventory includes the dependency commit as w
 | `tests/provider-configuration.test.ts` | Invalid operator config and synchronized deadline tests |
 | `tests/retry-policy.test.ts` | Numeric and HTTP dates, malformed/impossible dates, bounds and jitter |
 | `tests/search-history.test.tsx` | Storage quota/security failures do not break search/history UI |
+| `vendor/braces/LICENSE` | Preserve the upstream MIT license and copyright |
+| `vendor/braces/README.md` | Fork provenance, bounds, installation and return-to-upstream procedure |
+| `vendor/braces/package.json` | Identify the private fork and its audited fill-range dependency |
+| `vendor/braces/index.js` | Preserve the upstream public API |
+| `vendor/braces/lib/constants.js` | Define the hard maximum nesting depth |
+| `vendor/braces/lib/parse.js` | Bound combined brace and parenthesis nesting before allocating deeper AST nodes |
+| `vendor/braces/lib/compile.js` | Bound compilation of caller-supplied ASTs |
+| `vendor/braces/lib/expand.js` | Bound expansion and reject cyclic parent chains |
+| `vendor/braces/lib/stringify.js` | Bound stringification of caller-supplied ASTs |
+| `vendor/braces/lib/utils.js` | Preserve upstream compatibility helpers |
 
 ## Remaining operational verification
 
 Apply and verify migrations before publishing the matching Worker and enabling its workflow. Check all three pass summaries in manual recent discovery and the first archive run. Confirm shared cooldown behavior across live and scheduled traffic, then observe subsequent successful/DEGRADED runs. A later 401, invalid query/schema or zero-useful-provider outage must still make Actions fail. GitHub schedule timing and provider capacity are external constraints; no implementation can guarantee permanent upstream availability.
 
-## Local delivery
+## Delivery
 
-Changes are committed on `codex/ingestion-reliability`, based on `8556b5c`. Commits are grouped by behavior:
+Changes are based on `8556b5c` and delivered through [PR #5](https://github.com/Koon-Kiat/World-News-Atlas/pull/5). The branch is `codex/ingestion-squash`; the merge must use squash after every PR check passes. Implementation commits are grouped by behavior:
 
 - `b7a8e24` — Update dependencies with available security fixes.
 - `720880c` — Make ingestion outcomes and recovery durable; includes provider coordination, additive migrations and corresponding tests because their contracts change together.
@@ -231,6 +288,7 @@ Changes are committed on `codex/ingestion-reliability`, based on `8556b5c`. Comm
 - `4715777` — Preserve live discovery progress through provider failures.
 - `885691c` — Bound embedding response reads and total execution time.
 - `b61bc34` — Keep search usable when browser storage is unavailable.
-- The final documentation commit records this report and current operator guidance.
+- `436aaf2` records the original report and operator guidance.
+- The security follow-up adds the maintained braces backport, regression coverage and updated evidence.
 
-No push, pull request, merge or production release is included in this local delivery.
+The GitHub delivery does not publish the production Worker or apply remote migrations. Those remain governed by the deployment order above.
