@@ -10,6 +10,8 @@ export interface DatabaseCoverageState {
 }
 
 export interface NewsStore extends IngestionStateStore {
+  /** Durable stores bind every mutation to the accepted ingestion attempt. */
+  forIngestion?(requestId: string, token: string): NewsStore;
   persistStoryCandidates(candidates: StoryCandidate[], beforeWrite?: () => Promise<void>): Promise<{ storedArticles: number; storiesUpdated: number }>;
   ingestionRequests: IngestionRequestStore;
   loadStories(query: NewsQuery, now?: Date): Promise<StoryView[]>;

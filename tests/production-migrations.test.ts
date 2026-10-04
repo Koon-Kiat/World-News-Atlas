@@ -36,6 +36,9 @@ describe("production migration gate", () => {
     expect(run.mock.calls.map((call) => call[1].slice(1, 4))).toEqual([
       ["d1", "migrations", "list"], ["d1", "migrations", "apply"], ["d1", "execute", "--json"], ["d1", "execute", "--command"],
     ]);
+    const schemaCheck = run.mock.calls.at(-1)![1].join(" ");
+    expect(schemaCheck).toContain("retry_at");
+    expect(schemaCheck).toContain("provider_request_control");
     for (const [, args] of run.mock.calls) {
       expect(args.slice(-4)).toEqual(["DB", "--remote", "--config", configPath]);
       expect(args).not.toContain("--local");

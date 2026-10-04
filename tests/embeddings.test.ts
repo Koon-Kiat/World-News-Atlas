@@ -61,4 +61,24 @@ describe("semantic embedding provider", () => {
     await vi.advanceTimersByTimeAsync(1_000);
     await rejection;
   });
+
+  it("keeps the deadline active while a response body stalls and cancels its stream", async () => {
+    vi.useFakeTimers();
+    const cancel = vi.fn();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(new ReadableStream({ cancel })));
+    const checked = expect(new OpenAiTextEmbeddingProvider("test-key", "test-model", 1_000).embed(["headline"]))
+      .rejects.toThrow("Stream deadline exceeded");
+    await vi.advanceTimersByTimeAsync(1_000);
+    await checked;
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it("rejects oversized streaming responses before parsing JSON", async () => {
+    const cancel = vi.fn();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(new ReadableStream({
+      start(controller) { controller.enqueue(new Uint8Array(8 * 1024 * 1024 + 1)); }, cancel,
+    })));
+    await expect(new OpenAiTextEmbeddingProvider("test-key").embed(["headline"])).rejects.toThrow();
+    expect(cancel).toHaveBeenCalledOnce();
+  });
 });

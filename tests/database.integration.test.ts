@@ -19,10 +19,18 @@ import { buildNewsResponse } from "@/lib/news/query";
 import { canonicalSourceId } from "@/lib/news/sources/registry";
 import type { NewsStore } from "@/lib/news/store";
 import type { NewsQuery, NormalizedArticle } from "@/lib/news/types";
+import { D1GdeltRateControl } from "@/lib/news/providers/gdelt-rate-control";
 
 const migration = readdirSync("drizzle").filter((file) => file.endsWith(".sql")).sort()
   .flatMap((file) => readFileSync(`drizzle/${file}`, "utf8").split("--> statement-breakpoint").map((statement) => statement.trim()).filter(Boolean));
 const baseQuery: NewsQuery = { countries: [], sourcePerspective: "all", sources: [], period: "30d", sort: "newest", page: 1, pageSize: 12 };
+const ingestionSummary = (patch: Partial<IngestionSummary> = {}): IngestionSummary => ({
+  runId: "integration-run", mode: "incremental", period: "24h", countries: [], stagesProcessed: 1,
+  providersAttempted: 1, providersFailed: 0, received: 1, normalized: 1, articlesWithCountries: 1,
+  countryDetectionRate: 1, accepted: 1, outOfWindow: 0, countryIrrelevant: 0, rejected: 0,
+  duplicatesRemoved: 0, stored: 1, storiesUpdated: 1, persisted: true, budgetExhausted: false,
+  checkpointsCompleted: 1, durationMs: 10, ...patch,
+});
 
 let miniflare: Miniflare;
 let database: D1Database;
@@ -73,6 +81,123 @@ afterEach(async () => {
 });
 
 describe("D1 news integration", () => {
+  it("fences every data and checkpoint write after an attempt loses its lease", async () => {
+    const now = new Date();
+    const claim = await store.ingestionRequests.claim("fenced-write-operation", "digest", now);
+    if (claim.state !== "ACCEPTED") throw new Error("Expected acceptance");
+    const fenced = new D1NewsStore(database).forIngestion("fenced-write-operation", claim.token);
+    const checkpoint = {
+      provider: "RSS" as const, discoveryKey: "incremental:JP:24h:all", countryCode: "JP", language: null,
+      mode: "incremental" as const, status: "PARTIAL" as const, windowStart: new Date(now.getTime() - 86_400_000).toISOString(),
+      windowEnd: now.toISOString(), cursor: { offset: 1 }, exhausted: false, coverageComplete: false,
+      receivedCount: 1, acceptedCount: 1, duplicateCount: 0,
+    };
+    const stage = { ...checkpoint, windowStart: new Date(checkpoint.windowStart), windowEnd: now };
+    const stageId = await fenced.startStage(stage);
+    await fenced.save(checkpoint);
+    const candidate = clusterArticles([article("fenced", "Japan report", [{ code: "JP", name: "Japan", relevanceScore: 1 }])]);
+    await fenced.persistStoryCandidates(candidate);
+    await database.batch([
+      database.prepare("UPDATE ingestion_operation_lock SET lease_until = 0"),
+      database.prepare("UPDATE ingestion_logical_request SET lease_until = 0"),
+    ]);
+    const replacement = await store.ingestionRequests.claim("fenced-write-operation", "digest", new Date());
+    if (replacement.state !== "ACCEPTED") throw new Error("Expected resumed attempt");
+    const writes = [
+      () => fenced.persistStoryCandidates(clusterArticles([article("stale", "Stale worker report", [])])),
+      () => fenced.save({ ...checkpoint, cursor: { offset: 999 } }),
+      () => fenced.startStage(stage),
+      () => fenced.finishStage(stageId, { ...checkpoint, normalizedCount: 1, outOfWindowCount: 0, irrelevantCount: 0, storedCount: 1, storiesUpdated: 1 }),
+      () => fenced.nextCountryBatch(1),
+    ];
+    for (const write of writes) await expect(write()).rejects.toMatchObject({ code: "LEASE_LOST" });
+    expect(await countRows("article")).toBe(1);
+    expect((await store.load(checkpoint.discoveryKey, "RSS"))?.cursor).toEqual({ offset: 1 });
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM provider_ingestion_run").first()).toEqual({ count: 1 });
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM ingestion_scheduler_state").first()).toEqual({ count: 0 });
+    expect(await database.prepare("SELECT attempt_token FROM ingestion_operation_lock").first()).toEqual({ attempt_token: replacement.token });
+    const current = new D1NewsStore(database).forIngestion("fenced-write-operation", replacement.token);
+    await current.save({ ...checkpoint, cursor: { offset: 2 } });
+    await database.prepare("UPDATE ingestion_operation_lock SET lease_until = 0").run();
+    await expect(current.save(checkpoint)).rejects.toMatchObject({ code: "LEASE_LOST" });
+    await database.prepare("DELETE FROM ingestion_operation_lock").run();
+    await expect(current.nextCountryBatch(1)).rejects.toMatchObject({ code: "LEASE_LOST" });
+  }, 20_000);
+
+  it("rejects corrupt stored cursors instead of silently restarting discovery", async () => {
+    const now = new Date().toISOString();
+    await store.save({ provider: "GDELT", discoveryKey: "corrupt", countryCode: null, language: null, mode: "backfill",
+      status: "PARTIAL", windowStart: now, windowEnd: now, cursor: null, exhausted: false, coverageComplete: false,
+      receivedCount: 0, acceptedCount: 0, duplicateCount: 0 });
+    for (const cursor of ["not json", "[]", '{"page":-1}', '{"before":"yesterday"}', '{"discoveryCursors":{"a":42}}']) {
+      await database.prepare("UPDATE provider_ingestion_checkpoint SET cursor = ?").bind(cursor).run();
+      await expect(store.load("corrupt", "GDELT")).rejects.toMatchObject({ code: "INVALID_STATE" });
+    }
+  });
+  it("shares atomic GDELT starts and cooldowns across separate runtime instances", async () => {
+    const first = new D1GdeltRateControl(database);
+    const second = new D1GdeltRateControl(database);
+    const now = 1_000_000;
+    const slots = await Promise.all([first.acquire(now, 5500), second.acquire(now, 5500)]);
+    expect(slots.filter(({ granted }) => granted)).toHaveLength(1);
+    expect(slots.find(({ granted }) => !granted)?.waitMs).toBe(5500);
+    expect(await first.defer("60", now, 0)).toBe(60_000);
+    expect(await second.acquire(now + 5500, 5500)).toEqual({ granted: false, cooldown: true, waitMs: 54_500 });
+    // A late short response cannot erase a previously observed long cooldown.
+    await Promise.all([first.defer("120", now, 0), second.defer("30", now, 0)]);
+    expect((await first.acquire(now + 60_000, 5500)).waitMs).toBe(60_000);
+    expect((await second.acquire(now + 120_000, 5500)).granted).toBe(true);
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM provider_request_control").first()).toEqual({ count: 1 });
+  });
+  it("shares exponential fallback and expires backoff history after a quiet interval", async () => {
+    const first = new D1GdeltRateControl(database); const second = new D1GdeltRateControl(database);
+    const now = 1_000_000;
+    expect(await first.defer(null, now, 0)).toBe(30_000);
+    expect(await second.defer(null, now + 30_000, 0)).toBe(60_000);
+    expect(await first.defer("bad", now + 90_000, 0)).toBe(120_000);
+    expect(await second.defer(null, now + 1_000_000, 0)).toBe(30_000);
+  });
+  it("does not spend operation attempts or acquire the lock while a retry cooldown is active", async () => {
+    const requests = store.ingestionRequests;
+    const now = new Date();
+    const accepted = await requests.claim("cooldown-operation", "digest", now);
+    if (accepted.state !== "ACCEPTED") throw new Error("Expected acceptance");
+    const summary = ingestionSummary({ stored: 0, providersFailed: 1,
+      providerFailures: [{ provider: "GDELT", code: "HTTP_429", retryAfterMs: 60_000 }] });
+    await requests.finish("cooldown-operation", accepted.token, "FAILED_RETRYABLE", summary, now);
+    const early = await requests.claim("cooldown-operation", "digest", new Date(now.getTime() + 1000));
+    expect(early).toMatchObject({ state: "FAILED_RETRYABLE", retryAfterMs: 59_000, attempts: 1 });
+    expect(await database.prepare("SELECT lease_until FROM ingestion_operation_lock").first()).toEqual({ lease_until: 0 });
+    expect(await requests.claim("cooldown-operation", "digest", new Date(now.getTime() + 60_000))).toMatchObject({ state: "ACCEPTED", attempts: 2 });
+  });
+  it("fails corrupted saved plans terminally and releases the operation lock", async () => {
+    const now = new Date(); const requests = store.ingestionRequests;
+    const accepted = await requests.claim("corrupted-operation", "digest", now);
+    if (accepted.state !== "ACCEPTED") throw new Error("Expected acceptance");
+    await requests.finish("corrupted-operation", accepted.token, "FAILED_RETRYABLE", null, now);
+    await database.prepare("UPDATE ingestion_logical_request SET plan_json = ? WHERE request_id = ?").bind('{"snapshotTo":"invalid","countries":42}', "corrupted-operation").run();
+    await expect(requests.claim("corrupted-operation", "digest", now)).rejects.toMatchObject({ code: "INVALID_STATE" });
+    expect(await requests.claim("new-operation", "digest", now)).toMatchObject({ state: "ACCEPTED" });
+  });
+  it("reserves distinct country batches atomically and keeps archive rotation independent", async () => {
+    const batches = await Promise.all([store.nextCountryBatch(1), store.nextCountryBatch(1)]);
+    expect(batches[0]).not.toEqual(batches[1]);
+    expect(await store.nextCountryBatch(1, "backfill")).toEqual(["US"]);
+    expect(await database.prepare("SELECT COUNT(*) AS count FROM ingestion_scheduler_state").first()).toEqual({ count: 2 });
+  });
+  it.each([
+    { stored: -1 }, { stagesProcessed: "one" }, { persisted: "true" },
+    { providerFailures: [null] }, { providerFailures: [{ provider: "GDELT", code: "HTTP_429", retryAfterMs: -1 }] },
+  ])("rejects corrupted completed summaries instead of replaying success: %j", async (corruption) => {
+    const now = new Date(); const requests = store.ingestionRequests;
+    const accepted = await requests.claim("corrupted-summary", "digest", now);
+    if (accepted.state !== "ACCEPTED") throw new Error("Expected acceptance");
+    await requests.finish("corrupted-summary", accepted.token, "SUCCEEDED", ingestionSummary(), now);
+    await database.prepare("UPDATE ingestion_logical_request SET summary_json = ? WHERE request_id = ?")
+      .bind(JSON.stringify({ ...ingestionSummary(), ...corruption }), "corrupted-summary").run();
+    await expect(requests.claim("corrupted-summary", "digest", now)).rejects.toMatchObject({ code: "INVALID_STATE" });
+    expect(await requests.claim("unrelated-operation", "digest", now)).toMatchObject({ state: "ACCEPTED" });
+  });
   it("upgrades populated pre-retry D1 tables additively and keeps legacy failures terminal", async () => {
     const legacy = await miniflare.getD1Database("LEGACY", "news-test") as unknown as D1Database;
     for (const name of ["0000_world_news_d1.sql", "0001_parallel_martin_li.sql"]) {
@@ -87,7 +212,9 @@ describe("D1 news integration", () => {
       VALUES ('legacy-failure', 'digest', 'FAILED', 0, ?, ?)`)
       .bind(now.getTime() + INGESTION_RECORD_TTL_MS, now.getTime()).run();
     const before = await legacy.prepare("SELECT * FROM article").all();
-    for (const statement of readFileSync("drizzle/0002_ingestion_retries.sql", "utf8").split("--> statement-breakpoint")) await legacy.prepare(statement).run();
+    for (const name of readdirSync("drizzle").filter((file) => file.endsWith(".sql") && file >= "0002").sort()) {
+      for (const statement of readFileSync(`drizzle/${name}`, "utf8").split("--> statement-breakpoint").filter((sql) => sql.trim())) await legacy.prepare(statement).run();
+    }
     expect((await legacy.prepare("SELECT * FROM article").all()).results).toEqual(before.results);
     expect(await legacy.prepare("SELECT COUNT(*) AS count FROM story_article").first()).toEqual({ count: 1 });
     expect((await new D1IngestionRequestStore(legacy).claim("legacy-failure", "digest", now)).state).toBe("FAILED_TERMINAL");
@@ -139,9 +266,9 @@ describe("D1 news integration", () => {
       const claim = await requests.claim("bounded-request", "digest", now);
       if (claim.state !== "ACCEPTED") throw new Error("Expected acceptance");
       expect(await requests.finish("bounded-request", claim.token, "FAILED_RETRYABLE", null, now))
-        .toBe(attempt === MAX_INGESTION_ATTEMPTS ? "FAILED_TERMINAL" : "FAILED_RETRYABLE");
+        .toBe(attempt === MAX_INGESTION_ATTEMPTS ? "RETRY_BUDGET_EXHAUSTED" : "FAILED_RETRYABLE");
     }
-    expect((await requests.claim("bounded-request", "digest", now)).state).toBe("FAILED_TERMINAL");
+    expect((await requests.claim("bounded-request", "digest", now)).state).toBe("RETRY_BUDGET_EXHAUSTED");
     const claim = await requests.claim("permanent-provider", "digest", now);
     if (claim.state !== "ACCEPTED") throw new Error("Expected acceptance");
     await requests.markTerminalFailure("permanent-provider", claim.token, now);
@@ -173,15 +300,15 @@ describe("D1 news integration", () => {
     };
     const rss = fakeProvider("RSS"); const gdelt = fakeProvider("GDELT");
     vi.spyOn(providers, "createConfiguredProviders").mockReturnValue([rss, gdelt]);
-    const rotation = vi.spyOn(store, "nextCountryBatch").mockResolvedValue(["JP"]);
-    const originalSave = store.save.bind(store);
+    const rotation = vi.spyOn(D1NewsStore.prototype, "nextCountryBatch").mockResolvedValue(["JP"]);
+    const originalSave = D1NewsStore.prototype.save;
     let failed = false;
-    vi.spyOn(store, "save").mockImplementation(async (checkpoint) => {
+    vi.spyOn(D1NewsStore.prototype, "save").mockImplementation(async function (this: D1NewsStore, checkpoint) {
       if (checkpoint.provider === "GDELT" && !failed) { failed = true; throw new Error("Transient D1 checkpoint failure"); }
-      await originalSave(checkpoint);
+      await originalSave.call(this, checkpoint);
     });
     const dependencies = { secret, now: () => now, store };
-    expect((await handleIngestionRequest(await signed("a".repeat(32)), dependencies)).status).toBe(500);
+    expect((await handleIngestionRequest(await signed("a".repeat(32)), dependencies)).status).toBe(503);
     expect(await countRows("article")).toBe(2);
     const storiesBefore = await countRows("story");
     const saved = await database.prepare("SELECT state, plan_json FROM ingestion_logical_request WHERE request_id = ?").bind("transient-internal-request").first<{ state: string; plan_json: string }>();
@@ -266,7 +393,7 @@ describe("D1 news integration", () => {
     const replay = await handleIngestionRequest(await signed(), dependencies);
     expect(replay.status).toBe(202); expect(await replay.json()).toMatchObject({ state: "RUNNING" });
     expect((await handleIngestionRequest(await signed(body, "a".repeat(32)), dependencies)).status).toBe(409);
-    const completed = { runId: "run-original", stored: 7, storiesUpdated: 4, stagesProcessed: 1, providersFailed: 0, persisted: true } as IngestionSummary;
+    const completed = ingestionSummary({ runId: "run-original", stored: 7, storiesUpdated: 4 });
     finish!(completed);
     expect((await first).status).toBe(200);
     const retry = await handleIngestionRequest(await signed(), dependencies);
@@ -295,6 +422,30 @@ describe("D1 news integration", () => {
     expect(response.stories[0].countries.map(({ code }) => code).sort()).toEqual(["JP", "SG"]);
     expect(await countRows("story")).toBe(1);
   }, 15_000);
+
+  it("preserves untouched articles when a later provider stage reclusters only part of a story", async () => {
+    const first = article("partial-a", "Japan technology investment expands", [{ code: "JP", name: "Japan", relevanceScore: 1 }]);
+    const second = article("partial-b", first.title, [{ code: "SG", name: "Singapore", relevanceScore: 1 }], { topics: ["technology"], ageMinutes: 90 });
+    // Explicit candidates reproduce different provider batches independently of
+    // the similarity threshold used by the clustering algorithm.
+    const combined = { ...clusterArticles([first])[0], articles: [first, second] };
+    await store.persistStoryCandidates([combined]);
+    await store.persistStoryCandidates([clusterArticles([first])[0]]);
+    expect(await countRows("story_article")).toBe(2);
+    expect((await store.loadStories({ ...baseQuery, countries: ["SG"], topic: "technology" })).flatMap(({ articles }) => articles).map(({ canonicalUrl }) => canonicalUrl)).toContain(second.canonicalUrl);
+
+    const changed = { ...first, title: "Japan election results announced", topics: ["politics"] };
+    await store.persistStoryCandidates(clusterArticles([changed]));
+    expect(await countRows("article")).toBe(2);
+    expect(await countRows("story_article")).toBe(2);
+    expect(await countRows("story")).toBe(2);
+    const remaining = await store.loadStories({ ...baseQuery, countries: ["SG"], topic: "technology" });
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].articles.map(({ canonicalUrl }) => canonicalUrl)).toEqual([second.canonicalUrl]);
+    expect(remaining[0].title).toBe(second.title);
+    expect(remaining[0].firstPublishedAt).toBe(second.publishedAt);
+    expect(remaining[0].countries.map(({ code }) => code)).toEqual(["SG"]);
+  }, 20_000);
 
   it("returns Unicode, source, topic, country, and newest-first queries", async () => {
     const older = article("old", "Older Japan politics report", [{ code: "JP", name: "Japan", relevanceScore: 1 }], { ageMinutes: 90, sourceName: "Example News" });

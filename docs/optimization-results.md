@@ -2,6 +2,8 @@
 
 Measurements below distinguish observed local results from source-derived counts. They do not claim production latency or field Web Vitals.
 
+This is a historical September 2026 report. Its retry states, dependency audit and schedule describe that revision. For the current ingestion policy and October remediation, see [ingestion reliability and repository audit](ingestion-reliability-report.md).
+
 ## Baseline (7 September 2026)
 
 - `/country` and `/compare`: server constructs an empty response; hydration triggers one `/api/news` request before any useful stories. Normal API reads join the D1 candidate pool and supplement incomplete coverage with live providers before returning.

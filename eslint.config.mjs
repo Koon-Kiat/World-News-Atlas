@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Preserve the upstream CommonJS source of the tested security backport.
+    "vendor/braces/**",
   ]),
 ]);
 

@@ -47,7 +47,7 @@ export function migrateProduction({ configPath = process.env.NEWS_PRODUCTION_WRA
     throw new Error("Production has unapplied migrations; stop before application deployment.");
   }
   // Also verify the schema contract: a ledger entry alone cannot prove it exists.
-  invoke(["d1", "execute", "--command", "SELECT client_key, count, reset_at FROM api_rate_limit LIMIT 0; SELECT attempts, attempt_token, plan_json, terminal_failure FROM ingestion_logical_request LIMIT 0; SELECT attempt_token, lease_until FROM ingestion_operation_lock LIMIT 0;"]);
+  invoke(["d1", "execute", "--command", "SELECT client_key, count, reset_at FROM api_rate_limit LIMIT 0; SELECT attempts, attempt_token, plan_json, terminal_failure, retry_at FROM ingestion_logical_request LIMIT 0; SELECT attempt_token, lease_until FROM ingestion_operation_lock LIMIT 0; SELECT provider, next_request_at, cooldown_until, failures, last_failure_at FROM provider_request_control LIMIT 0;"]);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -3,12 +3,13 @@ name: News ingestion
 on:
   schedule:
     - cron: "*/30 * * * *"
+    - cron: "17 2,14 * * *"
   workflow_dispatch:
     inputs:
       period:
         description: Discovery period
         required: false
-        default: 30d
+        default: 24h
         type: choice
         options: [latest, 24h, 7d, 30d]
 
@@ -27,7 +28,8 @@ jobs:
       NEWS_INGEST_URL: ${{ secrets.NEWS_INGEST_URL }}
       NEWS_INGEST_HMAC_SECRET: ${{ secrets.NEWS_INGEST_HMAC_SECRET }}
       OAI_SITES_BYPASS_TOKEN: ${{ secrets.OAI_SITES_BYPASS_TOKEN }}
-      PERIOD: ${{ github.event_name == 'schedule' && '30d' || inputs.period || '30d' }}
+      PERIOD: ${{ inputs.period || '24h' }}
+      INGESTION_SCHEDULE: ${{ github.event.schedule }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

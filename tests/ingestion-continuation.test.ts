@@ -200,7 +200,7 @@ describe("bounded resumable ingestion", () => {
     }));
   });
 
-  it("persists a provider ceiling as partial exhausted coverage without retrying the same fixed window", async () => {
+  it("never turns a terminal provider ceiling into a successful empty checkpoint", async () => {
     let calls = 0;
     const provider: NewsProvider = {
       name: "NEWSAPI",
@@ -221,10 +221,10 @@ describe("bounded resumable ingestion", () => {
     await runNewsIngestion(options);
 
     const key = discoveryKeyFor({ mode: "backfill", countryCode: "US", period: "30d" });
-    expect(calls).toBe(1);
+    expect(calls).toBe(2);
     expect(await store.load(key, "NEWSAPI")).toMatchObject({
-      status: "PARTIAL",
-      exhausted: true,
+      status: "FAILED",
+      exhausted: false,
       coverageComplete: false,
       lastSuccessfulAt: undefined,
     });

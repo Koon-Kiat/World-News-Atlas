@@ -1,5 +1,5 @@
 import { getCountryName } from "./countries/metadata";
-import { countryBatchForRun, type IngestionCheckpoint, type IngestionStageRecord, type IngestionStageResult } from "./ingestion-state";
+import { countryBatchForRun, type IngestionMode, type IngestionCheckpoint, type IngestionStageRecord, type IngestionStageResult } from "./ingestion-state";
 import { newsPeriodHours } from "./periods";
 import { createConfiguredProviders } from "./providers";
 import { canonicalSourceId, parseDomainlessSourceId, sourceSeedForSelection } from "./sources/registry";
@@ -8,9 +8,12 @@ import type { DatabaseCoverageState, NewsStore } from "./store";
 import { topicLabel } from "./topics";
 import { buildNewsResponse } from "./query";
 import { D1IngestionRequestStore } from "./ingestion-requests";
+import { IngestionError } from "./ingestion-outcome";
+import { z } from "zod";
 import type { NewsQuery, NewsResponse, NormalizedArticle, ProviderContinuationState, ProviderName, SourceScope, StoryCandidate, StoryView } from "./types";
 
 type D1Value = string | number | null;
+type WriteBatch = (statements: D1PreparedStatement[]) => Promise<D1Result[]>;
 interface StoryRow { id: string; title: string; summary: string | null; first_published_at: string; last_updated_at: string; importance_score: number }
 interface StoryCountryRow { story_id: string; code: string; name: string; relevance_score: number }
 interface StoryTopicRow { story_id: string; slug: string }
@@ -34,15 +37,30 @@ function placeholders(count: number): string {
   return Array.from({ length: count }, () => "?").join(",");
 }
 
+const cursorSchema = z.object({
+  page: z.number().int().positive().optional(),
+  offset: z.number().int().nonnegative().optional(),
+  before: z.iso.datetime().optional(),
+  discoveryCursors: z.record(z.string(), z.iso.datetime().nullable()).optional(),
+  discoveryPages: z.record(z.string(), z.number().int().positive().nullable()).optional(),
+  completedPlanIds: z.array(z.string()).optional(),
+  exhaustionReason: z.string().optional(),
+}).strict();
+
 function jsonCursor(value: string | null): ProviderContinuationState | null {
-  if (!value) return null;
+  if (value === null) return null;
   try {
-    const parsed: unknown = JSON.parse(value);
-    return parsed && typeof parsed === "object" ? parsed as ProviderContinuationState : null;
-  } catch { return null; }
+    return cursorSchema.parse(JSON.parse(value));
+  } catch { throw new IngestionError("INVALID_STATE"); }
 }
 
 function checkpointFromRow(row: CheckpointRow): IngestionCheckpoint {
+  if (!["incremental", "backfill"].includes(row.mode) || !["RUNNING", "SUCCEEDED", "PARTIAL", "FAILED"].includes(row.status) ||
+      !z.iso.datetime().safeParse(row.window_start).success || !z.iso.datetime().safeParse(row.window_end).success ||
+      row.window_start > row.window_end || ![0, 1].includes(row.exhausted) || ![0, 1].includes(row.coverage_complete) ||
+      [row.received_count, row.accepted_count, row.duplicate_count].some((count) => !Number.isSafeInteger(count) || count < 0)) {
+    throw new IngestionError("INVALID_STATE");
+  }
   return {
     provider: row.provider, discoveryKey: row.discovery_key, countryCode: row.country_code, language: row.language,
     mode: row.mode === "backfill" ? "backfill" : "incremental",
@@ -64,16 +82,16 @@ async function firstId(database: D1Database, sql: string, values: D1Value[]): Pr
   return (await database.prepare(sql).bind(...values).first<{ id: string }>())?.id ?? null;
 }
 
-async function ensureCountry(database: D1Database, code: string, name = getCountryName(code)): Promise<void> {
+async function ensureCountry(database: D1Database, write: WriteBatch, code: string, name = getCountryName(code)): Promise<void> {
   const now = new Date().toISOString();
-  await database.prepare(`
+  await write([database.prepare(`
     INSERT INTO country (code, name, created_at, updated_at) VALUES (?, ?, ?, ?)
     ON CONFLICT(code) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at
-  `).bind(code, name, now, now).run();
+  `).bind(code, name, now, now)]);
 }
 
-async function upsertSource(database: D1Database, article: NormalizedArticle): Promise<string> {
-  if (article.source.countryCode) await ensureCountry(database, article.source.countryCode);
+async function upsertSource(database: D1Database, write: WriteBatch, article: NormalizedArticle): Promise<string> {
+  if (article.source.countryCode) await ensureCountry(database, write, article.source.countryCode);
   const existingId = article.source.domain
     ? await firstId(database, "SELECT id FROM source WHERE domain = ? LIMIT 1", [article.source.domain])
     : await firstId(database, "SELECT id FROM source WHERE domain IS NULL AND LOWER(name) = LOWER(?) AND country_code IS ? LIMIT 1", [article.source.name, article.source.countryCode]);
@@ -93,13 +111,13 @@ async function upsertSource(database: D1Database, article: NormalizedArticle): P
       ON CONFLICT(provider, identifier) DO UPDATE SET source_id = excluded.source_id
     `).bind(crypto.randomUUID(), sourceId, article.provider, article.sourceIdentifier, now));
   }
-  await database.batch(statements);
+  await write(statements);
   return sourceId;
 }
 
-async function upsertArticle(database: D1Database, article: NormalizedArticle): Promise<string> {
-  const sourceId = await upsertSource(database, article);
-  for (const country of article.countries) await ensureCountry(database, country.code, country.name);
+async function upsertArticle(database: D1Database, write: WriteBatch, article: NormalizedArticle): Promise<string> {
+  const sourceId = await upsertSource(database, write, article);
+  for (const country of article.countries) await ensureCountry(database, write, country.code, country.name);
   const canonicalId = await firstId(database, "SELECT id FROM article WHERE canonical_url = ? LIMIT 1", [article.canonicalUrl]);
   const providerId = await firstId(database, "SELECT article_id AS id FROM article_provider_ref WHERE provider = ? AND provider_article_id = ? LIMIT 1", [article.provider, article.providerArticleId]);
   const articleId = canonicalId ?? providerId ?? crypto.randomUUID();
@@ -137,7 +155,7 @@ async function upsertArticle(database: D1Database, article: NormalizedArticle): 
       ON CONFLICT(article_id, topic_id) DO NOTHING
     `).bind(articleId, slug));
   }
-  await database.batch(statements);
+  await write(statements);
   return articleId;
 }
 
@@ -201,27 +219,55 @@ export function databaseCandidateLimit(): number {
 
 export class D1NewsStore implements NewsStore {
   readonly ingestionRequests: D1IngestionRequestStore;
-  constructor(readonly database: D1Database) { this.ingestionRequests = new D1IngestionRequestStore(database); }
+  constructor(readonly database: D1Database, private readonly fence?: { requestId: string; token: string }) {
+    this.ingestionRequests = new D1IngestionRequestStore(database);
+  }
+
+  forIngestion(requestId: string, token: string): D1NewsStore {
+    return new D1NewsStore(this.database, { requestId, token });
+  }
+
+  private write: WriteBatch = async (statements) => {
+    if (!this.fence) return this.database.batch(statements);
+    // D1 batch rolls back all statements on constraint failure. A valid owner
+    // inserts nothing; a stale owner deliberately violates the existing NOT
+    // NULL constraint. The guard and data writes share one transaction, closing
+    // the gap between a JavaScript lease check and the actual mutation. Neither
+    // a missing lock nor a replaced token can let an old worker write.
+    const guard = this.database.prepare(`INSERT INTO ingestion_operation_lock (id, request_id, lease_until, attempt_token)
+      SELECT 'production', NULL, 0, '' WHERE NOT EXISTS (
+        SELECT 1 FROM ingestion_operation_lock WHERE id = 'production'
+          AND request_id = ? AND attempt_token = ? AND lease_until > unixepoch('subsec') * 1000
+      )`).bind(this.fence.requestId, this.fence.token);
+    try { return (await this.database.batch([guard, ...statements])).slice(1); }
+    catch (error) {
+      if (error instanceof Error && error.message.includes("NOT NULL constraint failed: ingestion_operation_lock.request_id")) {
+        throw new IngestionError("LEASE_LOST");
+      }
+      throw error;
+    }
+  };
 
   async persistStoryCandidates(candidates: StoryCandidate[], beforeWrite?: () => Promise<void>): Promise<{ storedArticles: number; storiesUpdated: number }> {
     const uniqueArticles = new Map(candidates.flatMap(({ articles }) => articles).map((article) => [article.canonicalUrl, article]));
     const articleIds = new Map<string, string>();
     for (const article of uniqueArticles.values()) {
       await beforeWrite?.();
-      articleIds.set(article.canonicalUrl, await upsertArticle(this.database, article));
+      articleIds.set(article.canonicalUrl, await upsertArticle(this.database, this.write, article));
     }
-    const previousStoryIds = new Set<string>();
+    const previousStoriesByArticle = new Map<string, string[]>();
     for (const idChunk of chunks([...articleIds.values()])) {
-      for (const row of await allRows<{ story_id: string }>(this.database,
-        `SELECT DISTINCT story_id FROM story_article WHERE article_id IN (${placeholders(idChunk.length)})`, idChunk)) previousStoryIds.add(row.story_id);
+      for (const row of await allRows<{ story_id: string; article_id: string }>(this.database,
+        `SELECT story_id, article_id FROM story_article WHERE article_id IN (${placeholders(idChunk.length)})`, idChunk)) {
+        previousStoriesByArticle.set(row.article_id, [...(previousStoriesByArticle.get(row.article_id) ?? []), row.story_id]);
+      }
     }
-    const desiredStoryIds = new Set<string>();
     for (const candidate of candidates) {
       await beforeWrite?.();
-      for (const country of candidate.countries) await ensureCountry(this.database, country.code, country.name);
+      for (const country of candidate.countries) await ensureCountry(this.database, this.write, country.code, country.name);
       const existingId = await firstId(this.database, "SELECT id FROM story WHERE fingerprint = ? LIMIT 1", [candidate.fingerprint]);
       const storyId = existingId ?? crypto.randomUUID();
-      desiredStoryIds.add(storyId);
+      const affectedStoryIds = new Set([storyId]);
       const now = new Date().toISOString();
       const statements: D1PreparedStatement[] = [
         this.database.prepare(`
@@ -233,32 +279,40 @@ export class D1NewsStore implements NewsStore {
             cluster_score = excluded.cluster_score, updated_at = excluded.updated_at
         `).bind(storyId, candidate.fingerprint, candidate.title, candidate.summary, candidate.firstPublishedAt,
           candidate.lastUpdatedAt, candidate.importanceScore, candidate.clusterScore, now, now),
-        this.database.prepare("DELETE FROM story_article WHERE story_id = ?").bind(storyId),
-        this.database.prepare("DELETE FROM story_country WHERE story_id = ?").bind(storyId),
-        this.database.prepare("DELETE FROM story_topic WHERE story_id = ?").bind(storyId),
       ];
       for (const article of candidate.articles) {
         const articleId = articleIds.get(article.canonicalUrl);
-        if (!articleId) throw new Error("Persisted article could not be reconciled");
+        if (!articleId) throw new IngestionError("INVARIANT_FAILED");
+        for (const previousId of previousStoriesByArticle.get(articleId) ?? []) affectedStoryIds.add(previousId);
+        // A provider stage only owns its incoming articles. Retain the other
+        // members of both the destination cluster and any previous cluster.
+        statements.push(this.database.prepare("DELETE FROM story_article WHERE article_id = ? AND story_id <> ?").bind(articleId, storyId));
         statements.push(this.database.prepare("INSERT INTO story_article (story_id, article_id) VALUES (?, ?) ON CONFLICT(story_id, article_id) DO NOTHING").bind(storyId, articleId));
       }
-      for (const country of candidate.countries) statements.push(this.database.prepare("INSERT INTO story_country (story_id, country_code, relevance_score) VALUES (?, ?, ?)").bind(storyId, country.code, country.relevanceScore));
-      for (const slug of candidate.topics) {
-        statements.push(this.database.prepare(`
-          INSERT INTO topic (id, slug, label, created_at, updated_at) VALUES (?, ?, ?, ?, ?)
-          ON CONFLICT(slug) DO UPDATE SET label = excluded.label, updated_at = excluded.updated_at
-        `).bind(`topic:${slug}`, slug, topicLabel(slug), now, now));
-        statements.push(this.database.prepare("INSERT INTO story_topic (story_id, topic_id) SELECT ?, id FROM topic WHERE slug = ? ON CONFLICT(story_id, topic_id) DO NOTHING").bind(storyId, slug));
-      }
-      await this.database.batch(statements);
+      for (const affectedId of affectedStoryIds) statements.push(...this.refreshStoryStatements(affectedId, now));
+      await this.write(statements);
     }
-    for (const idChunk of chunks([...previousStoryIds].filter((id) => !desiredStoryIds.has(id)))) {
-      await beforeWrite?.();
-      await this.database.prepare(`DELETE FROM story WHERE id IN (${placeholders(idChunk.length)})`).bind(...idChunk).run();
-    }
-    await beforeWrite?.();
-    await this.database.prepare("DELETE FROM story WHERE NOT EXISTS (SELECT 1 FROM story_article WHERE story_article.story_id = story.id)").run();
     return { storedArticles: articleIds.size, storiesUpdated: candidates.length };
+  }
+
+  private refreshStoryStatements(storyId: string, now: string): D1PreparedStatement[] {
+    // Derive filters and display metadata from actual membership, including
+    // articles absent from this batch. Run with the membership change atomically.
+    const members = "SELECT article_id FROM story_article WHERE story_id = ?";
+    return [
+      this.database.prepare("DELETE FROM story WHERE id = ? AND NOT EXISTS (SELECT 1 FROM story_article WHERE story_id = ?)").bind(storyId, storyId),
+      this.database.prepare("DELETE FROM story_country WHERE story_id = ?").bind(storyId),
+      this.database.prepare(`INSERT INTO story_country (story_id, country_code, relevance_score)
+        SELECT ?, country_code, MAX(relevance_score) FROM article_country WHERE article_id IN (${members}) GROUP BY country_code`).bind(storyId, storyId),
+      this.database.prepare("DELETE FROM story_topic WHERE story_id = ?").bind(storyId),
+      this.database.prepare(`INSERT INTO story_topic (story_id, topic_id)
+        SELECT ?, topic_id FROM article_topic WHERE article_id IN (${members}) GROUP BY topic_id`).bind(storyId, storyId),
+      this.database.prepare(`UPDATE story SET
+        (title, summary) = (SELECT title, description FROM article WHERE id IN (${members}) ORDER BY importance_score DESC, published_at ASC, id ASC LIMIT 1),
+        (first_published_at, last_updated_at, importance_score) =
+          (SELECT MIN(published_at), MAX(published_at), MIN(1.0, MAX(importance_score) + MIN(0.18, COUNT(*) * 0.04)) FROM article WHERE id IN (${members})),
+        updated_at = ? WHERE id = ?`).bind(storyId, storyId, now, storyId),
+    ];
   }
 
   async loadStories(query: NewsQuery, now = new Date(), options: { compact?: boolean; ids?: string[] } = {}): Promise<StoryView[]> {
@@ -400,7 +454,7 @@ export class D1NewsStore implements NewsStore {
 
   async save(checkpoint: IngestionCheckpoint): Promise<void> {
     const now = new Date().toISOString();
-    await this.database.prepare(`
+    await this.write([this.database.prepare(`
       INSERT INTO provider_ingestion_checkpoint (id, provider, discovery_key, country_code, language, mode, status,
         window_start, window_end, covered_from, covered_to, cursor, exhausted, coverage_complete,
         received_count, accepted_count, duplicate_count, last_successful_at, created_at, updated_at)
@@ -416,41 +470,42 @@ export class D1NewsStore implements NewsStore {
       checkpoint.windowEnd, checkpoint.coveredFrom ?? null, checkpoint.coveredTo ?? null,
       checkpoint.cursor ? JSON.stringify(checkpoint.cursor) : null, checkpoint.exhausted ? 1 : 0,
       checkpoint.coverageComplete ? 1 : 0, checkpoint.receivedCount, checkpoint.acceptedCount,
-      checkpoint.duplicateCount, checkpoint.lastSuccessfulAt ?? null, now, now).run();
+      checkpoint.duplicateCount, checkpoint.lastSuccessfulAt ?? null, now, now)]);
   }
 
   async startStage(stage: IngestionStageRecord): Promise<string> {
     const id = crypto.randomUUID();
-    await this.database.prepare(`INSERT INTO provider_ingestion_run
+    await this.write([this.database.prepare(`INSERT INTO provider_ingestion_run
       (id, provider, discovery_key, country_code, language, mode, status, started_at, window_start, window_end)
       VALUES (?, ?, ?, ?, ?, ?, 'RUNNING', ?, ?, ?)`)
       .bind(id, stage.provider, stage.discoveryKey, stage.countryCode, stage.language, stage.mode,
-        new Date().toISOString(), stage.windowStart.toISOString(), stage.windowEnd.toISOString()).run();
+        new Date().toISOString(), stage.windowStart.toISOString(), stage.windowEnd.toISOString())]);
     return id;
   }
 
   async finishStage(id: string | null, result: IngestionStageResult): Promise<void> {
     if (!id) return;
     const now = new Date().toISOString();
-    await this.database.prepare(`UPDATE provider_ingestion_run SET status = ?, completed_at = ?, last_successful_at = ?,
+    await this.write([this.database.prepare(`UPDATE provider_ingestion_run SET status = ?, completed_at = ?, last_successful_at = ?,
       cursor = ?, exhausted = ?, coverage_complete = ?, received_count = ?, normalized_count = ?, accepted_count = ?,
       out_of_window_count = ?, irrelevant_count = ?, duplicate_count = ?, stored_count = ?, stories_updated = ?, error_code = ? WHERE id = ?`)
       .bind(result.status, now, result.status === "FAILED" ? null : now, result.cursor ? JSON.stringify(result.cursor) : null,
         result.exhausted ? 1 : 0, result.coverageComplete ? 1 : 0, result.receivedCount, result.normalizedCount,
         result.acceptedCount, result.outOfWindowCount, result.irrelevantCount, result.duplicateCount,
-        result.storedCount, result.storiesUpdated, result.errorCode ?? null, id).run();
+        result.storedCount, result.storiesUpdated, result.errorCode ?? null, id)]);
   }
 
-  async nextCountryBatch(size: number): Promise<string[]> {
+  async nextCountryBatch(size: number, mode: IngestionMode = "incremental"): Promise<string[]> {
     const now = new Date().toISOString();
-    await this.database.prepare(`INSERT INTO ingestion_scheduler_state (id, next_country_offset, last_run_at, updated_at)
-      VALUES ('country-rotation', 0, ?, ?) ON CONFLICT(id) DO UPDATE SET last_run_at = excluded.last_run_at, updated_at = excluded.updated_at`).bind(now, now).run();
-    const row = await this.database.prepare("SELECT next_country_offset FROM ingestion_scheduler_state WHERE id = 'country-rotation'").first<{ next_country_offset: number }>();
-    const offset = row?.next_country_offset ?? 0;
-    const batch = countryBatchForRun(offset, size);
-    await this.database.prepare("UPDATE ingestion_scheduler_state SET next_country_offset = ?, updated_at = ? WHERE id = 'country-rotation'")
-      .bind(offset >= 1_000_000 ? 0 : offset + 1, now).run();
-    return batch;
+    const id = mode === "backfill" ? "country-rotation:backfill" : "country-rotation";
+    const result = await this.write([this.database.prepare(`INSERT INTO ingestion_scheduler_state (id, next_country_offset, last_run_at, updated_at)
+      VALUES (?, 1, ?, ?) ON CONFLICT(id) DO UPDATE SET
+        next_country_offset = CASE WHEN next_country_offset >= 1000000 THEN 0 ELSE next_country_offset + 1 END,
+        last_run_at = excluded.last_run_at, updated_at = excluded.updated_at
+      RETURNING next_country_offset`).bind(id, now, now)]);
+    const row = result[0].results[0] as { next_country_offset: number } | undefined;
+    if (!row) throw new IngestionError("INVARIANT_FAILED");
+    return countryBatchForRun(row.next_country_offset === 0 ? 1_000_000 : row.next_country_offset - 1, size);
   }
 
   async claimIngestionNonce(nonce: string, receivedAt: Date, expiresAt: Date): Promise<boolean> {
