@@ -2,6 +2,35 @@
 
 Keep this order: **apply production D1 migrations → verify migration success → deploy the application → run/enable the revised ingestion workflow**. Keep the current workflow until the database and application are ready. Do not change repository secrets or branch protection for this release.
 
+## Verified production release: 5 October 2026
+
+PR #5 changed the GitHub scheduler, but the production Site was still running
+version 42 from 9 September. Its database lacked `provider_request_control` and
+`ingestion_logical_request.retry_at`. Failed runs therefore combined the new
+scheduler with the old Worker, which still classified exhausted GDELT throttles
+as terminal failures even after storing stories. A green build or GitHub merge
+does not deploy this Site.
+
+Sites version **43** was published successfully on 5 October. Its source commit
+`99d5ccfb6599da7ab3264b1095cdb4cd64b2535d` has the identical Git tree
+`baeb12cb206792f280f28895bb123bd2e3a0d908` as GitHub `main` commit
+`72984adad8bd623655035832910f3e1edbf398dd`. Publication preserved the existing
+private Site and `DB`, and included migrations 0003 and 0004. Database readback
+confirmed all five provider-control columns and the request `retry_at` column.
+
+The subsequent [24h production verification run](https://github.com/Koon-Kiat/World-News-Atlas/actions/runs/37296206954)
+passed while GDELT was throttled: the global pass stored 95 articles/updated 94
+stories, and the country passes stored 5 and 18 articles. All three completed as
+`DEGRADED` in one operation each, with explicit 31/61/57-second cooldowns. This
+verifies the repaired failure semantics against real provider throttling; it
+does not promise that authentication, storage or complete provider outages can
+never fail.
+
+CI and ingestion explicitly use `ubuntu-24.04`. This avoids the announced
+[`ubuntu-latest` migration](https://github.com/actions/runner-images/issues/14748)
+starting 19 October 2026; upgrading the runner image is a deliberate future
+change. The migration notice itself did not cause the ingestion failures.
+
 `0001_parallel_martin_li.sql` creates the distributed quota, logical ingestion request and operation lease tables. `0002_ingestion_retries.sql` only adds constant-default attempt/fencing fields, a saved plan and a terminal-failure marker to the ingestion control tables. Neither changes or recreates news data tables. Applied SQL files and matching Drizzle metadata are immutable; subsequent changes require new migrations. Use a migration ledger, never manually replay SQL files or use `drizzle-kit push` on production.
 
 `0003_provider_rate_control.sql` adds the shared provider slot/cooldown table. `0004_ingestion_retry_deadline.sql` adds `retry_at` with a zero default to logical requests. Both are additive and retain existing news, plans, nonces and request history. Applying the migration command again is safe through its existing ledger; directly replaying an ALTER TABLE file is not supported.
