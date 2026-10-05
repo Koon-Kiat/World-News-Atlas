@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   ingest:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 18
     env:
       NEWS_INGEST_URL: ${{ secrets.NEWS_INGEST_URL }}
