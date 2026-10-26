@@ -214,6 +214,8 @@ export interface ProviderContinuationState {
   discoveryPages?: Record<string, number | null>;
   /** Deterministic Bing/RSS plan identifiers already attempted. */
   completedPlanIds?: string[];
+    /** Public feed attempts, including failures, to advance a bounded snapshot fairly. */
+    attemptedPlanIds?: string[];
   /** Provider-specific reason continuation ended before historical coverage completed. */
   exhaustionReason?: string;
 }

@@ -36,6 +36,17 @@ function LimitHarness() {
 }
 
 describe("source picker", () => {
+  it("focuses search on opening and returns focus on Escape", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    const trigger = screen.getByRole("button", { name: /news outlets/i });
+    await user.click(trigger);
+    expect(screen.getByRole("searchbox", { name: "Search news outlets" })).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
   it("searches, groups, multi-selects by stable ID, and keeps selections visible", async () => {
     const user = userEvent.setup();
     render(<Harness />);

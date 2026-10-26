@@ -130,7 +130,7 @@ function placeholderImageResponse(topicValue: string | null): Response {
   </defs>
   <rect width="1200" height="675" fill="#0c3036"/><rect width="1200" height="675" fill="url(#a)"/><rect width="1200" height="675" fill="url(#b)"/><rect width="1200" height="675" fill="url(#grid)"/>
   <g transform="translate(600 272)" fill="none" stroke="#d9e7e2" stroke-width="5" stroke-opacity=".8"><circle r="112"/><ellipse rx="52" ry="112"/><path d="M-108-35h216M-108 35h216M-112 0h224"/></g>
-  <circle cx="690" cy="192" r="18" fill="#f56f52"/><text x="600" y="470" text-anchor="middle" fill="#f7f1e8" font-family="Georgia,serif" font-size="54">${label}</text><text x="600" y="520" text-anchor="middle" fill="#b8ccc7" font-family="Arial,sans-serif" font-size="18" font-weight="700" letter-spacing="5">WORLD NEWS ATLAS</text>
+  <circle cx="690" cy="192" r="18" fill="#f56f52"/><text x="600" y="470" text-anchor="middle" fill="#f7f1e8" font-family="Arial,sans-serif" font-size="54">${label}</text><text x="600" y="520" text-anchor="middle" fill="#b8ccc7" font-family="Arial,sans-serif" font-size="18" font-weight="700" letter-spacing="5">WORLD NEWS ATLAS</text>
 </svg>`;
   return new Response(svg, {
     headers: {

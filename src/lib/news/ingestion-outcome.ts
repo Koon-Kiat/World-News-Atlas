@@ -8,6 +8,9 @@ export type FailureKind = "transient_provider" | "retryable_internal" | "termina
 /** Only explicitly understood upstream conditions are eligible for degradation. */
 export function ingestionFailureKind(code: string): FailureKind {
   if (["STORAGE_UNAVAILABLE", "LEASE_LOST", "OPERATION_TIMEOUT"].includes(code)) return "retryable_internal";
+  // Public, credential-free discovery sources can block a crawler or return HTML.
+  // Keep these observable without treating them as application auth/config errors.
+  if (["PUBLIC_FEED_UNAVAILABLE", "PUBLIC_FEED_INVALID_RESPONSE"].includes(code)) return "transient_provider";
   if (["REQUEST_FAILED", "STAGE_TIMEOUT", "PROVIDER_COOLDOWN", "PROVIDER_BUSY", "ALL_FEEDS_FAILED"].includes(code)) return "transient_provider";
   const status = /^HTTP_(\d{3})$/.exec(code);
   return status && isTransientStatus(Number(status[1])) ? "transient_provider" : "terminal";

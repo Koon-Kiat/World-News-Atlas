@@ -52,5 +52,5 @@ it("excludes API/private/query responses and bounds cached static resources", as
   sw.fetcher.mockResolvedValueOnce(new Response("private", { headers: { "Cache-Control": "private, no-store" } }));
   await sw.fetch("/saved"); expect(await sw.caches.match("/saved")).toBeUndefined();
   for (let index = 0; index < 85; index++) await sw.fetch(`/_next/static/${index}.js`, "cors");
-  expect(sw.stores.get("worldline-assets-v3")?.size).toBe(80);
+  expect(sw.stores.get("worldline-assets-v4")?.size).toBe(80);
 });

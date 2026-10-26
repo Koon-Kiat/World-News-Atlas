@@ -1,9 +1,11 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
+import { ArrowLeft, ExternalLink, Globe2, X } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { CountryFlag } from "@/components/CountryFlag";
+import { SourceLabel, SourceLogo } from "@/components/SourceLogo";
 import { getCountryName } from "@/lib/news/countries/metadata";
 import type { ArticleView, StoryView } from "@/lib/news/types";
 import { isSafeHttpUrl } from "@/lib/news/url";
@@ -25,10 +27,9 @@ function PublisherLink({ article, prominent = false }: { article: ArticleView; p
       rel="noopener noreferrer nofollow"
       referrerPolicy="strict-origin-when-cross-origin"
     >
+      {prominent && <SourceLogo name={article.source.name} domain={article.source.domain} />}
       <span>{prominent ? `Open ${article.source.name}` : "Open original"}</span>
-      <svg viewBox="0 0 20 20" aria-hidden="true">
-        <path d="M7 4h9v9M16 4 8.5 11.5M14 10v5H5V6h5" />
-      </svg>
+      <ExternalLink aria-hidden="true" />
     </a>
   );
 }
@@ -40,7 +41,7 @@ function ReaderSourceCard({ article, index }: { article: ArticleView; index: num
       <div className="reader-source-index">{String(index + 1).padStart(2, "0")}</div>
       <div>
         <div className="reader-source-meta">
-          <strong>{article.source.name}</strong>
+          <strong><SourceLabel source={article.source} /></strong>
           <time dateTime={article.publishedAt}>{formattedDate(article.publishedAt)}</time>
         </div>
         <h4>{article.title}</h4>
@@ -55,9 +56,7 @@ function ReaderSourceCard({ article, index }: { article: ArticleView; index: num
         {canOpenOriginal && (
           <span className="reader-source-action">
             Open original
-            <svg viewBox="0 0 20 20" aria-hidden="true">
-              <path d="M7 4h9v9M16 4 8.5 11.5M14 10v5H5V6h5" />
-            </svg>
+            <ExternalLink aria-hidden="true" />
           </span>
         )}
       </div>
@@ -92,6 +91,7 @@ export function StoryReader({
   onClose: () => void;
 }) {
   const backButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
   const readerScrollRef = useRef<HTMLDivElement>(null);
   const reportsSectionRef = useRef<HTMLElement>(null);
   const readerMountedRef = useRef(false);
@@ -99,7 +99,7 @@ export function StoryReader({
   const returnScrollRef = useRef(0);
   const historyKeyRef = useRef(`reader-${story.id}`);
   const lead = story.articles[0];
-  const sourceNames = [...new Set(story.articles.map((article) => article.source.name))];
+  const sources = [...new Map(story.articles.map((article) => [article.source.id, article.source])).values()];
 
   const showCoverage = useCallback(() => {
     const scroller = readerScrollRef.current;
@@ -153,6 +153,13 @@ export function StoryReader({
 
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape") requestClose();
+      if (event.key === "Tab") {
+        const controls = dialogRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex="0"]');
+        const first = controls?.[0];
+        const last = controls?.[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
     }
 
     function closeOnHistoryBack() {
@@ -183,11 +190,12 @@ export function StoryReader({
         if (event.currentTarget === event.target) requestClose();
       }}
     >
-      <section className="story-reader" role="dialog" aria-modal="true" aria-labelledby={`reader-title-${story.id}`}>
+      <section ref={dialogRef} className="story-reader" role="dialog" aria-modal="true" aria-labelledby={`reader-title-${story.id}`}>
         <header className="reader-chrome">
           <div className="reader-chrome-start">
             <button ref={backButtonRef} type="button" className="reader-back" onClick={requestClose} aria-label="Back to stories">
-              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m11.5 4.5-5.5 5.5 5.5 5.5M6.5 10H16" /></svg>
+              <ArrowLeft aria-hidden="true" />
+              <span>Back</span>
             </button>
           </div>
           <div className="reader-mode" aria-label="Current reading mode">
@@ -195,7 +203,8 @@ export function StoryReader({
             Reader view
           </div>
           <button type="button" className="reader-close" onClick={requestClose} aria-label="Close reader">
-            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
+            <X aria-hidden="true" />
+            <span>Close</span>
           </button>
         </header>
 
@@ -227,7 +236,7 @@ export function StoryReader({
                     {getCountryName(country.code)}
                   </span>
                 )) : (
-                  <span><span aria-hidden="true">🌐</span>Global</span>
+                  <span><Globe2 aria-hidden="true" />Global</span>
                 )}
               </div>
 
@@ -269,7 +278,7 @@ export function StoryReader({
                 <span>First published</span>
                 <strong>{formattedDate(story.firstPublishedAt)}</strong>
                 <span>Sources</span>
-                <strong>{sourceNames.join(" · ")}</strong>
+                <strong className="source-label-list">{sources.map((source) => <SourceLabel key={source.id} source={source} />)}</strong>
                 <span>Language</span>
                 <strong>{lead?.language?.toUpperCase() ?? "—"}</strong>
               </div>

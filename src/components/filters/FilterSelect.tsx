@@ -1,5 +1,6 @@
 "use client";
 
+import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
 interface FilterOption<T extends string> {
@@ -88,9 +89,7 @@ export function FilterSelect<T extends string>({
           <small>{label}</small>
           <strong>{selected.label}</strong>
         </span>
-        <svg viewBox="0 0 20 20" aria-hidden="true">
-          <path d="m5 7.5 5 5 5-5" />
-        </svg>
+        <ChevronDown aria-hidden="true" />
       </button>
       {open && (
         <div className="filter-select-menu" role="listbox" id={listId} aria-label={label}>
@@ -108,7 +107,7 @@ export function FilterSelect<T extends string>({
               onClick={() => choose(index)}
             >
               <span>{option.label}</span>
-              {option.value === value && <span aria-hidden="true">✓</span>}
+              {option.value === value && <Check aria-hidden="true" />}
             </button>
           ))}
         </div>

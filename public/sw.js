@@ -1,7 +1,7 @@
-const CACHE_NAME = "worldline-shell-v3";
-const ASSET_CACHE = "worldline-assets-v3";
+const CACHE_NAME = "worldline-shell-v4";
+const ASSET_CACHE = "worldline-assets-v4";
 const MAX_ASSETS = 80;
-const APP_SHELL = ["/", "/country", "/compare", "/saved", "/settings", "/offline.html", "/theme.js", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/icon-512.png"];
+const APP_SHELL = ["/", "/country", "/compare", "/saved", "/settings", "/offline.html", "/offline.css", "/fonts/source-sans-3-latin.woff2", "/theme.js", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/icon-512.png"];
 let writes = Promise.resolve();
 
 function cacheable(response) {

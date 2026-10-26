@@ -124,6 +124,16 @@ describe("D1 news integration", () => {
     await expect(current.nextCountryBatch(1)).rejects.toMatchObject({ code: "LEASE_LOST" });
   }, 20_000);
 
+  it("round-trips failed feed progress across independent database store instances", async () => {
+    const now = new Date().toISOString();
+    const cursor = { offset: 1, completedPlanIds: ["https://feeds.bbci.co.uk/news/world/rss.xml"],
+      attemptedPlanIds: ["https://feeds.bbci.co.uk/news/world/rss.xml", "https://www.aljazeera.com/xml/rss/all.xml"] };
+    await store.save({ provider: "RSS", discoveryKey: "feed-progress", countryCode: null, language: null,
+      mode: "incremental", status: "FAILED", windowStart: now, windowEnd: now, cursor,
+      exhausted: false, coverageComplete: false, receivedCount: 1, acceptedCount: 1, duplicateCount: 0 });
+    expect((await new D1NewsStore(database).load("feed-progress", "RSS"))?.cursor).toEqual(cursor);
+  });
+
   it("rejects corrupt stored cursors instead of silently restarting discovery", async () => {
     const now = new Date().toISOString();
     await store.save({ provider: "GDELT", discoveryKey: "corrupt", countryCode: null, language: null, mode: "backfill",
