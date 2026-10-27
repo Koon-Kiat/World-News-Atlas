@@ -158,6 +158,10 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .reader-tags .country-flag { width: 20px; height: 15px; }
 .source-label > .source-logo { display: inline-flex; margin: 0; }
 .reader-publisher-button .source-logo img[src$=".svg"] { filter: brightness(0); }
+/* The publisher's monochrome ST favicon has an opaque white canvas. Blend its
+   inverted canvas into dark surfaces while retaining the original letterforms. */
+.source-logo-monochrome img { filter: grayscale(1) invert(1); mix-blend-mode: screen; }
+.reader-publisher-button .source-logo-monochrome img { filter: grayscale(1); mix-blend-mode: multiply; }
 .period-option { border-radius: var(--control-radius); }
 .period-option:hover { transform: none; border-color: #b0b0b7; }
 .period-option.selected { background: #213346; border-color: #9bcfff; box-shadow: none; }

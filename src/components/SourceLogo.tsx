@@ -14,7 +14,8 @@ export function SourceLogo({ name, domain }: { name: string; domain?: string | n
   const publisherDomain = domain?.replace(/^www\./, "");
   const localLogo = publisherDomain === "channelnewsasia.com" ? "/publishers/cna.svg"
     : publisherDomain === "bbc.com" || publisherDomain === "bbc.co.uk" ? "/publishers/bbc.svg" : null;
-  return <span className={`source-logo${localLogo?.includes("bbc") ? " source-logo-wide" : ""}`} aria-hidden="true" title={name}>
+  const monochromeFavicon = publisherDomain === "straitstimes.com";
+  return <span className={`source-logo${localLogo?.includes("bbc") ? " source-logo-wide" : ""}${monochromeFavicon ? " source-logo-monochrome" : ""}`} aria-hidden="true" title={name}>
     {domain && failedDomain !== domain ? <img
       src={localLogo ?? `/api/source-logo?domain=${encodeURIComponent(domain)}&v=1`}
       alt="" width={16} height={16} loading="lazy" decoding="async"
