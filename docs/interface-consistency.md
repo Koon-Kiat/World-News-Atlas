@@ -37,6 +37,10 @@ centers its icon without inheriting text-link margins.
 - Mobile layout at a 390px viewport reviewed for navigation, map, filters, reader,
   settings, saved empty state and offline recovery; missing-page route inspected.
 - Lead border animation and centered footer icon verified from computed layout.
+- Follow-up annotations: the count/loading panel now shares one dark footprint,
+  centered beside the briefing heading; the loading spinner is a Lucide icon.
+  Reader Back and Close share 44px targets, 18px icons and identical colors,
+  borders and spacing. Publisher-link icon/text centers were measured in-browser.
 - Reader focus wraps within the dialog; Escape returns to stories. Source picker
   focuses search and returns focus to its trigger on Escape. Regression tests
   exercise these behaviors alongside existing filter, save, reader and settings tests.

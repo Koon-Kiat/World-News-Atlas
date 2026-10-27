@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUp, X } from "lucide-react";
+import { ArrowUp, LoaderCircle, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -471,7 +471,7 @@ export function WorldNewsExplorer({
             </div>
             <div className="result-meta" aria-live="polite">
               {isLoading ? (
-                <span className="refreshing"><i aria-hidden="true" /> Checking live sources…</span>
+                <span className="refreshing"><LoaderCircle aria-hidden="true" /> Checking live sources…</span>
               ) : (
                 <span>
                   {data.meta.total}{data.meta.coverageStatus === "expanding" ? "+" : ""} {data.meta.total === 1 ? "story" : "stories"}
