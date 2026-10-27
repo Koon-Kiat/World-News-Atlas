@@ -7,7 +7,7 @@ import { publicationDateInRange, trustedPublicationDate } from "../publication-d
 import { registrableDomain } from "../sources/domain";
 import { metadataExcerpt } from "../text";
 import type { ProviderArticle, ProviderFetchRequest, ProviderFetchResult } from "../types";
-import { branchFailures, rejectProviderResponse, throwBranchFailure, type NewsProvider, ProviderError } from "./provider";
+import { branchFailures, rejectProviderResponse, type NewsProvider, ProviderError } from "./provider";
 import { boundedText } from "@/lib/bounded-stream";
 
 const MAX_FEED_BYTES = 2 * 1024 * 1024;
@@ -142,6 +142,10 @@ async function fetchFeed(feedUrl: string, timeoutMs: number, parentSignal?: Abor
       catch { throw new ProviderError("RSS", "INVALID_RESPONSE", "RSS redirect is not trusted"); }
       continue;
     }
+    if ([403, 404, 410].includes(response.status)) {
+      await response.body?.cancel();
+      throw new ProviderError("RSS", "PUBLIC_FEED_UNAVAILABLE", "Public RSS feed unavailable");
+    }
     if (!response.ok) await rejectProviderResponse("RSS", response);
     try { return await boundedText(response.body, MAX_FEED_BYTES, signal); }
     catch { throw new ProviderError("RSS", signal.aborted ? "STAGE_TIMEOUT" : "RESPONSE_TOO_LARGE", "RSS feed body could not be accepted"); }
@@ -201,6 +205,7 @@ export class RssProvider implements NewsProvider {
             return secondLocal - firstLocal;
           });
     const completedPlanIds = new Set(request.continuation?.completedPlanIds ?? []);
+    const attemptedPlanIds = new Set(request.continuation?.attemptedPlanIds ?? []);
     const offset = Math.max(0, request.continuation?.offset ?? 0);
     if (completedPlanIds.size === 0 && offset > 0) {
       perspectiveFeeds.slice(0, offset).forEach(({ feedUrl }) => completedPlanIds.add(feedUrl));
@@ -208,7 +213,7 @@ export class RssProvider implements NewsProvider {
     const pendingFeeds = completedPlanIds.size > 0
       ? perspectiveFeeds.filter(({ feedUrl }) => !completedPlanIds.has(feedUrl))
       : perspectiveFeeds.slice(offset);
-    const feeds = pendingFeeds.slice(0, FEEDS_PER_STAGE);
+    const feeds = pendingFeeds.filter(({ feedUrl }) => !attemptedPlanIds.has(feedUrl)).slice(0, FEEDS_PER_STAGE);
     logNews("info", "rss_source_targeting", {
       provider_source_targeted_query_count: targets.length > 0 ? feeds.length : 0,
       feedOffset: offset,
@@ -219,7 +224,7 @@ export class RssProvider implements NewsProvider {
         const xml = await fetchFeed(feed.feedUrl, this.timeoutMs, request.signal);
         let parsed;
         try { parsed = await this.parser.parseString(xml); }
-        catch { throw new ProviderError(this.name, "INVALID_RESPONSE", "RSS response was not usable"); }
+        catch { throw new ProviderError(this.name, "PUBLIC_FEED_INVALID_RESPONSE", "RSS response was not usable"); }
         let truncatedDescriptionCount = 0;
         const articles = parsed.items.flatMap<ProviderArticle>((item, index) => {
           const publishedAt = trustedPublicationDate([item.isoDate, item.pubDate]);
@@ -266,18 +271,18 @@ export class RssProvider implements NewsProvider {
         0,
       ),
     });
-    if (feeds.length > 0 && articles.length === 0 && settled.every((result) => result.status === "rejected")) {
-      throwBranchFailure(this.name, settled);
-    }
+    // Persist attempted feeds separately from successful feeds: an unavailable
+    // publisher must not starve every later feed or freeze this snapshot forever.
+    feeds.forEach(({ feedUrl }) => attemptedPlanIds.add(feedUrl));
     successful.forEach(({ feed: { feedUrl } }) => completedPlanIds.add(feedUrl));
     const nextOffset = completedPlanIds.size;
-    const exhausted = perspectiveFeeds.every(({ feedUrl }) => completedPlanIds.has(feedUrl));
+    const exhausted = perspectiveFeeds.every(({ feedUrl }) => completedPlanIds.has(feedUrl) || attemptedPlanIds.has(feedUrl));
     return {
       provider: this.name,
       articles,
       failures: branchFailures(this.name, settled),
       receivedAt: new Date().toISOString(),
-      continuation: exhausted ? null : { offset: nextOffset, completedPlanIds: [...completedPlanIds] },
+      continuation: exhausted ? null : { offset: nextOffset, completedPlanIds: [...completedPlanIds], attemptedPlanIds: [...attemptedPlanIds] },
       exhausted,
       coverage: {
         archiveCapable: false,

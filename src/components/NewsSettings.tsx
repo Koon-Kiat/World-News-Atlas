@@ -1,11 +1,11 @@
 "use client";
 
+import { ArrowUp } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
 import { ExploreNavigation, HeaderTools } from "./ExploreNavigation";
 import { NEWS_PERIOD_OPTIONS } from "@/lib/news/periods";
 import { useNewsPeriodPreference } from "@/hooks/useNewsPeriodPreference";
-import { ThemeControl } from "./ThemeControl";
 
 export function NewsSettings() {
   const [period, setPeriod] = useNewsPeriodPreference();
@@ -23,7 +23,7 @@ export function NewsSettings() {
         <HeaderTools active="settings" />
       </header>
 
-      <main className="settings-page">
+      <main className="settings-page" id="main-content" tabIndex={-1}>
         <section className="settings-intro" aria-labelledby="settings-title">
           <p className="eyebrow">Your briefing, your pace</p>
           <h1 id="settings-title">Choose how far back to look.</h1>
@@ -67,24 +67,12 @@ export function NewsSettings() {
           </div>
         </section>
 
-        <section className="settings-panel theme-settings-panel" aria-labelledby="theme-title">
-          <div className="settings-panel-heading">
-            <div>
-              <p className="eyebrow">Appearance</p>
-              <h2 id="theme-title">Color theme</h2>
-            </div>
-            <span>System is the default. A manual choice stays on this device.</span>
-          </div>
-          <div className="settings-theme-control">
-            <ThemeControl />
-          </div>
-        </section>
       </main>
 
       <footer className="site-footer">
         <div className="brand footer-brand"><span className="brand-mark" aria-hidden="true"><span /></span><span>WORLDLINE</span></div>
         <p>Preferences are stored only in this browser.</p>
-        <Link href="/country#top">Back to map ↑</Link>
+        <Link href="/country#top">Back to map <ArrowUp aria-hidden="true" /></Link>
       </footer>
     </div>
   );

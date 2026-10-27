@@ -1,5 +1,7 @@
 "use client";
 
+import { ArrowLeftRight } from "lucide-react";
+
 import { useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { geoCentroid, geoDistance, geoGraticule10, geoInterpolate, geoOrthographic, geoPath } from "d3-geo";
@@ -315,10 +317,10 @@ export function LandingGlobe({ compact = false, activeStep }: { compact?: boolea
         <span>{activeStep === undefined ? `${LIVE_ROUTE_COUNT} random live routes` : "Live connection"}</span>
         <strong>
           {activeStep === undefined && statusConnection
-            ? `${getCountryName(statusConnection.from)} ↔ ${getCountryName(statusConnection.to)}`
+            ? <>{getCountryName(statusConnection.from)} <ArrowLeftRight aria-label="connected with" /> {getCountryName(statusConnection.to)}</>
             : activeStep === undefined
               ? "Global routes updating"
-            : "Japan ↔ Singapore"}
+            : <>Japan <ArrowLeftRight aria-label="connected with" /> Singapore</>}
         </strong>
       </div>
       <figcaption>{compact ? "Live geographic signal" : "Drag to rotate 360° · Routes move at independent speeds"}</figcaption>

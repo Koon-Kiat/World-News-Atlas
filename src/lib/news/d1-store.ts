@@ -44,6 +44,7 @@ const cursorSchema = z.object({
   discoveryCursors: z.record(z.string(), z.iso.datetime().nullable()).optional(),
   discoveryPages: z.record(z.string(), z.number().int().positive().nullable()).optional(),
   completedPlanIds: z.array(z.string()).optional(),
+  attemptedPlanIds: z.array(z.string()).optional(),
   exhaustionReason: z.string().optional(),
 }).strict();
 

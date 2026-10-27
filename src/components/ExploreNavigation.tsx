@@ -1,8 +1,8 @@
 "use client";
 
+import { Bookmark, Settings, UserRound } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
-import { ThemeControl } from "@/components/ThemeControl";
+import { useEffect, useId, useRef, useState } from "react";
 import { useSavedStories } from "@/hooks/useSavedStories";
 
 export type ExploreSection = "country" | "compare" | "saved" | "settings";
@@ -50,32 +50,43 @@ export function ExploreNavigation({ active }: { active: ExploreSection }) {
 export function HeaderTools({ active }: { active: ExploreSection }) {
   const { stories, count } = useSavedStories();
   const [profileOpen, setProfileOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
+  useEffect(() => {
+    if (!profileOpen) return;
+    const dismiss = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setProfileOpen(false);
+    };
+    document.addEventListener("pointerdown", dismiss);
+    return () => document.removeEventListener("pointerdown", dismiss);
+  }, [profileOpen]);
 
   return (
-    <div className="header-tools" aria-label="Settings and appearance">
-      <ThemeControl compact />
-      <div className={profileOpen ? "profile-menu is-open" : "profile-menu"}>
+    <div className="header-tools" aria-label="Library and settings">
+      <div ref={rootRef} className={profileOpen ? "profile-menu is-open" : "profile-menu"}
+        onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setProfileOpen(false); }}
+        onKeyDown={(event) => { if (event.key === "Escape") { setProfileOpen(false); triggerRef.current?.focus(); } }}>
         <button
+          ref={triggerRef}
           type="button"
           className={active === "settings" || active === "saved" ? "profile-button active" : "profile-button"}
-          aria-label="Open profile menu"
+          aria-label="Open library menu"
           aria-expanded={profileOpen}
-          title="Profile"
+          aria-controls={profileOpen ? panelId : undefined}
           onClick={() => setProfileOpen((current) => !current)}
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="8" r="3.5" />
-            <path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
-          </svg>
+          <UserRound aria-hidden="true" />
+          <span>Library</span>
           {count > 0 && <span className="profile-count" aria-label={`${count} saved articles`}>{count > 99 ? "99+" : count}</span>}
         </button>
-        {profileOpen && <div className="profile-dropdown">
+        {profileOpen && <div className="profile-dropdown" id={panelId}>
           <div className="profile-dropdown-heading">
             <span>Your library</span>
             <strong>{count} saved</strong>
           </div>
           <Link href="/saved" className={active === "saved" ? "active" : ""}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4Z" /></svg>
+            <Bookmark aria-hidden="true" />
             <span><strong>Saved articles</strong><small>Read later on this device</small></span>
           </Link>
           {stories.slice(0, 2).map((story) => (
@@ -84,8 +95,8 @@ export function HeaderTools({ active }: { active: ExploreSection }) {
             </Link>
           ))}
           <Link href="/settings" className={active === "settings" ? "active" : ""}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19 12a7 7 0 0 0-.12-1.3l2-1.55-2-3.46-2.45 1A7 7 0 0 0 14.2 5.4L13.85 3h-4l-.35 2.4a7 7 0 0 0-2.23 1.29l-2.45-1-2 3.46 2 1.55A7 7 0 0 0 4.7 12c0 .45.04.88.12 1.3l-2 1.55 2 3.46 2.45-1A7 7 0 0 0 9.5 18.6l.35 2.4h4l.35-2.4a7 7 0 0 0 2.23-1.29l2.45 1 2-3.46-2-1.55c.08-.42.12-.85.12-1.3Z" /></svg>
-            <span><strong>Settings</strong><small>Range and appearance</small></span>
+            <Settings aria-hidden="true" />
+            <span><strong>Settings</strong><small>Reading preferences</small></span>
           </Link>
         </div>}
       </div>

@@ -3,7 +3,10 @@ import { connection } from "next/server";
 import { PwaRegistration } from "@/components/PwaRegistration";
 import { SavedStoriesProvider } from "@/hooks/useSavedStories";
 import "flag-icons/css/flag-icons.min.css";
+import "@fontsource-variable/source-sans-3";
+import "@fontsource-variable/source-serif-4";
 import "./globals.css";
+import "./interface.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://world-news-atlas.bookoonkiat.chatgpt.site"),
@@ -39,7 +42,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#000000",
-  colorScheme: "dark light",
+  colorScheme: "dark",
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
@@ -47,9 +50,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   // request-bound so framework inline scripts receive this response's CSP nonce.
   await connection();
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-theme="dark" suppressHydrationWarning>
       <body>
-        {/* Runs before visible content to preserve the saved theme on first paint. */}
+        <a className="skip-link" href="#main-content">Skip to main content</a>
+        {/* Retire saved light/system preferences before the first paint. */}
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
         <script src="/theme.js" />
         <PwaRegistration />

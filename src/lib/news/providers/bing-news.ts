@@ -232,7 +232,7 @@ export class BingNewsProvider implements NewsProvider {
       );
     let parsed;
     try { parsed = await this.parser.parseString(xml); }
-    catch { throw new ProviderError(this.name, "INVALID_RESPONSE", "Bing News RSS response was not usable"); }
+    catch { throw new ProviderError(this.name, "PUBLIC_FEED_INVALID_RESPONSE", "Bing News RSS response was not usable"); }
     const articles = parsed.items.flatMap<ProviderArticle>((item, index) => {
       const articleUrl = originalArticleUrl(item.link);
       if (!articleUrl || !item.title) return [];

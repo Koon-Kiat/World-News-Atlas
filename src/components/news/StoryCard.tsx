@@ -1,10 +1,12 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
+import { BookOpen, Bookmark, ExternalLink, Globe2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import dynamic from "next/dynamic";
 import { relativeTime } from "@/lib/relative-time";
 import { CountryFlag } from "@/components/CountryFlag";
+import { SourceLabel } from "@/components/SourceLogo";
 import { useSavedStories } from "@/hooks/useSavedStories";
 import { getCountryName } from "@/lib/news/countries/metadata";
 import { approvedArticleUrl, approvedImageUrl } from "@/lib/news/image-policy";
@@ -41,9 +43,7 @@ function ArticleLink({ article }: { article: ArticleView }) {
       title={`Read at ${article.source.name}`}
     >
       <span>Read source</span>
-      <svg viewBox="0 0 20 20" aria-hidden="true">
-        <path d="M7 4h9v9M16 4 8.5 11.5M14 10v5H5V6h5" />
-      </svg>
+      <ExternalLink aria-hidden="true" />
     </a>
   );
 }
@@ -58,7 +58,7 @@ export function StoryCard({ story, featured = false, referenceTime }: { story: S
   const primaryTopic = story.topics[0] ?? "world";
   const safeImage = displayImageUrl(imageArticle?.imageUrl, lead?.url, primaryTopic);
   const fallbackSource = imageArticle?.source.name ?? lead?.source.name ?? "World News Atlas";
-  const sourceNames = [...new Set(story.articles.map((article) => article.source.name))];
+  const sources = [...new Map(story.articles.map((article) => [article.source.id, article.source])).values()];
 
   return (
     <>
@@ -71,7 +71,7 @@ export function StoryCard({ story, featured = false, referenceTime }: { story: S
       />
       <div className={safeImage ? "story-image-wrap" : "story-image-wrap is-placeholder"}>
         <div className="story-image-fallback" aria-hidden="true">
-          <svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="29"/><ellipse cx="40" cy="40" rx="13" ry="29"/><path d="M12 40h56M18 27h44M18 53h44"/><circle className="story-image-fallback-dot" cx="60" cy="20" r="5"/></svg>
+          <Globe2 aria-hidden="true" />
           <strong>{primaryTopic} briefing</strong>
           <small>{fallbackSource}</small>
         </div>
@@ -103,7 +103,7 @@ export function StoryCard({ story, featured = false, referenceTime }: { story: S
             savedStories.toggle(story);
           }}
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4Z" /></svg>
+          <Bookmark aria-hidden="true" />
         </button>
       </div>
       <div className="story-body">
@@ -118,20 +118,20 @@ export function StoryCard({ story, featured = false, referenceTime }: { story: S
           {story.countries.map((country) => (
             <span key={country.code} className="country-tag">
               <CountryFlag code={country.code} />
-              {getCountryName(country.code)}
+              <span>{getCountryName(country.code)}</span>
             </span>
           ))}
           {story.countries.length === 0 && (
-            <span className="country-tag is-global"><span aria-hidden="true">🌐</span>Global</span>
+            <span className="country-tag is-global"><Globe2 aria-hidden="true" /><span>Global</span></span>
           )}
         </div>
         <div className="coverage-row">
           <div>
-            <p className="coverage-sources">{sourceNames.slice(0, 3).join(" · ")}</p>
+            <span className="coverage-sources source-label-list">{sources.slice(0, 3).map((source) => <SourceLabel key={source.id} source={source} />)}</span>
             <p className="coverage-count">Covered by {story.articles.length} {story.articles.length === 1 ? "source" : "sources"}</p>
           </div>
           <div className="story-actions">
-            <button type="button" className="reader-link" onClick={() => setReaderOpen(true)}>Reader</button>
+            <button type="button" className="reader-link" onClick={() => setReaderOpen(true)}><BookOpen aria-hidden="true" />Reader</button>
             {lead && <ArticleLink article={lead} />}
           </div>
         </div>
@@ -142,7 +142,7 @@ export function StoryCard({ story, featured = false, referenceTime }: { story: S
               {story.articles.map((article) => (
                 <li key={article.id}>
                   <div>
-                    <strong>{article.source.name}</strong>
+                    <strong><SourceLabel source={article.source} /></strong>
                     <span>{article.source.countryCode ? getCountryName(article.source.countryCode) : "International"} · {displayTime(article.publishedAt)}</span>
                   </div>
                   <ArticleLink article={article} />

@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeftRight, ArrowRight, ArrowUp, ArrowUpRight, Settings } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
@@ -16,19 +17,19 @@ const StoryGlobe = dynamic(() => import("./LandingGlobe").then((module) => modul
 });
 
 function ArrowUpRightIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>;
+  return <ArrowUpRight aria-hidden="true" />;
 }
 
 function CompareIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14M15 4l4 4-4 4M19 16H5M9 12l-4 4 4 4" /></svg>;
+  return <ArrowLeftRight aria-hidden="true" />;
 }
 
 function ArrowRightIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M14 7l5 5-5 5" /></svg>;
+  return <ArrowRight aria-hidden="true" />;
 }
 
 function SettingsIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19 12a7 7 0 0 0-.12-1.3l2-1.55-2-3.46-2.45 1A7 7 0 0 0 14.2 5.4L13.85 3h-4l-.35 2.4a7 7 0 0 0-2.23 1.29l-2.45-1-2 3.46 2 1.55A7 7 0 0 0 4.7 12c0 .45.04.88.12 1.3l-2 1.55 2 3.46 2.45-1A7 7 0 0 0 9.5 18.6l.35 2.4h4l.35-2.4a7 7 0 0 0 2.23-1.29l2.45 1 2-3.46-2-1.55c.08-.42.12-.85.12-1.3Z" /></svg>;
+  return <Settings aria-hidden="true" />;
 }
 
 const STORY_STEPS = [
@@ -219,11 +220,11 @@ export function LandingPage() {
         </Link>
         <p>World news, mapped by connection</p>
         <Link className="latest-link" href="/country#stories">
-          Latest briefing <span aria-hidden="true">→</span>
+          Latest briefing <ArrowRight aria-hidden="true" />
         </Link>
       </header>
 
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <section className="landing-hero" aria-labelledby="landing-title">
           <div className="landing-hero-copy">
             <p className="eyebrow">World News Atlas</p>
@@ -356,7 +357,7 @@ export function LandingPage() {
         <div className="brand footer-brand"><span className="brand-mark" aria-hidden="true"><span /></span><span>WORLDLINE</span></div>
         <p>Headlines, permitted excerpts and metadata only. Every live article links to its original publisher.</p>
         <a className="back-to-top-link" href="#top" aria-label="Back to top" title="Back to top">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M7 10l5-5 5 5" /></svg>
+          <ArrowUp aria-hidden="true" />
         </a>
       </footer>
     </div>

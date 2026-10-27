@@ -71,7 +71,9 @@ describe("landing page", () => {
     expect(container.querySelectorAll(".depth-story-preview .story-card")).toHaveLength(2);
     expect(screen.getByText("New port rules reshape work along the waterfront")).toBeInTheDocument();
     expect(screen.getByText("Japan and Singapore align on a cross-border port standard")).toBeInTheDocument();
-    expect(screen.getByText(/The Japan Times · CNA · Reuters/)).toBeInTheDocument();
+    for (const name of ["The Japan Times", "CNA", "Reuters"]) {
+      expect(screen.getAllByText(name).length).toBeGreaterThan(0);
+    }
     expect(screen.getByRole("link", { name: "Back to top" })).not.toHaveTextContent("Back to top");
   });
 });

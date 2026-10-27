@@ -7,6 +7,47 @@ afterEach(() => {
 });
 
 describe("RSS provider", () => {
+  it("advances past blocked feeds without counting them as completed", async () => {
+    const feeds = DEFAULT_RSS_FEEDS.slice(0, 5);
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => String(input) === feeds[0].feedUrl
+      ? new Response("Blocked", { status: 403 })
+      : new Response('<rss version="2.0"><channel><title>News</title></channel></rss>'));
+    vi.stubGlobal("fetch", fetchMock);
+    const provider = new RssProvider(feeds);
+    const first = await provider.fetchLatest();
+    expect(first.failures).toEqual([{ provider: "RSS", code: "PUBLIC_FEED_UNAVAILABLE" }]);
+    expect(first.continuation?.completedPlanIds).not.toContain(feeds[0].feedUrl);
+    const second = await provider.fetchLatest({ continuation: first.continuation ?? undefined });
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(String(fetchMock.mock.calls[4][0])).toBe(feeds[4].feedUrl);
+    expect(second.exhausted).toBe(true);
+    expect(second.coverage?.timeRangeCovered).toBe(false);
+    // A new snapshot retries the publisher; failures are never a permanent skip.
+    await provider.fetchLatest();
+    expect(fetchMock).toHaveBeenCalledTimes(9);
+  });
+
+  it("retains continuation even when the first entire feed batch is blocked", async () => {
+    const feeds = DEFAULT_RSS_FEEDS.slice(0, 5);
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => String(input) === feeds[4].feedUrl
+      ? new Response('<rss version="2.0"><channel><title>News</title></channel></rss>')
+      : new Response("Blocked", { status: 403 })));
+    const provider = new RssProvider(feeds);
+    const first = await provider.fetchLatest();
+    expect(first.failures).toHaveLength(4);
+    expect(first.exhausted).toBe(false);
+    const second = await provider.fetchLatest({ continuation: first.continuation ?? undefined });
+    expect(second.failures).toEqual([]);
+    expect(second.exhausted).toBe(true);
+  });
+
+  it("classifies malformed public feed content without hiding configuration errors", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response('<html>Upstream challenge</html>')));
+    const result = await new RssProvider([DEFAULT_RSS_FEEDS[0]]).fetchLatest();
+    expect(result.failures).toEqual([{ provider: "RSS", code: "PUBLIC_FEED_INVALID_RESPONSE" }]);
+    const invalid = await new RssProvider([{ ...DEFAULT_RSS_FEEDS[0], feedUrl: "http://localhost/private" }]).fetchLatest();
+    expect(invalid.failures).toEqual([{ provider: "RSS", code: "INVALID_CONFIGURATION" }]);
+  });
   it("loads a reviewed publisher feed without requiring credentials", async () => {
     vi.stubGlobal(
       "fetch",

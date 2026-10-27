@@ -60,6 +60,22 @@ const story: StoryView = {
 };
 
 describe("Worldline Reader", () => {
+  it("keeps keyboard focus inside the open reader", async () => {
+    render(<StoryCard story={story} />);
+    fireEvent.click(screen.getByRole("button", { name: /Read A shared technology project.*Worldline Reader/i }));
+    const dialog = await screen.findByRole("dialog", { name: story.title });
+    const controls = dialog.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex="0"]');
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    expect(first).toHaveFocus();
+    fireEvent.keyDown(first, { key: "Tab", shiftKey: true });
+    expect(last).toHaveFocus();
+    fireEvent.keyDown(last, { key: "Tab" });
+    expect(first).toHaveFocus();
+    fireEvent.keyDown(first, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
   it("opens from the entire story card and offers an explicit publisher choice", async () => {
     const { container } = render(<StoryCard story={story} featured />);
 
@@ -69,7 +85,7 @@ describe("Worldline Reader", () => {
     fireEvent.click(screen.getByRole("button", { name: /Read A shared technology project.*Worldline Reader/i }));
 
     expect(await screen.findByRole("dialog", { name: story.title })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Back to stories" })).toHaveTextContent("");
+    expect(screen.getByRole("button", { name: "Back to stories" })).toHaveTextContent("Back");
     expect(container.querySelector(".reader-brand")).not.toBeInTheDocument();
     expect(screen.queryByText("Coverage at a glance")).not.toBeInTheDocument();
     expect(screen.getByText("Choose how to read")).toBeInTheDocument();

@@ -1,5 +1,6 @@
 "use client";
 
+import { Search } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import { CountryFlag } from "@/components/CountryFlag";
 import { getCountryName, listCountries } from "@/lib/news/countries/metadata";
@@ -67,15 +68,13 @@ export function CountryPicker({ selectedCountries, onSelect }: CountryPickerProp
         <small>Search every country by name or code</small>
       </label>
       <div className="country-search-field">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="m21 21-4.7-4.7m2.2-5.3a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" />
-        </svg>
+        <Search aria-hidden="true" />
         <input
           id={inputId}
           type="search"
           value={query}
           autoComplete="off"
-          placeholder="Start typing: Japan, SG, Canada…"
+          placeholder="Country name or code"
           role="combobox"
           aria-autocomplete="list"
           aria-expanded={expanded && Boolean(query.trim())}

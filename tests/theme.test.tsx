@@ -1,75 +1,26 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ThemeControl } from "@/components/ThemeControl";
-import { THEME_STORAGE_KEY } from "@/lib/theme";
-
-let prefersDark = false;
-let mediaListener: ((event: MediaQueryListEvent) => void) | null = null;
-
-function installMatchMedia(): void {
-  vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
-    matches: prefersDark,
-    media: query,
-    onchange: null,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    addEventListener: vi.fn((_type: string, listener: (event: MediaQueryListEvent) => void) => {
-      mediaListener = listener;
-    }),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })));
-}
-
-beforeEach(() => {
-  prefersDark = false;
-  mediaListener = null;
-  window.localStorage.clear();
-  delete document.documentElement.dataset.theme;
-  delete document.documentElement.dataset.themePreference;
-  document.documentElement.style.colorScheme = "";
-  installMatchMedia();
-});
-
-afterEach(() => {
-  cleanup();
-  vi.unstubAllGlobals();
-});
-
-describe("theme preference", () => {
-  it("defaults to the cinematic dark theme", () => {
-    render(<ThemeControl />);
-
-    expect(screen.getByRole("button", { name: "Dark" })).toHaveAttribute("aria-pressed", "true");
-    expect(document.documentElement.dataset.themePreference).toBe("dark");
-    expect(document.documentElement.dataset.theme).toBe("dark");
+// @vitest-environment node
+import { readFileSync } from "node:fs";
+import { runInNewContext } from "node:vm";
+import { describe, expect, it } from "vitest";
+const bootstrap = readFileSync("public/theme.js", "utf8");
+describe("permanent dark appearance", () => {
+  it.each(["light", "system", "dark", null])("replaces legacy preference %s without consulting the OS", (stored) => {
+    const root = { dataset: { theme: "light" }, style: { colorScheme: "light" } };
+    let preference = stored;
+    runInNewContext(bootstrap, { document: { documentElement: root }, window: {
+      localStorage: { setItem: (_key: string, value: string) => { preference = value; } },
+      matchMedia: () => { throw new Error("Dark mode must not depend on the system"); },
+    } });
+    expect(root.dataset.theme).toBe("dark");
+    expect(root.style.colorScheme).toBe("dark");
+    expect(preference).toBe("dark");
   });
-
-  it("persists and applies a manual override", () => {
-    render(<ThemeControl />);
-    fireEvent.click(screen.getByRole("button", { name: "Dark" }));
-
-    expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
-    expect(document.documentElement.dataset.theme).toBe("dark");
-    expect(screen.getByRole("button", { name: "Dark" })).toHaveAttribute("aria-pressed", "true");
-  });
-
-  it("restores a persisted manual override", () => {
-    window.localStorage.setItem(THEME_STORAGE_KEY, "light");
-    prefersDark = true;
-    render(<ThemeControl />);
-
-    expect(screen.getByRole("button", { name: "Light" })).toHaveAttribute("aria-pressed", "true");
-    expect(document.documentElement.dataset.theme).toBe("light");
-  });
-
-  it("tracks system changes while system mode is selected", () => {
-    render(<ThemeControl />);
-    fireEvent.click(screen.getByRole("button", { name: "System" }));
-    expect(document.documentElement.dataset.theme).toBe("light");
-
-    prefersDark = true;
-    act(() => mediaListener?.({ matches: true } as MediaQueryListEvent));
-    expect(document.documentElement.dataset.theme).toBe("dark");
+  it("stays dark when browser storage is unavailable", () => {
+    const root = { dataset: {}, style: { colorScheme: "" } };
+    runInNewContext(bootstrap, { document: { documentElement: root }, window: {
+      localStorage: { setItem: () => { throw new Error("Storage disabled"); } },
+    } });
+    expect(root.dataset).toEqual({ theme: "dark" });
+    expect(root.style.colorScheme).toBe("dark");
   });
 });
