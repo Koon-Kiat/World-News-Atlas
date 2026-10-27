@@ -48,6 +48,19 @@ async function signedRequest(body: string, overrides: Record<string, string> = {
 }
 
 describe("signed ingestion route", () => {
+  it("returns degraded for the production combination of stored news and blocked public feeds", async () => {
+    const partial = { ...summary(), providersFailed: 2, providerFailures: [
+      { provider: "RSS" as const, code: "PUBLIC_FEED_UNAVAILABLE" },
+      { provider: "OTHER" as const, code: "PUBLIC_FEED_INVALID_RESPONSE" },
+    ] };
+    const store = replayProtectedStore();
+    const response = await handleIngestionRequest(await signedRequest(JSON.stringify({ requestId: "public-feed-outage", scope: "global" })), {
+      secret, store, now: () => now, run: async () => partial,
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ state: "DEGRADED", summary: { stored: 3, providersFailed: 2 } });
+    expect(store.ingestionRequests.markTerminalFailure).not.toHaveBeenCalled();
+  });
   it("completes useful work as degraded and reports the upstream cooldown", async () => {
     const partial: IngestionSummary = { ...summary(), providersFailed: 1, providerFailures: [{ provider: "GDELT", code: "HTTP_429", retryAfterMs: 60_000 }] };
     const response = await handleIngestionRequest(await signedRequest(JSON.stringify({ requestId: "throttled-operation", scope: "global" })), {

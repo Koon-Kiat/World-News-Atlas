@@ -1,5 +1,8 @@
 "use client";
 
+import { SourceLabel } from "@/components/SourceLogo";
+
+import { ChevronDown, Search } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { SourceFacet } from "@/lib/news/types";
 
@@ -16,16 +19,21 @@ export function SourceFilter({ availableSources, selectedCountries, value, onCha
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const panelId = useId();
   const limitMessageId = `${panelId}-limit`;
   const atSelectionLimit = value.length >= MAX_SELECTED_OUTLETS;
+  useEffect(() => { if (open) searchRef.current?.focus(); }, [open]);
 
   useEffect(() => {
     function closeOnOutsideClick(event: PointerEvent) {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     }
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape" && rootRef.current?.contains(document.activeElement)) {
+        setOpen(false); triggerRef.current?.focus();
+      }
     }
     document.addEventListener("pointerdown", closeOnOutsideClick);
     document.addEventListener("keydown", closeOnEscape);
@@ -70,8 +78,10 @@ export function SourceFilter({ availableSources, selectedCountries, value, onCha
   }
 
   return (
-    <div className="filter-select source-filter" ref={rootRef}>
+    <div className="filter-select source-filter" ref={rootRef}
+      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}>
       <button
+        ref={triggerRef}
         type="button"
         className="filter-select-trigger"
         aria-haspopup="dialog"
@@ -84,9 +94,7 @@ export function SourceFilter({ availableSources, selectedCountries, value, onCha
           <small>News outlets</small>
           <strong>{value.length === 0 ? "All outlets" : `${value.length} selected`}</strong>
         </span>
-        <svg viewBox="0 0 20 20" aria-hidden="true">
-          <path d="m5 7.5 5 5 5-5" />
-        </svg>
+        <ChevronDown aria-hidden="true" />
       </button>
       {open && (
         <div className="source-filter-menu" id={panelId} role="dialog" aria-label="Filter by news outlet">
@@ -102,8 +110,9 @@ export function SourceFilter({ availableSources, selectedCountries, value, onCha
           )}
           <label className="source-filter-search">
             <span className="sr-only">Search news outlets</span>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.7-4.7m2.2-5.3a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" /></svg>
+            <Search aria-hidden="true" />
             <input
+              ref={searchRef}
               type="search"
               value={search}
               placeholder="Search publishers"
@@ -124,14 +133,14 @@ export function SourceFilter({ availableSources, selectedCountries, value, onCha
                       aria-describedby={atSelectionLimit ? limitMessageId : undefined}
                       onChange={() => toggle(source.id)}
                     />
-                    <span><strong>{source.name}</strong><small>{source.domain ?? source.countryCode ?? "Publisher"}</small></span>
+                    <span><strong><SourceLabel source={source} /></strong><small>{source.domain ?? source.countryCode ?? "Publisher"}</small></span>
                     <em>{source.storyCount}</em>
                   </label>
                 ))}
               </section>
             ))}
           </div>
-          <button type="button" className="source-filter-done" onClick={() => setOpen(false)}>Done</button>
+          <button type="button" className="source-filter-done" onClick={() => { setOpen(false); triggerRef.current?.focus(); }}>Done</button>
         </div>
       )}
     </div>

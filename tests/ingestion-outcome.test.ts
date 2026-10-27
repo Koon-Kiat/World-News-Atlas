@@ -15,13 +15,14 @@ describe("ingestion acceptance policy", () => {
     expect(classifyIngestionOutcome(summary())).toBe("SUCCESS");
     expect(classifyIngestionOutcome(summary({ stored: 0 }))).toBe("SUCCESS");
   });
-  it.each(["HTTP_429", "HTTP_503", "REQUEST_FAILED", "STAGE_TIMEOUT", "PROVIDER_COOLDOWN"])("degrades a useful operation with transient %s", (code) => {
+  it.each(["HTTP_429", "HTTP_503", "REQUEST_FAILED", "STAGE_TIMEOUT", "PROVIDER_COOLDOWN", "PUBLIC_FEED_UNAVAILABLE", "PUBLIC_FEED_INVALID_RESPONSE"])("degrades a useful operation with transient %s", (code) => {
     expect(classifyIngestionOutcome(summary({ providersFailed: 1, providerFailures: [{ provider: "GDELT", code }] }))).toBe("DEGRADED");
   });
   it.each(["HTTP_401", "HTTP_403", "INVALID_QUERY", "INVALID_CONFIGURATION", "INVALID_RESPONSE", "UNEXPECTED_FAILURE", "INVARIANT_FAILED"])("never degrades terminal %s", (code) => {
     expect(classifyIngestionOutcome(summary({ providersFailed: 1, providerFailures: [{ provider: "NEWSAPI", code }] }))).toBe("TERMINAL_FAILURE");
   });
   it("keeps all-provider outages and storage failures retryable and red", () => {
+    expect(classifyIngestionOutcome(summary({ usefulStages: 0, stored: 0, providersFailed: 1, providerFailures: [{ provider: "RSS", code: "PUBLIC_FEED_UNAVAILABLE" }] }))).toBe("RETRYABLE_FAILURE");
     expect(classifyIngestionOutcome(summary({ usefulStages: 0, stored: 0, providersFailed: 1, providerFailures: [{ provider: "GDELT", code: "HTTP_429" }] }))).toBe("RETRYABLE_FAILURE");
     expect(classifyIngestionOutcome(summary({ persisted: false }))).toBe("RETRYABLE_FAILURE");
     expect(classifyIngestionOutcome(summary({ providersFailed: 1, providerFailures: [{ provider: "GDELT", code: "STORAGE_UNAVAILABLE" }] }))).toBe("RETRYABLE_FAILURE");

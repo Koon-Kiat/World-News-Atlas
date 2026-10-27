@@ -1,5 +1,6 @@
 "use client";
 
+import { Minus, Plus } from "lucide-react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { geoNaturalEarth1, geoPath } from "d3-geo";
@@ -198,8 +199,8 @@ export function WorldMap({
             : selectedCountries.map(getCountryName).join(" + ")}
       </div>
       <div className="map-zoom-controls" aria-label="Map zoom controls">
-        <button type="button" onClick={() => zoomFromCenter(1)} disabled={view.scale >= MAX_ZOOM} aria-label="Zoom in"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12" /></svg></button>
-        <button type="button" onClick={() => zoomFromCenter(-1)} disabled={view.scale <= MIN_ZOOM} aria-label="Zoom out"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12" /></svg></button>
+        <button type="button" onClick={() => zoomFromCenter(1)} disabled={view.scale >= MAX_ZOOM} aria-label="Zoom in"><Plus aria-hidden="true" /></button>
+        <button type="button" onClick={() => zoomFromCenter(-1)} disabled={view.scale <= MIN_ZOOM} aria-label="Zoom out"><Minus aria-hidden="true" /></button>
         <button type="button" className="map-reset" onClick={() => updateView({ scale: 1, x: 0, y: 0 })} disabled={view.scale === 1} aria-label="Reset map zoom">Reset</button>
       </div>
       <svg

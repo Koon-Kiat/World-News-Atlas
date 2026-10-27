@@ -1,5 +1,6 @@
 "use client";
 
+import { History, Search } from "lucide-react";
 import { useState } from "react";
 import { useSearchHistory } from "@/hooks/useSearchHistory";
 
@@ -29,14 +30,13 @@ export function HeaderSearch({
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
       }}
+      onKeyDown={(event) => { if (event.key === "Escape") setOpen(false); }}
       onSubmit={(event) => {
         event.preventDefault();
         submit();
       }}
     >
-      <button className="header-search-submit" type="submit" aria-label="Run search" title="Search">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21 21-4.7-4.7m2.2-5.3a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" /></svg>
-      </button>
+      <Search aria-hidden="true" />
       <label className="sr-only" htmlFor="news-search">Search news</label>
       <input
         id="news-search"
@@ -47,6 +47,7 @@ export function HeaderSearch({
         placeholder="Search topics, people, places…"
         onChange={(event) => onChange(event.target.value)}
       />
+      <button className="header-search-submit" type="submit" aria-label="Run search">Search</button>
       {open && history.length > 0 && (
         <div className="search-history" aria-label="Search history">
           <div className="search-history-heading">
@@ -66,7 +67,7 @@ export function HeaderSearch({
                     onSearch(query);
                   }}
                 >
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v4l3 2M4.9 4.9A10 10 0 1 1 2 12M2 5v7h7" /></svg>
+                  <History aria-hidden="true" />
                   <span>{query}</span>
                 </button>
               </li>

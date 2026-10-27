@@ -6,6 +6,10 @@ afterEach(() => {
 });
 
 describe("Bing News RSS provider", () => {
+  it("reports an unusable public discovery response as an upstream failure", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<html>Service unavailable</html>")));
+    await expect(new BingNewsProvider().fetchLatest()).rejects.toMatchObject({ code: "PUBLIC_FEED_INVALID_RESPONSE" });
+  });
   it("continues global discovery across bounded query plans", async () => {
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       void input;

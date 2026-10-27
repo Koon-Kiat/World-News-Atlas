@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowUp, LoaderCircle, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -224,7 +225,7 @@ export function WorldNewsExplorer({
     const second = getCountryName(selectedCountries[1]);
     return {
       eyebrow: "Bilateral lens",
-      title: `${first} ↔ ${second}`,
+      title: `${first} and ${second}`,
       description: `Stories with a meaningful connection to both ${first} and ${second}.`,
     };
   }, [selectedCountries]);
@@ -388,7 +389,7 @@ export function WorldNewsExplorer({
         <HeaderTools active={mode} />
       </header>
 
-      <main>
+      <main id="main-content" tabIndex={-1}>
         <section className="hero-section" aria-labelledby="hero-title">
           <h1 id="hero-title" className="sr-only">
             {mode === "country" ? "Explore news by country" : "Compare news between two countries"}
@@ -404,7 +405,7 @@ export function WorldNewsExplorer({
                 {QUICK_COUNTRIES.map((code) => (
                   <button type="button" key={code} aria-pressed={selectedCountries.includes(code)} onClick={() => selectCountry(code)}>
                     <CountryFlag code={code} />
-                    <strong>{getCountryName(code)}</strong>
+                    <strong>{code === "US" ? "United States" : code === "CN" ? "China" : getCountryName(code)}</strong>
                   </button>
                 ))}
               </div>
@@ -441,7 +442,7 @@ export function WorldNewsExplorer({
                           <strong>{code ? getCountryName(code) : index === 0 ? "First country" : "Add another"}</strong>
                           <small>{code ? (index === 0 ? "Primary lens" : "Shared lens") : "Not selected"}</small>
                         </div>
-                        {code && <button type="button" onClick={() => changeCountries(selectedCountries.filter((item) => item !== code))} aria-label={`Remove ${getCountryName(code)}`}>×</button>}
+                        {code && <button type="button" onClick={() => changeCountries(selectedCountries.filter((item) => item !== code))} aria-label={`Remove ${getCountryName(code)}`}><X aria-hidden="true" /></button>}
                       </div>
                     );
                   })}
@@ -452,7 +453,7 @@ export function WorldNewsExplorer({
             <div className="selection-toolbar">
               <div className="selection-title">
                 <span className="pulse-dot" />
-                <strong>{selectedCountries.length === 0 ? "Global view" : selectedCountries.map(getCountryName).join(" ↔ ")}</strong>
+                <strong>{selectedCountries.length === 0 ? "Global view" : selectedCountries.map(getCountryName).join(" and ")}</strong>
                 <span>{selectedCountries.length}/{selectionLimit} selected</span>
               </div>
               <PerspectiveFilter countries={selectedCountries} value={perspective} onChange={setPerspective} />
@@ -470,7 +471,7 @@ export function WorldNewsExplorer({
             </div>
             <div className="result-meta" aria-live="polite">
               {isLoading ? (
-                <span className="refreshing"><i aria-hidden="true" /> Checking live sources…</span>
+                <span className="refreshing"><LoaderCircle aria-hidden="true" /> Checking live sources…</span>
               ) : (
                 <span>
                   {data.meta.total}{data.meta.coverageStatus === "expanding" ? "+" : ""} {data.meta.total === 1 ? "story" : "stories"}
@@ -545,7 +546,7 @@ export function WorldNewsExplorer({
       <footer className="site-footer">
         <div className="brand footer-brand"><span className="brand-mark" aria-hidden="true"><span /></span><span>WORLDLINE</span></div>
         <p>Headlines, permitted excerpts and metadata only. Every live article links to its original publisher.</p>
-        <a href="#top">Back to map ↑</a>
+        <a href="#top">Back to map <ArrowUp aria-hidden="true" /></a>
       </footer>
     </div>
   );

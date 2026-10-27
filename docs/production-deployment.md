@@ -35,6 +35,32 @@ change. The migration notice itself did not cause the ingestion failures.
 
 `0003_provider_rate_control.sql` adds the shared provider slot/cooldown table. `0004_ingestion_retry_deadline.sql` adds `retry_at` with a zero default to logical requests. Both are additive and retain existing news, plans, nonces and request history. Applying the migration command again is safe through its existing ledger; directly replaying an ALTER TABLE file is not supported.
 
+## 27 October 2026 public-feed remediation
+
+Public RSS access denials and malformed responses were being treated like terminal
+application failures. RSS now reports explicit public-feed failure codes and
+persists attempted feeds separately from successfully completed feeds, allowing
+later publishers to run. Authentication, storage, unsafe redirects and unknown
+failure codes retain their stricter behavior. No database migration is required;
+the optional attempted-feed list is stored in the existing plan JSON.
+
+Sites version 44 deployed the ingestion change from source commit
+`0aefd9dbeaa4100d5f4be5d93df0b9dc1995440c`, with the same source tree as GitHub
+commit `490216924b1a6c81fe804fc4329b5902126b480e`.
+
+Real production verification, using the existing secrets and workflow on `main`:
+
+| Run | Global articles / stories | First country pass | Next country pass | Result |
+| --- | --- | --- | --- | --- |
+| [24h: 40457429741](https://github.com/Koon-Kiat/World-News-Atlas/actions/runs/40457429741) | 41 / 41 | 4 / 4 | 11 / 11 | All three passes completed as DEGRADED; GDELT throttling remained visible. |
+| [30d: 40457610214](https://github.com/Koon-Kiat/World-News-Atlas/actions/runs/40457610214) | 94 / 91 | 0 / 0 | 0 / 0 | All three passes completed as DEGRADED; the last pass included RSS PUBLIC_FEED_UNAVAILABLE. |
+
+Each pass completed in one request and one operation. Zero stored articles in a
+country pass are not evidence of new coverage: successful empty feed stages can
+complete while other providers are unavailable. These results verify bounded
+continuation and honest degradation, not uninterrupted availability of every
+upstream provider. The subsequent UI-only publication preserves this ingestion code.
+
 ## Existing Sites deployment (normal path)
 
 This repository declares `d1: "DB"` in `.openai/hosting.json` and uses `sites()` in `vite.config.ts`. The installed `@openai/sites-vite-plugin` copies `drizzle/**` into `dist/.openai/drizzle/**`; the Sites packaging helper includes those files with the Worker. The Sites 0.1.57 persistence contract explicitly states that migrations are **applied and recorded individually before Worker upload**. This establishes the migration-before-application gate; the presence of a `DB` binding alone would not establish it.

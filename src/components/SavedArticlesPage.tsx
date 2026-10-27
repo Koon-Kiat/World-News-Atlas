@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowUp, Bookmark } from "lucide-react";
 import Link from "next/link";
 import { ExploreNavigation, HeaderTools } from "@/components/ExploreNavigation";
 import { StoryList } from "@/components/news/StoryList";
@@ -20,7 +21,7 @@ export function SavedArticlesPage() {
         <HeaderTools active="saved" />
       </header>
 
-      <main className="saved-page">
+      <main className="saved-page" id="main-content" tabIndex={-1}>
         <section className="saved-intro" aria-labelledby="saved-title">
           <div>
             <p className="eyebrow">Your reading list</p>
@@ -34,7 +35,7 @@ export function SavedArticlesPage() {
           <StoryList stories={saved.stories} />
         ) : (
           <div className="saved-empty-state">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4Z" /></svg>
+            <Bookmark aria-hidden="true" />
             <h2>Your reading list is empty.</h2>
             <p>Use the bookmark button on any news card to save it here.</p>
             <Link href="/country#stories">Browse the latest stories</Link>
@@ -45,7 +46,7 @@ export function SavedArticlesPage() {
       <footer className="site-footer">
         <div className="brand footer-brand"><span className="brand-mark" aria-hidden="true"><span /></span><span>WORLDLINE</span></div>
         <p>Saved articles are stored only in this browser.</p>
-        <Link href="/country#stories">Back to stories ↑</Link>
+        <Link href="/country#stories">Back to stories <ArrowUp aria-hidden="true" /></Link>
       </footer>
     </div>
   );

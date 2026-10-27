@@ -1,0 +1,10 @@
+@font-face { font-family: "Source Sans 3 Variable"; font-style: normal; font-weight: 200 900; font-display: swap; src: url('/fonts/source-sans-3-latin.woff2') format('woff2'); }
+:root { color-scheme: dark; background: #000; color: #f5f5f7; font-family: "Source Sans 3 Variable", system-ui, sans-serif; }
+body { margin: 0; line-height: 1.6; }
+main { max-width: 640px; margin: 12vh auto; padding: 32px 24px; }
+h1 { font-size: 1rem; letter-spacing: .12em; text-transform: uppercase; }
+h2 { font-size: clamp(2rem,6vw,3.5rem); line-height: 1.15; }
+p { color: #b0b0b7; }
+a { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 12px; color: #f5f5f7; border: 1px solid #55555c; border-radius: 6px; text-decoration: none; }
+a:hover { background: #303034; }
+a:focus-visible { outline: 3px solid #9bcfff; outline-offset: 3px; }
