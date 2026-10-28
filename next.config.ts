@@ -3,6 +3,8 @@ import { contentSecurityPolicy } from "./src/lib/security-headers";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Project guidance lives in CLAUDE.md; stop `next dev` from recreating AGENTS.md.
+  agentRules: false,
   async headers() {
     return [
       {
