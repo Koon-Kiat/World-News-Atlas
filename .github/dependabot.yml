@@ -7,9 +7,23 @@ updates:
       day: monday
       time: "01:00"
       timezone: Asia/Singapore
+    # One catch-all group previously bundled breaking majors (ESLint 10,
+    # TypeScript 7) with safe updates, and split react-server-dom-webpack from
+    # the exactly pinned react, so npm ci failed on every grouped PR.
     groups:
+      react:
+        patterns: ["react", "react-dom", "react-server-dom-webpack", "@types/react", "@types/react-dom"]
       npm-dependencies:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
+    ignore:
+      # Next, its ESLint config and typescript-eslint gate these majors.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 5
 
   - package-ecosystem: github-actions

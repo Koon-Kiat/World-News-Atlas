@@ -452,9 +452,9 @@ export function WorldNewsExplorer({
 
             <div className="selection-toolbar">
               <div className="selection-title">
-                <span className="pulse-dot" />
+                <span className={selectedCountries.length ? "pulse-dot is-active" : "pulse-dot"} aria-hidden="true" />
                 <strong>{selectedCountries.length === 0 ? "Global view" : selectedCountries.map(getCountryName).join(" and ")}</strong>
-                <span>{selectedCountries.length}/{selectionLimit} selected</span>
+                <span className="selection-count">{selectedCountries.length} of {selectionLimit} selected</span>
               </div>
               <PerspectiveFilter countries={selectedCountries} value={perspective} onChange={setPerspective} />
               {selectedCountries.length > 0 && <button type="button" className="clear-button" onClick={() => changeCountries([])}>Clear selection</button>}
