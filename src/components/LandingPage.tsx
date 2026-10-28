@@ -304,6 +304,7 @@ export function LandingPage() {
           </div>
         </section>
 
+        <div className="landing-finale">
         <section className="landing-journeys" aria-labelledby="journeys-title">
           <div className="landing-journeys-heading">
             <p className="eyebrow">Choose your lens</p>
@@ -334,6 +335,7 @@ export function LandingPage() {
             <Link href="/settings">Set your reading range <SettingsIcon /></Link>
           </div>
         </section>
+        </div>
       </main>
 
       <footer className="site-footer landing-footer">

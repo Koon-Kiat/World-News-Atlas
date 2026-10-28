@@ -545,3 +545,33 @@ body { font-size: var(--fs-body); text-rendering: optimizeLegibility; -webkit-fo
   .landing-story-inner, .landing-depth, .landing-journeys, .landing-closing, .landing-hero { width: calc(100% - 32px); }
   .story-steps > li { grid-template-columns: 40px minmax(0, 1fr); }
 }
+
+/* ---------- One screen per landing section ----------
+   Header + hero, the pinned story stage, the perspective comparison and the
+   journeys + closing finale each fill one viewport, and gentle proximity
+   snapping settles each section into place. Sections still grow when their
+   content is taller than the screen. */
+.landing-page { --landing-header: 76px; }
+.landing-page .landing-hero { min-height: calc(100svh - var(--landing-header)); padding-block: clamp(24px, 5vh, 64px); align-items: center; }
+.landing-depth { min-height: 100svh; display: flex; flex-direction: column; justify-content: center; padding-block: clamp(24px, 4vh, 64px); }
+.depth-copy { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: end; gap: 8px 48px; max-width: none; margin-bottom: clamp(24px, 4vh, 40px); }
+.depth-copy .eyebrow { grid-column: 1 / -1; margin: 0; }
+.depth-copy > p:last-child { margin: 0; }
+.depth-story-preview .story-image-wrap { aspect-ratio: auto; height: clamp(140px, 18vh, 260px); }
+.depth-story-preview .coverage-details { display: none; }
+.landing-depth .depth-card { padding: 20px; gap: 6px; }
+.landing-finale { min-height: 100svh; display: flex; flex-direction: column; justify-content: center; gap: clamp(32px, 5vh, 56px); padding-block: clamp(32px, 6vh, 80px); }
+.landing-finale .landing-journeys { padding-block: 0; }
+.landing-finale .landing-closing { margin-bottom: 0; }
+
+html:has(.landing-page) { scroll-snap-type: y proximity; }
+.landing-page :is(.landing-utility-header, .landing-story, .landing-depth, .landing-finale) { scroll-snap-align: start; }
+
+@media (max-width: 1060px), (max-height: 680px) {
+  html:has(.landing-page) { scroll-snap-type: none; }
+  .landing-page .landing-hero, .landing-depth, .landing-finale { min-height: 0; }
+  .depth-copy { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:has(.landing-page) { scroll-snap-type: none; }
+}
