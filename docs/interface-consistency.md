@@ -78,9 +78,11 @@ Rules now enforced in `interface.css`:
 - **Targets:** 44px for primary controls and never below 24px (WCAG 2.5.8). The 18px source checkboxes pass because their full 44px label row is the target.
 - **Selection indicator:** a hollow ring in the global view and a filled amber marker once a country is selected. The adjacent text ("1 of 2 selected") states the same thing, so color is never the only signal.
 - **Map overlays:** the status chip and zoom controls use a solid chart panel instead of a translucent blur.
-- **Landing page:** no scroll-jacking and no content hidden until it is scrolled to.
-  - The four-step story is a normal list beside a pinned globe.
-  - Perspective previews render at full size.
+- **Landing page:** a scroll-driven story without hidden content.
+  - The story stage pins while its section scrolls past (one 85vh chapter per step). Scroll progress fills a rail, advances steps 01–04, swaps the example card, and drives a light parallax: globe drift and rotation, counter-rotating orbit rings, and a slower background grid.
+  - All four step titles stay visible; the active step expands with its description. Each title is a button that scrolls to its chapter, so the story works by keyboard.
+  - Below 1060px wide, below 680px tall, or with reduced motion, the stage unpins and every description is shown as a normal list.
+  - Perspective previews render at full size with story-specific artwork (`public/landing/`) instead of the generic placeholder.
   - Decorative background words were removed.
 
 Not covered: screen-reader testing with NVDA, VoiceOver or JAWS, and 200% zoom reflow on every route.

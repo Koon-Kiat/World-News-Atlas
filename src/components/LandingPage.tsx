@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeftRight, ArrowRight, ArrowUp, ArrowUpRight, Settings } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { StoryCard } from "@/components/news/StoryCard";
@@ -156,22 +156,49 @@ const GLOBAL_PREVIEW_STORY: StoryView = {
 };
 
 export function LandingPage() {
-  const stepsRef = useRef<HTMLOListElement>(null);
+  const storyRef = useRef<HTMLElement>(null);
   const [activeStep, setActiveStep] = useState(0);
 
-  // Highlight the step nearest the middle of the viewport. Every step stays
-  // readable in the normal page flow; the highlight is only an enhancement.
+  // Scroll-driven story: the stage pins while the section scrolls past, and
+  // progress through the section selects the step and drives the parallax.
+  // CSS turns the pin off on small screens and for reduced motion, where the
+  // same progress maths still selects the step nearest the reader.
   useEffect(() => {
-    const steps = stepsRef.current;
-    if (!steps) return;
-    const observer = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) setActiveStep(Number((entry.target as HTMLElement).dataset.step));
-      }
-    }, { rootMargin: "-45% 0px -45% 0px" });
-    steps.querySelectorAll("[data-step]").forEach((step) => observer.observe(step));
-    return () => observer.disconnect();
+    const story = storyRef.current;
+    if (!story) return;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Scroll events are already frame-aligned; updating directly avoids a
+    // stalled requestAnimationFrame freezing the story in background tabs.
+    const update = () => {
+      const box = story.getBoundingClientRect();
+      const viewport = window.innerHeight;
+      const range = box.height > viewport * 1.5 ? box.height - viewport : box.height + viewport * 0.5;
+      const offset = box.height > viewport * 1.5 ? -box.top : viewport * 0.75 - box.top;
+      const progress = Math.min(1, Math.max(0, offset / Math.max(1, range)));
+      story.style.setProperty("--story-progress", reducedMotion ? "0" : progress.toFixed(4));
+      const next = Math.min(STORY_STEPS.length - 1, Math.floor(progress * STORY_STEPS.length));
+      setActiveStep((current) => current === next ? current : next);
+    };
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
   }, []);
+
+  // Step buttons scroll to that chapter, so keyboard users can move through
+  // the story without relying on scroll position alone.
+  const goToStep = (index: number) => {
+    const story = storyRef.current;
+    if (!story) return;
+    const range = story.offsetHeight - window.innerHeight;
+    if (range <= window.innerHeight * 0.5) { setActiveStep(index); return; }
+    const top = story.getBoundingClientRect().top + window.scrollY;
+    const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({ top: top + range * ((index + 0.5) / STORY_STEPS.length), behavior: smooth ? "smooth" : "auto" });
+  };
 
   return (
     <div className="site-frame landing-page" id="top">
@@ -208,33 +235,43 @@ export function LandingPage() {
           <LandingGlobe />
         </section>
 
-        <section id="story" className="landing-story" aria-labelledby="story-title">
-          <div className="landing-story-inner">
-            <div className="story-copy-intro">
-              <p className="eyebrow">How a briefing comes together</p>
-              <h2 id="story-title">Watch one signal become a world story.</h2>
-            </div>
-            <div className="landing-story-layout">
-              <ol className="story-steps" ref={stepsRef}>
-                {STORY_STEPS.map((step, index) => (
-                  <li key={step.number} data-step={index} className={activeStep === index ? "active" : ""}>
-                    <span className="story-step-number" aria-hidden="true">{step.number}</span>
-                    <div>
-                      <p className="eyebrow">{step.eyebrow}</p>
-                      <h3>{step.title}</h3>
-                      <p>{step.copy}</p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-              <div className={`story-visual story-visual-step-${activeStep + 1}`}>
-                <StoryGlobe compact activeStep={activeStep} />
-                <article className="story-evidence-card" aria-label={`Example for step ${activeStep + 1}`}>
-                  <span>{STORY_EVIDENCE[activeStep].label}</span>
-                  <strong>{STORY_EVIDENCE[activeStep].headline}</strong>
-                  <small>{STORY_EVIDENCE[activeStep].source}</small>
-                  <b>{STORY_EVIDENCE[activeStep].metric}</b>
-                </article>
+        <section id="story" ref={storyRef} className="landing-story" aria-labelledby="story-title"
+          style={{ "--story-steps": STORY_STEPS.length } as CSSProperties}>
+          <div className="landing-story-stage">
+            <div className="landing-story-inner">
+              <div className="story-copy-intro">
+                <p className="eyebrow">How a briefing comes together</p>
+                <h2 id="story-title">Watch one signal become a world story.</h2>
+              </div>
+              <div className="landing-story-layout">
+                <div className="story-steps-wrap">
+                  <div className="story-progress-rail" aria-hidden="true"><span /></div>
+                  <ol className="story-steps">
+                    {STORY_STEPS.map((step, index) => (
+                      <li key={step.number} className={activeStep === index ? "active" : ""} aria-current={activeStep === index ? "step" : undefined}>
+                        <span className="story-step-number" aria-hidden="true">{step.number}</span>
+                        <div>
+                          <p className="eyebrow">{step.eyebrow}</p>
+                          <h3><button type="button" className="story-step-button" onClick={() => goToStep(index)}>{step.title}</button></h3>
+                          <p className="story-step-copy">{step.copy}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+                <div className={`story-visual story-visual-step-${activeStep + 1}`}>
+                  <div className="story-orbit story-orbit-one" aria-hidden="true" />
+                  <div className="story-orbit story-orbit-two" aria-hidden="true" />
+                  <div className="story-globe-parallax">
+                    <StoryGlobe compact activeStep={activeStep} />
+                  </div>
+                  <article className="story-evidence-card" key={activeStep} aria-label={`Example for step ${activeStep + 1}`}>
+                    <span>{STORY_EVIDENCE[activeStep].label}</span>
+                    <strong>{STORY_EVIDENCE[activeStep].headline}</strong>
+                    <small>{STORY_EVIDENCE[activeStep].source}</small>
+                    <b>{STORY_EVIDENCE[activeStep].metric}</b>
+                  </article>
+                </div>
               </div>
             </div>
           </div>
@@ -254,14 +291,14 @@ export function LandingPage() {
               <h3>Local perspective</h3>
               <p>Reporting from inside the country explains the direct human and policy impact.</p>
               <div className="depth-story-preview" aria-hidden="true" inert>
-                <StoryCard story={LOCAL_PREVIEW_STORY} />
+                <StoryCard story={LOCAL_PREVIEW_STORY} previewImage="/landing/port-waterfront.svg" />
               </div>
             </div>
             <div className="depth-card depth-card-global">
               <h3>Global perspective</h3>
               <p>International coverage reveals different priorities, framing and consequences.</p>
               <div className="depth-story-preview" aria-hidden="true" inert>
-                <StoryCard story={GLOBAL_PREVIEW_STORY} />
+                <StoryCard story={GLOBAL_PREVIEW_STORY} previewImage="/landing/shipping-corridor.svg" />
               </div>
             </div>
           </div>

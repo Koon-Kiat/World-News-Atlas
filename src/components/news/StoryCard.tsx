@@ -48,7 +48,12 @@ function ArticleLink({ article }: { article: ArticleView }) {
   );
 }
 
-export function StoryCard({ story, featured = false, referenceTime }: { story: StoryView; featured?: boolean; referenceTime?: string }) {
+// Landing-page previews may use bundled artwork; anything else goes through the image policy.
+const PREVIEW_IMAGE_PATH = /^\/landing\/[a-z0-9-]+\.svg$/;
+
+export function StoryCard({ story, featured = false, referenceTime, previewImage }: {
+  story: StoryView; featured?: boolean; referenceTime?: string; previewImage?: string;
+}) {
   const displayTime = (value: string) => referenceTime ? relativeTime(value, referenceTime) : value.slice(0, 10);
   const [readerOpen, setReaderOpen] = useState(false);
   const savedStories = useSavedStories();
@@ -56,7 +61,8 @@ export function StoryCard({ story, featured = false, referenceTime }: { story: S
   const lead = story.articles[0];
   const imageArticle = story.articles.find((article) => isSafeHttpUrl(article.imageUrl));
   const primaryTopic = story.topics[0] ?? "world";
-  const safeImage = displayImageUrl(imageArticle?.imageUrl, lead?.url, primaryTopic);
+  const safeImage = previewImage && PREVIEW_IMAGE_PATH.test(previewImage)
+    ? previewImage : displayImageUrl(imageArticle?.imageUrl, lead?.url, primaryTopic);
   const fallbackSource = imageArticle?.source.name ?? lead?.source.name ?? "World News Atlas";
   const sources = [...new Map(story.articles.map((article) => [article.source.id, article.source])).values()];
 
