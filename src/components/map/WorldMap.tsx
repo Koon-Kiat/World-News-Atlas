@@ -191,7 +191,7 @@ export function WorldMap({
   return (
     <div className="map-shell">
       <div className="map-status" aria-live="polite">
-        <span className="map-status-dot" />
+        <span className={selectedCountries.length ? "map-status-dot is-active" : "map-status-dot"} aria-hidden="true" />
         {hoveredCountry
           ? hoveredCountry.name
           : selectedCountries.length === 0

@@ -156,63 +156,25 @@ const GLOBAL_PREVIEW_STORY: StoryView = {
 };
 
 export function LandingPage() {
-  const pageRef = useRef<HTMLDivElement>(null);
-  const storyRef = useRef<HTMLElement>(null);
+  const stepsRef = useRef<HTMLOListElement>(null);
   const [activeStep, setActiveStep] = useState(0);
 
+  // Highlight the step nearest the middle of the viewport. Every step stays
+  // readable in the normal page flow; the highlight is only an enhancement.
   useEffect(() => {
-    const page = pageRef.current;
-    const story = storyRef.current;
-    if (!page || !story) return;
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let frame = 0;
-
-    const updateProgress = () => {
-      frame = 0;
-      const pageRange = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-      const pageProgress = Math.min(1, Math.max(0, window.scrollY / pageRange));
-      const storyTop = story.getBoundingClientRect().top + window.scrollY;
-      const storyRange = Math.max(1, story.offsetHeight - window.innerHeight);
-      const storyProgress = Math.min(1, Math.max(0, (window.scrollY - storyTop) / storyRange));
-      page.style.setProperty("--landing-progress", reducedMotion ? "0" : String(pageProgress));
-      page.style.setProperty("--story-progress", reducedMotion ? "1" : String(storyProgress));
-      page.style.setProperty("--story-offset", reducedMotion ? "0px" : `${(0.5 - storyProgress) * 34}px`);
-      page.style.setProperty("--story-grid-offset", reducedMotion ? "0px" : `${storyProgress * -84}px`);
-      page.style.setProperty("--story-rotation", reducedMotion ? "0deg" : `${storyProgress * 140}deg`);
-      page.style.setProperty("--depth-back-offset", reducedMotion ? "0px" : `${pageProgress * -170}px`);
-      page.style.setProperty("--depth-mid-offset", reducedMotion ? "0px" : `${pageProgress * -320}px`);
-      page.style.setProperty("--depth-grid-offset", reducedMotion ? "0px" : `${pageProgress * -45}px`);
-      const nextStep = reducedMotion ? 0 : Math.min(STORY_STEPS.length - 1, Math.floor(storyProgress * STORY_STEPS.length));
-      setActiveStep((current) => current === nextStep ? current : nextStep);
-    };
-
-    const requestUpdate = () => {
-      if (frame) return;
-      frame = window.requestAnimationFrame(updateProgress);
-    };
-
-    const revealObserver = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) entry.target.classList.add("is-visible");
-        }
-      },
-      { threshold: reducedMotion ? 0 : 0.18 },
-    );
-    page.querySelectorAll("[data-reveal]").forEach((element) => revealObserver.observe(element));
-    window.addEventListener("scroll", requestUpdate, { passive: true });
-    window.addEventListener("resize", requestUpdate);
-    updateProgress();
-    return () => {
-      window.removeEventListener("scroll", requestUpdate);
-      window.removeEventListener("resize", requestUpdate);
-      revealObserver.disconnect();
-      if (frame) window.cancelAnimationFrame(frame);
-    };
+    const steps = stepsRef.current;
+    if (!steps) return;
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) setActiveStep(Number((entry.target as HTMLElement).dataset.step));
+      }
+    }, { rootMargin: "-45% 0px -45% 0px" });
+    steps.querySelectorAll("[data-step]").forEach((step) => observer.observe(step));
+    return () => observer.disconnect();
   }, []);
 
   return (
-    <div ref={pageRef} className="site-frame landing-page" id="top">
+    <div className="site-frame landing-page" id="top">
       <header className="site-header landing-utility-header">
         <Link className="brand" href="/" aria-label="World News Atlas home">
           <span className="brand-mark" aria-hidden="true"><span /></span>
@@ -237,104 +199,88 @@ export function LandingPage() {
               <Link href="/country#top">Explore one country <ArrowUpRightIcon /></Link>
               <Link href="/compare#top">Compare two countries <CompareIcon /></Link>
             </div>
+            <dl className="landing-facts">
+              <div><dt>Coverage</dt><dd>Every country on the map</dd></div>
+              <div><dt>Sources</dt><dd>Publisher feeds, NewsAPI and GDELT</dd></div>
+              <div><dt>Account</dt><dd>None needed</dd></div>
+            </dl>
           </div>
-
           <LandingGlobe />
-
-          <a className="scroll-cue" href="#story">
-            <span>Scroll to trace the signal</span>
-            <i aria-hidden="true" />
-          </a>
         </section>
 
-        <section ref={storyRef} id="story" className="landing-story" aria-labelledby="story-title">
-          <div className={`landing-story-stage is-step-${activeStep + 1}`}>
-            <div className="story-progress-rail" aria-hidden="true">
-              <span style={{ transform: `scaleX(${(activeStep + 1) / STORY_STEPS.length})` }} />
+        <section id="story" className="landing-story" aria-labelledby="story-title">
+          <div className="landing-story-inner">
+            <div className="story-copy-intro">
+              <p className="eyebrow">How a briefing comes together</p>
+              <h2 id="story-title">Watch one signal become a world story.</h2>
             </div>
-
-            <div className={`story-visual story-visual-step-${activeStep + 1}`}>
-              <div className="story-orbit story-orbit-one" aria-hidden="true" />
-              <div className="story-orbit story-orbit-two" aria-hidden="true" />
-              <StoryGlobe compact activeStep={activeStep} />
-              <article className="story-evidence-card" key={STORY_EVIDENCE[activeStep].label}>
-                <span>{STORY_EVIDENCE[activeStep].label}</span>
-                <strong>{STORY_EVIDENCE[activeStep].headline}</strong>
-                <small>{STORY_EVIDENCE[activeStep].source}</small>
-                <b>{STORY_EVIDENCE[activeStep].metric}</b>
-              </article>
-            </div>
-
-            <div className="story-copy-stack">
-              <div className="story-copy-intro">
-                <p className="eyebrow">A connected briefing · Scroll to explore</p>
-                <h2 id="story-title">Watch one signal become a world story.</h2>
-              </div>
-              <div className="story-steps" aria-live="polite">
+            <div className="landing-story-layout">
+              <ol className="story-steps" ref={stepsRef}>
                 {STORY_STEPS.map((step, index) => (
-                  <article key={step.number} className={activeStep === index ? "active" : ""}>
-                    <span>{step.number}</span>
-                    <p className="eyebrow">{step.eyebrow}</p>
-                    <h3>{step.title}</h3>
-                    <p>{step.copy}</p>
-                  </article>
-                ))}
-              </div>
-              <ol className="story-step-index" aria-label="Story journey progress">
-                {STORY_STEPS.map((step, index) => (
-                  <li key={step.number} className={activeStep === index ? "active" : ""}>
-                    <span>{step.number}</span>
-                    {step.eyebrow}
+                  <li key={step.number} data-step={index} className={activeStep === index ? "active" : ""}>
+                    <span className="story-step-number" aria-hidden="true">{step.number}</span>
+                    <div>
+                      <p className="eyebrow">{step.eyebrow}</p>
+                      <h3>{step.title}</h3>
+                      <p>{step.copy}</p>
+                    </div>
                   </li>
                 ))}
               </ol>
+              <div className={`story-visual story-visual-step-${activeStep + 1}`}>
+                <StoryGlobe compact activeStep={activeStep} />
+                <article className="story-evidence-card" aria-label={`Example for step ${activeStep + 1}`}>
+                  <span>{STORY_EVIDENCE[activeStep].label}</span>
+                  <strong>{STORY_EVIDENCE[activeStep].headline}</strong>
+                  <small>{STORY_EVIDENCE[activeStep].source}</small>
+                  <b>{STORY_EVIDENCE[activeStep].metric}</b>
+                </article>
+              </div>
             </div>
-
-            <p className="story-scroll-hint" aria-hidden="true">
-              <span>{activeStep + 1}</span> / {STORY_STEPS.length}
-            </p>
           </div>
         </section>
 
         <section className="landing-depth" aria-labelledby="depth-title">
-          <div className="depth-layer depth-layer-back" aria-hidden="true"><span>Local reporting</span><span>Independent sources</span></div>
-          <div className="depth-layer depth-layer-mid" aria-hidden="true"><span>Context</span><span>Connection</span></div>
-          <div className="depth-copy" data-reveal>
+          <div className="depth-copy">
             <p className="eyebrow">Perspective creates depth</p>
             <h2 id="depth-title">Move beyond the headline.</h2>
             <p>
-              Background sources move differently from the story in front of you—just as local,
-              regional and international reporting each add a different layer of meaning.
+              Local, regional and international reporting each add a different layer of meaning.
+              Worldline keeps them side by side, and every source links back to its publisher.
             </p>
           </div>
-          <div className="depth-card depth-card-local" data-reveal>
-            <div className="depth-card-visual depth-story-preview depth-local-visual" aria-hidden="true" inert>
-              <StoryCard story={LOCAL_PREVIEW_STORY} />
+          <div className="depth-comparison">
+            <div className="depth-card depth-card-local">
+              <h3>Local perspective</h3>
+              <p>Reporting from inside the country explains the direct human and policy impact.</p>
+              <div className="depth-story-preview" aria-hidden="true" inert>
+                <StoryCard story={LOCAL_PREVIEW_STORY} />
+              </div>
             </div>
-            <span>Local perspective</span><strong>Understand what changes on the ground.</strong><small>Reporting from inside the country explains the direct human and policy impact.</small>
-          </div>
-          <div className="depth-card depth-card-global" data-reveal>
-            <div className="depth-card-visual depth-story-preview depth-global-visual" aria-hidden="true" inert>
-              <StoryCard story={GLOBAL_PREVIEW_STORY} />
+            <div className="depth-card depth-card-global">
+              <h3>Global perspective</h3>
+              <p>International coverage reveals different priorities, framing and consequences.</p>
+              <div className="depth-story-preview" aria-hidden="true" inert>
+                <StoryCard story={GLOBAL_PREVIEW_STORY} />
+              </div>
             </div>
-            <span>Global perspective</span><strong>Compare how the same event travels.</strong><small>International coverage reveals different priorities, framing and consequences.</small>
           </div>
         </section>
 
         <section className="landing-journeys" aria-labelledby="journeys-title">
-          <div className="landing-journeys-heading" data-reveal>
+          <div className="landing-journeys-heading">
             <p className="eyebrow">Choose your lens</p>
             <h2 id="journeys-title">Start anywhere.</h2>
             <p>No setup, provider choices or account required.</p>
           </div>
           <div className="journey-grid">
-            <Link href="/country#top" className="journey-card journey-country" data-reveal>
+            <Link href="/country#top" className="journey-card journey-country">
               <span>One country</span>
               <h3>Follow one place.</h3>
               <p>Choose a country and see reporting that involves it, wherever the story was published.</p>
               <strong>Open the country map <ArrowUpRightIcon /></strong>
             </Link>
-            <Link href="/compare#top" className="journey-card journey-compare" data-reveal>
+            <Link href="/compare#top" className="journey-card journey-compare">
               <span>Compare two</span>
               <h3>Find the shared story.</h3>
               <p>Select two countries and surface the reporting signals that connect them directly.</p>
@@ -343,9 +289,9 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section className="landing-closing" data-reveal>
-          <p className="eyebrow">News without borders</p>
-          <h2>See where the <em>story meets.</em></h2>
+        <section className="landing-closing" aria-labelledby="closing-title">
+          <h2 id="closing-title">See where the story meets.</h2>
+          <p>Open the map, pick a country, and the briefing updates as coverage arrives.</p>
           <div className="landing-actions">
             <Link href="/country#top">Enter World News Atlas <ArrowRightIcon /></Link>
             <Link href="/settings">Set your reading range <SettingsIcon /></Link>

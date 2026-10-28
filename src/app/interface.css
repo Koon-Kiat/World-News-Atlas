@@ -301,3 +301,203 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* ==========================================================================
+   Legibility and accessibility layer (WCAG 2.2 AA)
+   - Type floor: 13px metadata, 14-15px interface text, 16px+ reading text,
+     all in rem so browser text-size settings scale everything.
+   - Text contrast >= 4.5:1; control boundaries and indicators >= 3:1.
+   - Targets: 44px for primary controls, never below 24px.
+   ========================================================================== */
+:root {
+  --fs-meta: .8125rem;   /* 13px: timestamps, counts, helper text */
+  --fs-ui: .9375rem;     /* 15px: buttons, labels, chips, inputs */
+  --fs-body: 1rem;       /* 16px: summaries and running text */
+  --fs-lede: 1.125rem;   /* 18px: introductions */
+  --action-background: #2668b5;   /* 5.6:1 with white text */
+  --action-hover: #1f5ea6;
+  --control-border: #66788d;      /* >= 3.3:1 on every surface */
+}
+:is(.map-layout, .landing-globe-interactive, .landing-story, .landing-depth, .journey-compare) { --control-border: #7f93aa; }
+body { font-size: var(--fs-body); text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+
+/* Primary actions: AA contrast, darker on hover rather than lighter. */
+:is(.ui-primary, .landing-actions a:first-child, .story-actions .reader-link, .reader-publisher-button, .source-filter-done, .settings-actions button, .saved-empty-state a, .load-more-sentinel button):hover {
+  background: var(--action-hover); border-color: var(--action-hover);
+}
+:is(.landing-story, .landing-depth) { --action-background: #2668b5; --action-foreground: #fff; }
+
+/* Control boundaries that identify an input or button must reach 3:1. */
+:is(.header-search, .country-search-field, .source-filter-search, .filter-select-trigger, .topic-chip, .quick-countries button,
+  .segmented-control button, .profile-button, .save-story-button, .reader-back, .reader-close, .period-option,
+  .ui-secondary, .landing-actions a:not(:first-child), .story-actions .article-link, .clear-button, .reader-stay-button, .settings-actions > a) {
+  border-color: var(--control-border);
+}
+
+/* Inputs fill their field so the whole box is clickable. */
+:is(.header-search, .country-search-field, .source-filter-search) { cursor: text; }
+:is(.header-search, .country-search-field, .source-filter-search) input { align-self: stretch; min-height: 44px; font-size: var(--fs-ui); }
+:is(.header-search, .country-search-field, .source-filter-search) input::placeholder { color: var(--muted); opacity: 1; }
+.header-search-submit { min-height: 40px; font-size: .875rem; }
+
+/* Interface text: 14-15px. */
+:is(.topic-chip, .segmented-control button, .profile-button, .quick-countries button strong, .filter-select-trigger strong,
+  .filter-select-menu button, .source-filter-options label, .selection-slot strong, .selection-title strong, .country-suggestions strong,
+  .reader-back, .reader-close, .reader-mode, .story-actions .reader-link, .story-actions .article-link, .article-link,
+  .coverage-details summary, .clear-button, .header-mode-links strong, .latest-link, .site-footer > a, .period-option strong) {
+  font-size: var(--fs-ui) !important;
+}
+:is(.map-status, .map-zoom-controls .map-reset, .source-filter-heading button, .search-history-heading button,
+  .settings-actions > span, .period-option small, .reader-facts strong, .reader-tags > span, .refresh-banner small,
+  .load-more-sentinel small, .notice-banner, .error-banner, .story-evidence-card > small, .story-evidence-card > b) {
+  font-size: .875rem !important;
+}
+
+/* Metadata floor: 13px, never smaller. */
+:is(small, time, .story-kicker, .story-kicker *, .story-rank, .country-tag, .country-tag span, .coverage-count, .coverage-sources,
+  .source-label, .source-label span, .coverage-details li > div > span, .coverage-details strong, .map-help,
+  .selection-slot small, .selection-count, .filter-select-trigger small, .source-filter-group h3, .source-filter-options label small,
+  .source-filter-options label em, .country-picker > label small, .country-picker-hint, .country-suggestions small, .country-suggestions p,
+  .result-meta small, .reader-excerpt-label, .reader-facts > span, .reader-facts span, .reader-source-meta time, .notice-banner span,
+  .landing-globe-status span, .landing-globe-interactive figcaption, .profile-count, .profile-dropdown > a span small, .profile-saved-story,
+  .search-history-heading strong, .profile-dropdown-heading, .story-image-fallback small, .reader-source-index) {
+  font-size: var(--fs-meta) !important; line-height: 1.45;
+}
+:is(.story-summary, .reader-choice-card > p:not(.reader-eyebrow), .map-guide-intro > p:last-child, .stories-heading > div > p:last-child) {
+  font-size: var(--fs-body) !important; line-height: 1.6;
+}
+.story-summary { color: color-mix(in srgb, var(--ink) 80%, var(--muted)); }
+.coverage-count, .country-tag span { color: var(--muted); }
+.source-label span { color: var(--ink); font-weight: 600; }
+
+/* Status indicator: hollow ring for the global view, amber marker once a
+   country is selected. The text always states the same thing. */
+:is(.pulse-dot, .map-status-dot) {
+  width: 10px; height: 10px; flex: 0 0 10px; border-radius: 50%;
+  background: transparent; border: 2px solid var(--muted); box-shadow: none;
+}
+:is(.pulse-dot, .map-status-dot).is-active { background: var(--marker); border-color: var(--marker); box-shadow: 0 0 0 4px color-mix(in srgb, var(--marker) 20%, transparent); }
+.selection-title { gap: 10px; }
+.selection-count {
+  display: inline-flex; align-items: center; min-height: 26px; padding: 2px 10px;
+  color: var(--ink) !important; background: var(--surface-subtle); border: 1px solid var(--line-strong); border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+.map-status { gap: 10px; min-height: 36px; padding: 8px 14px; color: var(--ink); background: rgba(9,28,47,.88); border-color: var(--line-strong); }
+
+/* Focus is always visible, including on the chart and inside cards. */
+:is(button, a, input, select, textarea, summary, [role="button"], [role="option"]):focus-visible {
+  outline: 3px solid var(--focus); outline-offset: 2px;
+}
+.map-country:focus-visible { outline: none; stroke: var(--marker); stroke-width: 2.4; }
+.filter-select-menu [data-active], .country-suggestions [data-active] { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+/* Header and footer */
+.landing-utility-header > p { font-size: var(--fs-ui); }
+.site-footer { padding-block: 32px; color: var(--muted); }
+.site-footer p { font-size: .875rem !important; line-height: 1.6; color: var(--muted); }
+.footer-brand { transform: none; }
+
+/* Pages are complete at rest: no content hidden until it is scrolled to. */
+[data-reveal] { opacity: 1 !important; transform: none !important; }
+
+/* ---------- Landing page ---------- */
+.landing-hero { min-height: auto; padding-block: clamp(56px, 8vw, 112px); gap: clamp(32px, 6vw, 96px); }
+.landing-page .landing-hero { min-height: auto; }
+.landing-hero::before { opacity: .6; }
+.landing-hero-copy h1 { font-size: clamp(3rem, 6.2vw, 6.25rem); line-height: 1.02; max-width: 15ch; text-wrap: balance; }
+.landing-hero-copy h1 em { display: block; }
+.landing-hero-copy > p:not(.eyebrow) { max-width: 52ch; margin-top: 24px; font-size: var(--fs-lede); line-height: 1.6; }
+.landing-actions { gap: 12px; margin-top: 32px; }
+.landing-actions a { min-height: 48px; padding: 0 20px; border-radius: var(--control-radius); font-size: var(--fs-ui); font-weight: 600; }
+.landing-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: 620px; margin: 40px 0 0; padding: 0; border-top: 1px solid var(--line); }
+.landing-facts > div { padding: 16px 16px 0 0; }
+.landing-facts > div + div { padding-left: 16px; border-left: 1px solid var(--line); }
+.landing-facts dt { color: var(--muted); font-size: var(--fs-meta); font-weight: 600; }
+.landing-facts dd { margin: 4px 0 0; color: var(--ink); font-size: var(--fs-ui); font-weight: 600; line-height: 1.4; }
+.landing-globe-interactive { width: min(42vw, 560px); }
+.landing-globe-status { padding: 12px 16px; background: rgba(9,28,47,.9); border-color: var(--line-strong); }
+.landing-globe-status strong { font-size: 1.0625rem; }
+.landing-globe-interactive figcaption { bottom: 4%; color: var(--muted); }
+
+.landing-story { background: var(--paper); border-block: 1px solid var(--line); }
+.landing-story-inner { width: min(1480px, calc(100% - 48px)); margin: 0 auto; padding-block: clamp(72px, 9vw, 128px); }
+.story-copy-intro { max-width: 720px; margin-bottom: 48px; }
+.story-copy-intro h2 { margin: 0; font-size: clamp(2.25rem, 4vw, 3.75rem); line-height: 1.08; text-wrap: balance; }
+.landing-story-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 520px); gap: clamp(32px, 6vw, 96px); align-items: start; }
+.story-steps { display: grid; margin: 0; padding: 0; list-style: none; }
+.story-steps > li { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 16px; padding: 28px 0; border-top: 1px solid var(--line); transition: opacity .3s ease; }
+.story-steps > li:last-child { border-bottom: 1px solid var(--line); }
+.story-steps > li:not(.active) { opacity: .62; }
+.story-step-number { color: var(--muted); font-family: var(--display); font-size: 1.5rem; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.story-steps > li.active .story-step-number { color: var(--signal); }
+.story-steps h3 { margin: 4px 0 0; font-size: clamp(1.5rem, 2.2vw, 2rem); line-height: 1.15; }
+.story-steps p:not(.eyebrow) { max-width: 58ch; margin: 12px 0 0; color: var(--muted); font-size: var(--fs-body); line-height: 1.65; }
+.story-steps .eyebrow { margin: 0; }
+.story-visual { position: sticky; top: 96px; display: grid; gap: 16px; justify-items: center; }
+.is-story-globe { position: relative; width: min(100%, 440px); }
+.is-story-globe .landing-globe-status, .is-story-globe figcaption { display: none; }
+.story-evidence-card { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; padding: 18px 20px; color: var(--ink); background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--panel-radius); }
+.story-evidence-card > span { grid-column: 1 / -1; color: var(--signal); }
+.story-evidence-card > strong { font-family: var(--display); font-size: 1.25rem; font-weight: 600; line-height: 1.25; }
+.story-evidence-card > small { grid-column: 1; color: var(--muted); }
+.story-evidence-card > b { grid-column: 2; grid-row: 2 / 4; align-self: center; color: var(--signal); text-align: right; font-weight: 600; }
+
+.landing-depth { width: min(1480px, calc(100% - 48px)); margin: 0 auto; padding-block: clamp(72px, 9vw, 128px); background: transparent; }
+.depth-copy { max-width: 720px; margin-bottom: 40px; }
+.depth-copy h2 { margin: 0; font-size: clamp(2.25rem, 4vw, 3.75rem); line-height: 1.08; }
+.depth-copy > p:last-child { max-width: 60ch; margin: 16px 0 0; color: var(--muted); font-size: var(--fs-lede); line-height: 1.6; }
+.depth-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.depth-card { display: grid; align-content: start; gap: 8px; padding: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--panel-radius); }
+.depth-card h3 { margin: 0; font-size: 1.5rem; }
+.depth-card > p { margin: 0 0 12px; color: var(--muted); font-size: var(--fs-body); line-height: 1.6; }
+.depth-story-preview .story-card { grid-column: auto; height: auto; }
+.depth-story-preview .story-image-wrap { min-height: 160px; }
+.depth-story-preview .story-body h3 { font-size: 1.375rem; }
+
+.landing-journeys { width: min(1480px, calc(100% - 48px)); margin: 0 auto; padding-block: 0 clamp(72px, 9vw, 128px); }
+.landing-journeys-heading { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 32px; margin-bottom: 32px; }
+.landing-journeys-heading .eyebrow { flex-basis: 100%; margin: 0; }
+.landing-journeys-heading h2 { margin: 0; font-size: clamp(2.25rem, 4vw, 3.75rem); line-height: 1.08; }
+.landing-journeys-heading > p:last-child { margin: 0; color: var(--muted); font-size: var(--fs-lede); }
+.journey-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.journey-card { position: relative; display: flex; flex-direction: column; gap: 12px; min-height: 0; padding: clamp(24px, 3vw, 40px); color: var(--ink); text-decoration: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--panel-radius); transition: border-color .15s ease, background .15s ease; }
+.journey-card.journey-compare { background: var(--surface); }
+.journey-card:hover { border-color: var(--signal); background: var(--surface-hover); }
+.journey-card > span { color: var(--signal); }
+.journey-card h3 { margin: 0; font-size: clamp(2rem, 3vw, 2.75rem); line-height: 1.05; }
+.journey-card p { max-width: 48ch; margin: 0; color: var(--muted); font-size: var(--fs-body); line-height: 1.6; }
+.journey-card strong { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--ink); font-size: var(--fs-ui); font-weight: 600; }
+
+.landing-closing { display: grid; justify-items: start; gap: 16px; width: min(1480px, calc(100% - 48px)); margin: 0 auto clamp(56px, 7vw, 96px); padding: clamp(32px, 5vw, 64px); background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--action-background); border-radius: var(--panel-radius); text-align: left; }
+.landing-closing h2 { margin: 0; font-size: clamp(2rem, 3.6vw, 3.25rem); line-height: 1.1; }
+.landing-closing > p { max-width: 56ch; margin: 0; color: var(--muted); font-size: var(--fs-lede); }
+.landing-closing .landing-actions { margin-top: 8px; }
+
+@media (max-width: 1060px) {
+  .landing-hero { grid-template-columns: 1fr; }
+  .landing-globe-interactive { width: min(80vw, 520px); }
+  .landing-story-layout { grid-template-columns: 1fr; }
+  .story-visual { position: relative; top: 0; order: -1; }
+  .is-story-globe { width: min(70vw, 360px); }
+  .depth-comparison, .journey-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .landing-story-inner, .landing-depth, .landing-journeys, .landing-closing, .landing-hero { width: calc(100% - 32px); }
+  .landing-hero-copy h1 { font-size: clamp(2.75rem, 12vw, 4rem); }
+  .landing-facts { grid-template-columns: 1fr; }
+  .landing-facts > div, .landing-facts > div + div { padding: 12px 0; border-left: 0; border-bottom: 1px solid var(--line); }
+  .story-steps > li { grid-template-columns: 40px minmax(0, 1fr); padding: 20px 0; }
+  .story-steps > li:not(.active) { opacity: 1; }
+  .depth-card { padding: 16px; }
+  .selection-toolbar { flex-wrap: wrap; }
+}
+
+/* Map overlays sit on a solid chart panel so they stay legible over land. */
+.map-zoom-controls { background: rgba(9,28,47,.92); border: 1px solid var(--line-strong); backdrop-filter: none; }
+.map-zoom-controls button { color: var(--ink); border-right-color: var(--line); }
+.map-zoom-controls button:disabled { color: var(--muted); opacity: .7; }
+.map-status { backdrop-filter: none; }
+/* The wordmark never shrinks below interface size. */
+.brand { font-size: max(.875rem, 1em) !important; }
+@media (max-width: 760px) { .brand { font-size: .875rem !important; } }

@@ -54,3 +54,33 @@ artwork use the same palette.
 - `npm run check`: lint, typecheck and 430 tests pass. `npm run build` and
   `npm run db:check` pass.
 - This is not a formal accessibility audit or assistive-technology test.
+
+## Accessibility audit, 28 October 2026 (WCAG 2.2 AA)
+
+Every route was measured in the browser at 1440px and 375px with a script that checks the rendered font size, text contrast and target size of each visible element.
+
+| Check | Before | After |
+| --- | --- | --- |
+| Text under 14px (landing) | 69 elements, smallest 9.3px | None under 13px |
+| Text under 14px (explorer) | 151 elements | None under 13px |
+| Primary button contrast | 3.39:1 (white on `#3d8fe0`) | 5.63:1 (white on `#2668b5`) |
+| Input/chip/select borders | 1.91:1 | 3.38:1 or better (`#66788d`) |
+| Search inputs | 21px-tall hit area inside a 48px box | Input fills the field (44px) |
+
+Rules now enforced in `interface.css`:
+
+- **Type scale:** set in rem, so browser text-size settings scale everything.
+  - `--fs-meta` (13px): metadata such as timestamps, counts and helper text.
+  - `--fs-ui` (15px): interface text such as buttons, labels, chips and inputs.
+  - `--fs-body` (16px): summaries and running text.
+  - `--fs-lede` (18px): introductions.
+- **Contrast:** text is at least 4.5:1; control boundaries and indicators are at least 3:1 (WCAG 1.4.3 and 1.4.11).
+- **Targets:** 44px for primary controls and never below 24px (WCAG 2.5.8). The 18px source checkboxes pass because their full 44px label row is the target.
+- **Selection indicator:** a hollow ring in the global view and a filled amber marker once a country is selected. The adjacent text ("1 of 2 selected") states the same thing, so color is never the only signal.
+- **Map overlays:** the status chip and zoom controls use a solid chart panel instead of a translucent blur.
+- **Landing page:** no scroll-jacking and no content hidden until it is scrolled to.
+  - The four-step story is a normal list beside a pinned globe.
+  - Perspective previews render at full size.
+  - Decorative background words were removed.
+
+Not covered: screen-reader testing with NVDA, VoiceOver or JAWS, and 200% zoom reflow on every route.
