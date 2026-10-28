@@ -297,8 +297,8 @@ export function LandingPage() {
         </section>
 
         <section className="landing-depth" aria-labelledby="depth-title">
-          <div className="depth-layer depth-layer-back" aria-hidden="true"><span>LOCAL REPORTING</span><span>INDEPENDENT SOURCES</span></div>
-          <div className="depth-layer depth-layer-mid" aria-hidden="true"><span>CONTEXT</span><span>CONNECTION</span></div>
+          <div className="depth-layer depth-layer-back" aria-hidden="true"><span>Local reporting</span><span>Independent sources</span></div>
+          <div className="depth-layer depth-layer-mid" aria-hidden="true"><span>Context</span><span>Connection</span></div>
           <div className="depth-copy" data-reveal>
             <p className="eyebrow">Perspective creates depth</p>
             <h2 id="depth-title">Move beyond the headline.</h2>
@@ -311,13 +311,13 @@ export function LandingPage() {
             <div className="depth-card-visual depth-story-preview depth-local-visual" aria-hidden="true" inert>
               <StoryCard story={LOCAL_PREVIEW_STORY} />
             </div>
-            <span>LOCAL PERSPECTIVE</span><strong>Understand what changes on the ground.</strong><small>Reporting from inside the country explains the direct human and policy impact.</small>
+            <span>Local perspective</span><strong>Understand what changes on the ground.</strong><small>Reporting from inside the country explains the direct human and policy impact.</small>
           </div>
           <div className="depth-card depth-card-global" data-reveal>
             <div className="depth-card-visual depth-story-preview depth-global-visual" aria-hidden="true" inert>
               <StoryCard story={GLOBAL_PREVIEW_STORY} />
             </div>
-            <span>GLOBAL PERSPECTIVE</span><strong>Compare how the same event travels.</strong><small>International coverage reveals different priorities, framing and consequences.</small>
+            <span>Global perspective</span><strong>Compare how the same event travels.</strong><small>International coverage reveals different priorities, framing and consequences.</small>
           </div>
         </section>
 
@@ -329,13 +329,13 @@ export function LandingPage() {
           </div>
           <div className="journey-grid">
             <Link href="/country#top" className="journey-card journey-country" data-reveal>
-              <span>01 · ONE COUNTRY</span>
+              <span>One country</span>
               <h3>Follow one place.</h3>
               <p>Choose a country and see reporting that involves it, wherever the story was published.</p>
               <strong>Open the country map <ArrowUpRightIcon /></strong>
             </Link>
             <Link href="/compare#top" className="journey-card journey-compare" data-reveal>
-              <span>02 · COMPARE TWO</span>
+              <span>Compare two</span>
               <h3>Find the shared story.</h3>
               <p>Select two countries and surface the reporting signals that connect them directly.</p>
               <strong>Build a comparison <CompareIcon /></strong>

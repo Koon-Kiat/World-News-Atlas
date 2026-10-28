@@ -124,13 +124,13 @@ function placeholderImageResponse(topicValue: string | null): Response {
   const label = `${topic[0]?.toUpperCase() ?? "W"}${topic.slice(1)} briefing`;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-label="${label}">
   <defs>
-    <radialGradient id="a" cx="0" cy="0" r="1" gradientTransform="translate(260 120) rotate(31) scale(520 410)"><stop stop-color="#f56f52" stop-opacity=".55"/><stop offset="1" stop-color="#f56f52" stop-opacity="0"/></radialGradient>
-    <radialGradient id="b" cx="0" cy="0" r="1" gradientTransform="translate(990 600) rotate(-142) scale(560 430)"><stop stop-color="#9fd1c6" stop-opacity=".34"/><stop offset="1" stop-color="#9fd1c6" stop-opacity="0"/></radialGradient>
-    <pattern id="grid" width="52" height="52" patternUnits="userSpaceOnUse"><path d="M52 0H0v52" fill="none" stroke="#d9e7e2" stroke-opacity=".07"/></pattern>
+    <radialGradient id="a" cx="0" cy="0" r="1" gradientTransform="translate(260 120) rotate(31) scale(520 410)"><stop stop-color="#e9a23b" stop-opacity=".28"/><stop offset="1" stop-color="#e9a23b" stop-opacity="0"/></radialGradient>
+    <radialGradient id="b" cx="0" cy="0" r="1" gradientTransform="translate(990 600) rotate(-142) scale(560 430)"><stop stop-color="#8fc1ef" stop-opacity=".34"/><stop offset="1" stop-color="#8fc1ef" stop-opacity="0"/></radialGradient>
+    <pattern id="grid" width="52" height="52" patternUnits="userSpaceOnUse"><path d="M52 0H0v52" fill="none" stroke="#eaf0f6" stroke-opacity=".06"/></pattern>
   </defs>
-  <rect width="1200" height="675" fill="#0c3036"/><rect width="1200" height="675" fill="url(#a)"/><rect width="1200" height="675" fill="url(#b)"/><rect width="1200" height="675" fill="url(#grid)"/>
-  <g transform="translate(600 272)" fill="none" stroke="#d9e7e2" stroke-width="5" stroke-opacity=".8"><circle r="112"/><ellipse rx="52" ry="112"/><path d="M-108-35h216M-108 35h216M-112 0h224"/></g>
-  <circle cx="690" cy="192" r="18" fill="#f56f52"/><text x="600" y="470" text-anchor="middle" fill="#f7f1e8" font-family="Arial,sans-serif" font-size="54">${label}</text><text x="600" y="520" text-anchor="middle" fill="#b8ccc7" font-family="Arial,sans-serif" font-size="18" font-weight="700" letter-spacing="5">WORLD NEWS ATLAS</text>
+  <rect width="1200" height="675" fill="#0e2a47"/><rect width="1200" height="675" fill="url(#a)"/><rect width="1200" height="675" fill="url(#b)"/><rect width="1200" height="675" fill="url(#grid)"/>
+  <g transform="translate(600 272)" fill="none" stroke="#eaf0f6" stroke-width="4" stroke-opacity=".7"><circle r="112"/><ellipse rx="52" ry="112"/><path d="M-108-35h216M-108 35h216M-112 0h224"/></g>
+  <circle cx="690" cy="192" r="18" fill="#e9a23b"/><text x="600" y="470" text-anchor="middle" fill="#eaf0f6" font-family="Georgia,serif" font-size="54">${label}</text><text x="600" y="520" text-anchor="middle" fill="#a3b3c5" font-family="Arial,sans-serif" font-size="18" font-weight="700" letter-spacing="5">WORLD NEWS ATLAS</text>
 </svg>`;
   return new Response(svg, {
     headers: {
