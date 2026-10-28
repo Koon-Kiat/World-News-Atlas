@@ -181,29 +181,29 @@ export function LandingGlobe({ compact = false, activeStep }: { compact?: boolea
         .rotate(rotationRef.current);
       const path = geoPath(projection, context);
       const ocean = context.createRadialGradient(size * 0.36, size * 0.3, size * 0.03, size / 2, size / 2, size * 0.48);
-      ocean.addColorStop(0, "#242427");
-      ocean.addColorStop(0.58, "#111114");
-      ocean.addColorStop(1, "#030304");
+      ocean.addColorStop(0, "#1d4a75");
+      ocean.addColorStop(0.58, "#123659");
+      ocean.addColorStop(1, "#0a2039");
 
       context.beginPath();
       context.arc(size / 2, size / 2, size * 0.435, 0, Math.PI * 2);
       context.fillStyle = ocean;
       context.fill();
-      context.strokeStyle = "rgba(245,245,247,.26)";
+      context.strokeStyle = "rgba(234,240,246,.3)";
       context.lineWidth = 1.2;
       context.stroke();
 
       context.beginPath();
       path(geoGraticule10());
-      context.strokeStyle = "rgba(245,245,247,.1)";
+      context.strokeStyle = "rgba(234,240,246,.12)";
       context.lineWidth = 0.75;
       context.stroke();
 
       context.beginPath();
       path(world);
-      context.fillStyle = "rgba(205,205,211,.74)";
+      context.fillStyle = "rgba(214,225,236,.86)";
       context.fill();
-      context.strokeStyle = "rgba(0,0,0,.78)";
+      context.strokeStyle = "rgba(14,42,71,.9)";
       context.lineWidth = 0.7;
       context.stroke();
 

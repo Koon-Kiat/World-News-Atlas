@@ -191,7 +191,7 @@ export function WorldMap({
   return (
     <div className="map-shell">
       <div className="map-status" aria-live="polite">
-        <span className="map-status-dot" />
+        <span className={selectedCountries.length ? "map-status-dot is-active" : "map-status-dot"} aria-hidden="true" />
         {hoveredCountry
           ? hoveredCountry.name
           : selectedCountries.length === 0
@@ -218,11 +218,11 @@ export function WorldMap({
       >
         <defs>
           <radialGradient id="ocean-glow" cx="48%" cy="43%" r="66%">
-            <stop offset="0%" stopColor="#111113" />
-            <stop offset="100%" stopColor="#000000" />
+            <stop offset="0%" stopColor="#123659" />
+            <stop offset="100%" stopColor="#0a2039" />
           </radialGradient>
           <pattern id="map-grid" width="34" height="34" patternUnits="userSpaceOnUse">
-            <path d="M 34 0 L 0 0 0 34" fill="none" stroke="#ffffff" strokeOpacity="0.035" strokeWidth="1" />
+            <path d="M 34 0 L 0 0 0 34" fill="none" stroke="#eaf0f6" strokeOpacity="0.06" strokeWidth="1" />
           </pattern>
         </defs>
         <rect width={WIDTH} height={HEIGHT} rx="26" fill="url(#ocean-glow)" />

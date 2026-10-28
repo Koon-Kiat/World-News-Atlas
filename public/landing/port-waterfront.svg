@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" role="img" aria-label="Container port waterfront at dusk with gantry cranes and stacked containers">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0a2039"/>
+      <stop offset=".62" stop-color="#1d4a75"/>
+      <stop offset="1" stop-color="#3d6a92"/>
+    </linearGradient>
+    <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16395e"/>
+      <stop offset="1" stop-color="#091c2f"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="78%" cy="58%" r="38%">
+      <stop offset="0" stop-color="#eaa94a" stop-opacity=".45"/>
+      <stop offset="1" stop-color="#eaa94a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Sky and low sun -->
+  <rect width="1200" height="675" fill="url(#sky)"/>
+  <rect width="1200" height="430" fill="url(#glow)"/>
+  <circle cx="930" cy="392" r="34" fill="#f0bb6a" opacity=".85"/>
+
+  <!-- Distant city skyline -->
+  <path fill="#163a60" d="M0 412V372h38v-22h26v34h30v-58h22v58h36v-30h40v-46h18v-24h20v70h44v-38h34v52h26v-80h30v80h40v-28h46v46h52v-36h20v-30h30v66h40v-52h28v52h46v-24h36v40h44v-62h20v62h34v-34h40v48h38v-30h44v40h48v-50h26v50h40v-20h44v32h36v-46h40v46h38v-26h40v54z"/>
+
+  <!-- Water with reflected light -->
+  <rect y="412" width="1200" height="263" fill="url(#water)"/>
+  <g stroke="#f0bb6a" stroke-linecap="round" opacity=".55">
+    <path d="M880 432h104M864 452h132M890 474h86M872 498h120M900 524h66" stroke-width="4"/>
+  </g>
+  <g stroke="#eaf0f6" stroke-opacity=".08" stroke-width="2">
+    <path d="M40 470h220M330 500h260M120 560h300M640 590h220M40 630h180M520 640h260"/>
+  </g>
+
+  <!-- Quay -->
+  <rect x="0" y="404" width="760" height="22" fill="#0b2238"/>
+  <rect x="0" y="426" width="760" height="10" fill="#07182a"/>
+
+  <!-- Container stacks -->
+  <g stroke="#0b2238" stroke-width="3">
+    <g fill="#2a4f78">
+      <rect x="40" y="350" width="96" height="27"/><rect x="40" y="377" width="96" height="27"/>
+      <rect x="136" y="377" width="96" height="27"/><rect x="420" y="377" width="96" height="27"/>
+      <rect x="516" y="350" width="96" height="27"/><rect x="612" y="377" width="96" height="27"/>
+    </g>
+    <g fill="#3f6b96">
+      <rect x="136" y="350" width="96" height="27"/><rect x="232" y="377" width="96" height="27"/>
+      <rect x="420" y="350" width="96" height="27"/><rect x="516" y="377" width="96" height="27"/>
+      <rect x="88" y="323" width="96" height="27"/>
+    </g>
+    <g fill="#eaa94a">
+      <rect x="232" y="350" width="96" height="27"/><rect x="468" y="323" width="96" height="27"/>
+    </g>
+    <g fill="#a3b3c5">
+      <rect x="328" y="377" width="92" height="27"/><rect x="612" y="350" width="96" height="27"/>
+    </g>
+  </g>
+  <g stroke="#0b2238" stroke-opacity=".5" stroke-width="2">
+    <path d="M64 350v54M88 350v54M112 350v54M160 350v54M184 350v54M208 350v54M256 350v54M280 350v54M304 350v54M444 350v54M468 350v54M492 350v54M540 350v54M564 350v54M588 350v54M636 350v54M660 350v54M684 350v54"/>
+  </g>
+
+  <!-- Gantry cranes -->
+  <g fill="none" stroke="#c3d0dd" stroke-width="7" stroke-linejoin="round">
+    <path d="M300 404V210M372 404V210M290 210h300M300 262h72M300 262l72 -52M372 262L300 210"/>
+    <path d="M590 210v18M510 210v56"/>
+    <path d="M660 404V170M732 404V170M650 170h330M660 222h72M660 222l72 -52M732 222L660 170"/>
+    <path d="M980 170v18M890 170v60"/>
+  </g>
+  <g stroke="#c3d0dd" stroke-width="3">
+    <path d="M510 266v46M890 230v52"/>
+  </g>
+  <rect x="490" y="312" width="40" height="18" fill="#eaa94a" stroke="#0b2238" stroke-width="3"/>
+  <rect x="870" y="282" width="40" height="18" fill="#a3b3c5" stroke="#0b2238" stroke-width="3"/>
+  <circle cx="336" cy="204" r="5" fill="#f0716a"/>
+  <circle cx="696" cy="164" r="5" fill="#f0716a"/>
+
+  <!-- Ship alongside -->
+  <path d="M770 404h400l-34 54H806z" fill="#0b2238"/>
+  <path d="M770 404h400" stroke="#eaa94a" stroke-width="4"/>
+  <g stroke="#0b2238" stroke-width="3">
+    <rect x="820" y="350" width="80" height="27" fill="#3f6b96"/><rect x="900" y="350" width="80" height="27" fill="#2a4f78"/>
+    <rect x="820" y="377" width="80" height="27" fill="#2a4f78"/><rect x="900" y="377" width="80" height="27" fill="#a3b3c5"/>
+    <rect x="980" y="377" width="80" height="27" fill="#3f6b96"/>
+  </g>
+  <rect x="1080" y="330" width="58" height="74" fill="#163a60" stroke="#0b2238" stroke-width="3"/>
+  <path d="M1090 346h38M1090 362h38" stroke="#f0bb6a" stroke-width="4"/>
+</svg>
