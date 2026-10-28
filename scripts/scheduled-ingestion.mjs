@@ -14,9 +14,11 @@ export const ARCHIVE_SCHEDULE = "17 2,14 * * *";
 export const MAX_ATTEMPTS = 3;
 export const CONNECT_TIMEOUT_MS = 10_000;
 export const REQUEST_TIMEOUT_MS = 165_000;
-export const MAX_SCOPE_DURATION_MS = 300_000;
-export const MAX_JOB_DURATION_MS = 15 * 60_000;
-export const MAX_STATUS_POLLS = 12;
+// A pass may start requests for six minutes: long enough for an orphaned
+// attempt's 180s server lease to expire and a retried 150s operation to finish.
+export const MAX_SCOPE_DURATION_MS = 360_000;
+export const MAX_JOB_DURATION_MS = 20 * 60_000;
+export const MAX_STATUS_POLLS = 30;
 const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 export function scheduledIngestionMode({ eventName, schedule, period } = {}) {
@@ -68,7 +70,7 @@ export function validSummary(value) {
 }
 
 export async function runScheduledIngestion({ url, secret, bypassToken = "", period = "24h", runKey = randomUUID(),
-  send = sendIngestionRequest, wait = sleep, random = Math.random, now = Date.now }) {
+  send = sendIngestionRequest, wait = sleep, random = Math.random, now = Date.now, log = () => {} }) {
   const endpoint = new URL(url);
   if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password || secret.length < 32 ||
     !["latest", "24h", "7d", "30d"].includes(period)) throw new Error("Invalid ingestion configuration");
@@ -84,7 +86,10 @@ export async function runScheduledIngestion({ url, secret, bypassToken = "", per
       category: "unknown", status: 0, summary: null, durationMs: 0, retryAfterMs: 0 };
     let failures = 0;
     let polls = 0;
-    const deadline = Math.min(startedAt + MAX_SCOPE_DURATION_MS, jobDeadline);
+    // Any request can claim the lock and start a full server operation, so only
+    // start one that can be awaited for the whole request timeout. Abandoning a
+    // started operation keeps the lock held and makes the next pass see BUSY.
+    const deadline = Math.min(startedAt + MAX_SCOPE_DURATION_MS, jobDeadline - REQUEST_TIMEOUT_MS);
     for (let attempt = 1; failures < MAX_ATTEMPTS && polls < MAX_STATUS_POLLS; attempt++) {
       if (now() >= deadline) { result.category = "operation_timeout"; break; }
       result.attempts = attempt;
@@ -97,7 +102,7 @@ export async function runScheduledIngestion({ url, secret, bypassToken = "", per
       let retry = false;
       let retryAfterMs = 0;
       try {
-        const response = await send(url, headers, body, Math.min(REQUEST_TIMEOUT_MS, deadline - now()));
+        const response = await send(url, headers, body, REQUEST_TIMEOUT_MS);
         result.status = response.status;
         const json = response.json;
         if (json?.requestId === requestId && validSummary(json?.summary)) result.summary = json.summary;
@@ -132,6 +137,8 @@ export async function runScheduledIngestion({ url, secret, bypassToken = "", per
         failures++;
         retry = true;
       }
+      log(`[${name}] request ${attempt} at +${((now() - startedAt) / 1000).toFixed(1)}s: ${result.category}` +
+        `${result.status ? ` (HTTP ${result.status})` : ""}`);
       if (!retry || failures >= MAX_ATTEMPTS || polls >= MAX_STATUS_POLLS) break;
       // A running operation is not another failed transport attempt. Poll it
       // within a separate wall-clock budget, long enough for its 150s lease work.
@@ -171,7 +178,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     process.exitCode = await ingestionExitCode({ url: process.env.NEWS_INGEST_URL, secret: process.env.NEWS_INGEST_HMAC_SECRET ?? "",
       bypassToken: process.env.OAI_SITES_BYPASS_TOKEN, ...scheduledIngestionMode({ eventName: process.env.GITHUB_EVENT_NAME,
         schedule: process.env.INGESTION_SCHEDULE, period: process.env.PERIOD }),
-      runKey: process.env.GITHUB_RUN_ID ?? randomUUID() }, async (report) => {
+      runKey: process.env.GITHUB_RUN_ID ?? randomUUID(), log: (line) => console.info(line) }, async (report) => {
       if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, report);
       console.info(report);
     });

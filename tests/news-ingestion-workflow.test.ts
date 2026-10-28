@@ -25,7 +25,7 @@ describe("scheduled ingestion", () => {
     expect(workflow).toContain("workflow_dispatch:");
     expect(workflow).toContain("group: production-news-ingestion");
     expect(workflow).toContain("cancel-in-progress: false");
-    expect(workflow).toContain("timeout-minutes: 18");
+    expect(workflow).toContain("timeout-minutes: 25");
     expect(workflow).toContain("node scripts/scheduled-ingestion.mjs");
     const script = readFileSync("scripts/scheduled-ingestion.mjs", "utf8");
     expect(script).toContain("process.exitCode = await ingestionExitCode");
@@ -108,7 +108,7 @@ describe("scheduled ingestion", () => {
     const result = await runScheduledIngestion({ url: "https://example.test/ingest", secret, now: () => time, send, wait });
     expect(result.success).toBe(true); expect(send).toHaveBeenCalledTimes(3); expect(wait).not.toHaveBeenCalled();
   });
-  it("clamps a retry to the remaining five-minute scope budget", async () => {
+  it("never starts a truncated request and stops retrying after the six-minute scope window", async () => {
     let time = 0;
     const timeouts: number[] = [];
     const timestamps: string[] = [];
@@ -120,11 +120,35 @@ describe("scheduled ingestion", () => {
         time += timeout;
         throw new Error("timeout");
       } });
-    expect(timeouts).toHaveLength(2);
-    expect(timeouts[0]).toBe(165_000); expect(timeouts[1]).toBeLessThan(135_000);
+    expect(timeouts).toEqual([165_000, 165_000, 165_000]);
     expect(timestamps[0]).not.toBe(timestamps[1]);
-    expect(result.results[0].durationMs).toBe(300_000);
+    expect(result.results[0].durationMs).toBeLessThanOrEqual(360_000 + 165_000);
     expect(result.results[0].success).toBe(false); expect(result.results[2].success).toBe(true);
+  });
+  it("waits out an orphaned server lease without abandoning a newly started operation", async () => {
+    // Reproduces Actions run 40657846707: the first global attempt died without
+    // releasing the 180s lease, so every poll saw RUNNING/BUSY until it expired.
+    let time = 0;
+    let lock = { id: "", until: 0 };
+    const done = new Set<string>();
+    const timeouts: number[] = [];
+    const result = await runScheduledIngestion({ url: "https://example.test/ingest", secret, now: () => time, random: () => 0,
+      wait: async (ms: number) => { time += ms; },
+      send: async (_url: string, _headers: Record<string, string>, body: string, timeout = REQUEST_TIMEOUT_MS) => {
+        const { requestId } = JSON.parse(body);
+        timeouts.push(timeout);
+        if (done.has(requestId)) return success(body);
+        if (lock.until > time) {
+          return { status: 202, retryAfter: "15", json: { requestId, state: lock.id === requestId ? "RUNNING" : "BUSY" } };
+        }
+        if (time === 0) { lock = { id: requestId, until: 200_000 }; time += 20_000; return { status: 503, retryAfter: undefined, json: null }; }
+        lock = { id: requestId, until: time + 60_000 };
+        if (timeout < 60_000) { time += timeout; done.add(requestId); throw new Error("timeout"); }
+        time += 60_000; done.add(requestId); lock.until = 0;
+        return success(body);
+      } });
+    expect(result.results.map((r: { category: string }) => r.category)).toEqual(["success", "success", "success"]);
+    expect(timeouts.every((timeout) => timeout === REQUEST_TIMEOUT_MS)).toBe(true);
   });
   it("returns a failing CLI exit code after retaining and reporting later successful scopes", async () => {
     const report = vi.fn(async () => {});
