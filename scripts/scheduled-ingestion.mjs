@@ -69,7 +69,7 @@ export function validSummary(value) {
       Number.isSafeInteger(value[field]) && value[field] >= 0);
 }
 
-export async function runScheduledIngestion({ url, secret, bypassToken = "", period = "24h", runKey = randomUUID(),
+export async function runScheduledIngestion({ url, secret, bypassToken = "", accessClientId = "", accessClientSecret = "", period = "24h", runKey = randomUUID(),
   send = sendIngestionRequest, wait = sleep, random = Math.random, now = Date.now, log = () => {} }) {
   const endpoint = new URL(url);
   if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password || secret.length < 32 ||
@@ -98,7 +98,10 @@ export async function runScheduledIngestion({ url, secret, bypassToken = "", per
       const signature = createHmac("sha256", secret).update(`${timestamp}.${nonce}.${body}`).digest("hex");
       const headers = { "Content-Type": "application/json", "Content-Length": String(Buffer.byteLength(body)),
         "X-Ingest-Timestamp": timestamp, "X-Ingest-Nonce": nonce, "X-Ingest-Signature": signature,
-        ...(bypassToken ? { "OAI-Sites-Authorization": `Bearer ${bypassToken}` } : {}) };
+        ...(bypassToken ? { "OAI-Sites-Authorization": `Bearer ${bypassToken}` } : {}),
+        // A Cloudflare Access service token lets the scheduler past the login on a self-hosted Worker.
+        ...(accessClientId && accessClientSecret
+          ? { "CF-Access-Client-Id": accessClientId, "CF-Access-Client-Secret": accessClientSecret } : {}) };
       let retry = false;
       let retryAfterMs = 0;
       try {
@@ -176,7 +179,8 @@ export async function ingestionExitCode(options, report) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     process.exitCode = await ingestionExitCode({ url: process.env.NEWS_INGEST_URL, secret: process.env.NEWS_INGEST_HMAC_SECRET ?? "",
-      bypassToken: process.env.OAI_SITES_BYPASS_TOKEN, ...scheduledIngestionMode({ eventName: process.env.GITHUB_EVENT_NAME,
+      bypassToken: process.env.OAI_SITES_BYPASS_TOKEN, accessClientId: process.env.CF_ACCESS_CLIENT_ID,
+      accessClientSecret: process.env.CF_ACCESS_CLIENT_SECRET, ...scheduledIngestionMode({ eventName: process.env.GITHUB_EVENT_NAME,
         schedule: process.env.INGESTION_SCHEDULE, period: process.env.PERIOD }),
       runKey: process.env.GITHUB_RUN_ID ?? randomUUID(), log: (line) => console.info(line) }, async (report) => {
       if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, report);

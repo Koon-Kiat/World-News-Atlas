@@ -30,6 +30,17 @@ describe("scheduled ingestion", () => {
     const script = readFileSync("scripts/scheduled-ingestion.mjs", "utf8");
     expect(script).toContain("process.exitCode = await ingestionExitCode");
   });
+  it("sends Cloudflare Access service token headers only when both parts are configured", async () => {
+    const seen: Array<Record<string, string>> = [];
+    const send = async (_url: string, headers: Record<string, string>, body: string) => { seen.push(headers); return success(body); };
+    await runScheduledIngestion({ url: "https://example.test/ingest", secret, send, wait: async () => {},
+      accessClientId: "client.access", accessClientSecret: "access-secret" });
+    expect(seen[0]["CF-Access-Client-Id"]).toBe("client.access");
+    expect(seen[0]["CF-Access-Client-Secret"]).toBe("access-secret");
+    seen.length = 0;
+    await runScheduledIngestion({ url: "https://example.test/ingest", secret, send, wait: async () => {}, accessClientId: "client.access" });
+    expect(seen[0]).not.toHaveProperty("CF-Access-Client-Id");
+  });
   it("retries a lost response with fresh authentication but the same signed logical operation", async () => {
     const requests: Array<{ headers: Record<string, string>; body: string }> = [];
     const send = vi.fn(async (_url: string, headers: Record<string, string>, body: string) => {

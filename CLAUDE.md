@@ -1,6 +1,6 @@
 # World News Atlas (Worldline)
 
-A news explorer built on a world map: global coverage, one country, or the stories connecting two countries. It runs on **vinext** (the Vite reimplementation of the Next.js App Router) and is hosted on **OpenAI Sites** (Cloudflare Workers plus a D1 database bound as `DB`). The README has product behaviour and architecture. `docs/` has deployment and ingestion details.
+A news explorer built on a world map: global coverage, one country, or the stories connecting two countries. It runs on **vinext** (the Vite reimplementation of the Next.js App Router) and is hosted on **OpenAI Sites** (Cloudflare Workers plus a D1 database bound as `DB`). A second, private copy runs on the owner's own Cloudflare account behind Cloudflare Access (`docs/cloudflare-deployment.md`). The README has product behaviour and architecture. `docs/` has deployment and ingestion details.
 
 ## Commands
 
@@ -48,8 +48,8 @@ The site is dark-only (`public/theme.js` forces `data-theme="dark"`). There is n
 - GitHub Actions (`news-ingestion.yml`) sends HMAC-signed requests to `/api/internal/ingest/run`: `24h` every 30 minutes and `30d` archive at 02:17/14:17 UTC. A single D1 lock (`ingestion_operation_lock`) serialises operations with a 180s renewable lease and a 150s server budget.
 - The scheduler must never start a request it cannot wait for in full (165s). An abandoned operation keeps the lock, and the next pass then sees `BUSY`. Keep the per-pass window longer than lease + operation time.
 - Outcome classification lives in `src/lib/news/ingestion-outcome.ts`: DEGRADED (transient provider failures with useful stored work) is a success; terminal codes fail the run.
-- Merging to `main` does **not** deploy the Site. Follow `docs/production-deployment.md`: migrate D1, verify, publish the Site, then enable ingestion changes that need new server code.
-- Secrets (`NEWS_INGEST_HMAC_SECRET`, `NEWSAPI_KEY`, `OAI_SITES_BYPASS_TOKEN`) live in Sites/GitHub. Never commit `.env.local`.
+- Merging to `main` deploys the self-hosted Worker (`deploy-cloudflare.yml`, after CI passes; build with `NEWS_DEPLOY_TARGET=cloudflare`). It does **not** deploy the Sites copy. Follow `docs/production-deployment.md`: migrate D1, verify, publish the Site, then enable ingestion changes that need new server code.
+- Secrets (`NEWS_INGEST_HMAC_SECRET`, `NEWSAPI_KEY`, `OAI_SITES_BYPASS_TOKEN`, `CLOUDFLARE_API_TOKEN`, `CF_ACCESS_CLIENT_ID`/`CF_ACCESS_CLIENT_SECRET`) live in Sites, the Worker and GitHub. Never commit `.env.local`.
 
 ## Commits
 

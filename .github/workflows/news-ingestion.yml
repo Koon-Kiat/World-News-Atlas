@@ -28,6 +28,8 @@ jobs:
       NEWS_INGEST_URL: ${{ secrets.NEWS_INGEST_URL }}
       NEWS_INGEST_HMAC_SECRET: ${{ secrets.NEWS_INGEST_HMAC_SECRET }}
       OAI_SITES_BYPASS_TOKEN: ${{ secrets.OAI_SITES_BYPASS_TOKEN }}
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
       PERIOD: ${{ inputs.period || '24h' }}
       INGESTION_SCHEDULE: ${{ github.event.schedule }}
     steps:
